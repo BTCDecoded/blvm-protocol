@@ -17,9 +17,16 @@
 use consensus_proof::{ConsensusProof, Result, ValidationResult, Block, Transaction};
 use serde::{Deserialize, Serialize};
 
+// Re-export feature and economic modules for convenience
+pub use features::{FeatureActivation, FeatureRegistry, ActivationMethod, FeatureContext};
+pub use economic::EconomicParameters;
+
 pub mod variants;
 pub mod validation;
 pub mod network_params;
+pub mod genesis;
+pub mod features;
+pub mod economic;
 
 /// Bitcoin Protocol Engine
 /// 
@@ -109,6 +116,29 @@ impl BitcoinProtocolEngine {
             }
         }
     }
+    
+    /// Check if a feature is active at a specific block height and timestamp
+    pub fn is_feature_active(&self, feature: &str, height: u64, timestamp: u64) -> bool {
+        let registry = features::FeatureRegistry::for_protocol(self.protocol_version);
+        registry.is_feature_active(feature, height, timestamp)
+    }
+    
+    /// Get economic parameters for this protocol
+    pub fn get_economic_parameters(&self) -> economic::EconomicParameters {
+        economic::EconomicParameters::for_protocol(self.protocol_version)
+    }
+    
+    /// Get feature activation registry for this protocol
+    pub fn get_feature_registry(&self) -> features::FeatureRegistry {
+        features::FeatureRegistry::for_protocol(self.protocol_version)
+    }
+    
+    /// Create a feature context for a specific block height and timestamp
+    /// This consolidates all feature activation checks into a single context
+    pub fn feature_context(&self, height: u64, timestamp: u64) -> features::FeatureContext {
+        let registry = features::FeatureRegistry::for_protocol(self.protocol_version);
+        registry.create_context(height, timestamp)
+    }
 }
 
 impl NetworkParameters {
@@ -121,32 +151,12 @@ impl NetworkParameters {
         }
     }
     
-    /// Create a placeholder block for testing
-    fn create_placeholder_block() -> Block {
-        // TODO: Create proper genesis blocks
-        // For now, return a minimal block structure
-        use consensus_proof::types::*;
-        Block {
-            header: BlockHeader {
-                version: 1,
-                prev_block_hash: [0u8; 32],
-                merkle_root: [0u8; 32],
-                timestamp: 1231006505,
-                bits: 0x1d00ffff,
-                nonce: 0,
-            },
-            transactions: vec![],
-        }
-    }
-    
     /// Bitcoin mainnet parameters
     pub fn mainnet() -> Result<Self> {
-        // TODO: Implement actual mainnet genesis block and parameters
-        // For now, return placeholder values
         Ok(NetworkParameters {
             magic_bytes: [0xf9, 0xbe, 0xb4, 0xd9], // Bitcoin mainnet magic
             default_port: 8333,
-            genesis_block: Self::create_placeholder_block(), // TODO: Real genesis block
+            genesis_block: genesis::mainnet_genesis(),
             max_target: 0x1d00ffff,
             halving_interval: 210000,
             network_name: "mainnet".to_string(),
@@ -159,7 +169,7 @@ impl NetworkParameters {
         Ok(NetworkParameters {
             magic_bytes: [0x0b, 0x11, 0x09, 0x07], // Bitcoin testnet magic
             default_port: 18333,
-            genesis_block: Self::create_placeholder_block(), // TODO: Real testnet genesis block
+            genesis_block: genesis::testnet_genesis(),
             max_target: 0x1d00ffff,
             halving_interval: 210000,
             network_name: "testnet".to_string(),
@@ -172,7 +182,7 @@ impl NetworkParameters {
         Ok(NetworkParameters {
             magic_bytes: [0xfa, 0xbf, 0xb5, 0xda], // Bitcoin regtest magic
             default_port: 18444,
-            genesis_block: Self::create_placeholder_block(), // TODO: Real regtest genesis block
+            genesis_block: genesis::regtest_genesis(),
             max_target: 0x207fffff, // Easier difficulty for testing
             halving_interval: 150, // Faster halving for testing
             network_name: "regtest".to_string(),
@@ -426,5 +436,48 @@ mod tests {
         assert_eq!(ProtocolVersion::BitcoinV1, ProtocolVersion::BitcoinV1);
         assert_ne!(ProtocolVersion::BitcoinV1, ProtocolVersion::Testnet3);
         assert_ne!(ProtocolVersion::Testnet3, ProtocolVersion::Regtest);
+    }
+    
+    #[test]
+    fn test_feature_activation_by_height() {
+        let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
+        
+        // SegWit activates at block 481,824
+        assert!(!engine.is_feature_active("segwit", 481_823, 1503539000));
+        assert!(engine.is_feature_active("segwit", 481_824, 1503539857));
+        assert!(engine.is_feature_active("segwit", 500_000, 1504000000));
+        
+        // Taproot activates at block 709,632
+        assert!(!engine.is_feature_active("taproot", 709_631, 1636934000));
+        assert!(engine.is_feature_active("taproot", 709_632, 1636934400));
+        assert!(engine.is_feature_active("taproot", 800_000, 1640000000));
+    }
+    
+    #[test]
+    fn test_economic_parameters_access() {
+        let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
+        let params = engine.get_economic_parameters();
+        
+        assert_eq!(params.initial_subsidy, 50_0000_0000);
+        assert_eq!(params.halving_interval, 210_000);
+        assert_eq!(params.coinbase_maturity, 100);
+        
+        // Test block subsidy calculation
+        assert_eq!(params.get_block_subsidy(0), 50_0000_0000);
+        assert_eq!(params.get_block_subsidy(210_000), 25_0000_0000);
+    }
+    
+    #[test]
+    fn test_feature_registry_access() {
+        let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
+        let registry = engine.get_feature_registry();
+        
+        assert!(registry.get_feature("segwit").is_some());
+        assert!(registry.get_feature("taproot").is_some());
+        assert!(registry.get_feature("nonexistent").is_none());
+        
+        let features = registry.list_features();
+        assert!(features.contains(&"segwit".to_string()));
+        assert!(features.contains(&"taproot".to_string()));
     }
 }

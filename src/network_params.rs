@@ -164,7 +164,7 @@ impl NetworkParameters {
         Ok(NetworkParameters {
             magic_bytes: constants.magic_bytes,
             default_port: constants.default_port,
-            genesis_block: NetworkParameters::create_placeholder_block(), // TODO: Create actual genesis block
+            genesis_block: crate::genesis::mainnet_genesis(),
             max_target: constants.max_target,
             halving_interval: constants.halving_interval,
             network_name: constants.network_name.clone(),

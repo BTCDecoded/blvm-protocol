@@ -2,8 +2,8 @@
 name = "protocol-engine"
 version = "0.1.0"
 edition = "2021"
-authors = ["BTCDecoded Team"]
-description = "Bitcoin protocol abstraction layer for multiple variants and evolution"
+authors = ["Bitcoin Commons Team"]
+description = "Bitcoin Commons BLLVM: Bitcoin protocol abstraction layer for multiple variants and evolution"
 license = "MIT"
 repository = "https://github.com/BTCDecoded/protocol-engine"
 homepage = "https://btcdecoded.org"
