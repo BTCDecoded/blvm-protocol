@@ -10,7 +10,7 @@ This crate provides a Bitcoin protocol abstraction layer that enables:
 
 ## Architecture Position
 
-This is **Tier 3** of the 5-tier BTCDecoded architecture:
+This is **Tier 3** of the 5-tier Bitcoin Commons architecture (BLLVM technology stack):
 
 ```
 1. Orange Paper (mathematical foundation)
