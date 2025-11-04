@@ -10,7 +10,7 @@ homepage = "https://btcdecoded.org"
 documentation = "https://docs.rs/protocol-engine"
 keywords = ["bitcoin", "protocol", "blockchain", "network", "consensus"]
 categories = ["cryptography::cryptocurrencies", "network-programming"]
-rust-version = "1.70"
+rust-version = "1.82"
 
 [package.metadata.docs.rs]
 all-features = true
