@@ -17,6 +17,37 @@
 use consensus_proof::{ConsensusProof, Result, ValidationResult, Block, Transaction};
 use serde::{Deserialize, Serialize};
 
+// Re-export commonly used types from consensus-proof for convenience
+// This allows upper layers (like reference-node) to depend only on protocol-engine
+pub use consensus_proof::{
+    Block, BlockHeader, Transaction, TransactionInput, TransactionOutput,
+    OutPoint, UTXO, UtxoSet, ValidationResult, Hash, ByteString, Natural, Integer,
+    ConsensusError, Result, ConsensusProof,
+};
+
+// Re-export commonly used modules
+pub mod mempool {
+    pub use consensus_proof::mempool::*;
+}
+pub mod segwit {
+    pub use consensus_proof::segwit::*;
+}
+pub mod block {
+    pub use consensus_proof::block::*;
+}
+pub mod serialization {
+    pub use consensus_proof::serialization::*;
+}
+pub mod network {
+    pub use consensus_proof::network::*;
+}
+pub mod types {
+    pub use consensus_proof::types::*;
+}
+pub mod error {
+    pub use consensus_proof::error::*;
+}
+
 // Re-export feature and economic modules for convenience
 pub use features::{FeatureActivation, FeatureRegistry, ActivationMethod, FeatureContext};
 pub use economic::EconomicParameters;
