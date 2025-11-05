@@ -21,7 +21,9 @@ jobs:
         repository: BTCDecoded/consensus-proof
         path: _temp-consensus-proof
     - name: Move consensus-proof to parent directory
-      run: mv _temp-consensus-proof ../consensus-proof
+      run: |
+        if [ -d "../consensus-proof" ]; then rm -rf ../consensus-proof; fi
+        mv _temp-consensus-proof ../consensus-proof
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -63,7 +65,9 @@ jobs:
         repository: BTCDecoded/consensus-proof
         path: _temp-consensus-proof
     - name: Move consensus-proof to parent directory
-      run: mv _temp-consensus-proof ../consensus-proof
+      run: |
+        if [ -d "../consensus-proof" ]; then rm -rf ../consensus-proof; fi
+        mv _temp-consensus-proof ../consensus-proof
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -98,7 +102,9 @@ jobs:
         repository: BTCDecoded/consensus-proof
         path: _temp-consensus-proof
     - name: Move consensus-proof to parent directory
-      run: mv _temp-consensus-proof ../consensus-proof
+      run: |
+        if [ -d "../consensus-proof" ]; then rm -rf ../consensus-proof; fi
+        mv _temp-consensus-proof ../consensus-proof
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -161,7 +167,9 @@ jobs:
         repository: BTCDecoded/consensus-proof
         path: _temp-consensus-proof
     - name: Move consensus-proof to parent directory
-      run: mv _temp-consensus-proof ../consensus-proof
+      run: |
+        if [ -d "../consensus-proof" ]; then rm -rf ../consensus-proof; fi
+        mv _temp-consensus-proof ../consensus-proof
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
