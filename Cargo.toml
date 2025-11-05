@@ -45,6 +45,11 @@ utxo-commitments = ["bllvm-consensus/utxo-commitments"]
 # Sigop counting module (always available, no feature flag needed)
 # sigop module is always compiled in bllvm-consensus
 
+[features]
+# Forward consensus-proof features
+production = ["consensus-proof/production"]
+utxo-commitments = ["consensus-proof/utxo-commitments"]
+
 [dev-dependencies]
 tempfile = "=3.8.1"
 cargo-tarpaulin = "0.27"
