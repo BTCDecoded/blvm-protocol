@@ -14,7 +14,6 @@
 //! 4. reference-node (full Bitcoin node)
 //! 5. developer-sdk (ergonomic API)
 
-use consensus_proof::{ConsensusProof, Result, ValidationResult, Block, Transaction};
 use serde::{Deserialize, Serialize};
 
 // Re-export commonly used types from consensus-proof for convenience
@@ -34,6 +33,9 @@ pub mod segwit {
 }
 pub mod block {
     pub use consensus_proof::block::*;
+}
+pub mod mining {
+    pub use consensus_proof::mining::*;
 }
 pub mod serialization {
     pub use consensus_proof::serialization::*;
