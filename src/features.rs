@@ -4,8 +4,8 @@
 //! This allows the protocol engine to determine if features are active
 //! at a specific block height, not just whether they're supported.
 
-use serde::{Deserialize, Serialize};
 use crate::ProtocolVersion;
+use serde::{Deserialize, Serialize};
 
 /// Feature activation method
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -63,7 +63,7 @@ impl FeatureActivation {
             ActivationMethod::BIP9 => {
                 // BIP9 uses both height and timestamp for safety
                 // Feature is active if either condition is met after grace period
-                let height_active = self.activation_height.map_or(false, |h| height >= h);
+                let height_active = self.activation_height.is_some_and(|h| height >= h);
                 let timestamp_active = self.activation_timestamp.map_or(false, |t| timestamp >= t);
                 height_active || timestamp_active
             }
@@ -89,7 +89,7 @@ impl FeatureRegistry {
             ProtocolVersion::Regtest => Self::regtest(),
         }
     }
-    
+
     /// Mainnet feature activations
     pub fn mainnet() -> Self {
         Self {
@@ -146,7 +146,7 @@ impl FeatureRegistry {
             ],
         }
     }
-    
+
     /// Testnet feature activations
     pub fn testnet() -> Self {
         Self {
@@ -195,7 +195,7 @@ impl FeatureRegistry {
             ],
         }
     }
-    
+
     /// Regtest feature activations (all features active from genesis)
     pub fn regtest() -> Self {
         Self {
@@ -247,28 +247,31 @@ impl FeatureRegistry {
             ],
         }
     }
-    
+
     /// Check if a feature is active at a given height and timestamp
     pub fn is_feature_active(&self, feature_name: &str, height: u64, timestamp: u64) -> bool {
-        self.features.iter()
+        self.features
+            .iter()
             .find(|f| f.feature_name == feature_name)
             .map(|f| f.is_active_at(height, timestamp))
             .unwrap_or(false)
     }
-    
+
     /// Get feature activation information
     pub fn get_feature(&self, feature_name: &str) -> Option<&FeatureActivation> {
-        self.features.iter()
+        self.features
+            .iter()
             .find(|f| f.feature_name == feature_name)
     }
-    
+
     /// List all features
     pub fn list_features(&self) -> Vec<String> {
-        self.features.iter()
+        self.features
+            .iter()
             .map(|f| f.feature_name.clone())
             .collect()
     }
-    
+
     /// Create a FeatureContext for a specific height and timestamp
     /// This consolidates all feature activation checks into a single context
     pub fn create_context(&self, height: u64, timestamp: u64) -> FeatureContext {
@@ -312,7 +315,7 @@ impl FeatureContext {
     pub fn from_registry(registry: &FeatureRegistry, height: u64, timestamp: u64) -> Self {
         registry.create_context(height, timestamp)
     }
-    
+
     /// Check if a specific feature is active
     pub fn is_active(&self, feature: &str) -> bool {
         match feature {
@@ -325,16 +328,28 @@ impl FeatureContext {
             _ => false,
         }
     }
-    
+
     /// Get list of all active features
     pub fn active_features(&self) -> Vec<&'static str> {
         let mut features = Vec::new();
-        if self.segwit { features.push("segwit"); }
-        if self.taproot { features.push("taproot"); }
-        if self.csv { features.push("csv"); }
-        if self.cltv { features.push("cltv"); }
-        if self.rbf { features.push("rbf"); }
-        if self.ctv { features.push("ctv"); }
+        if self.segwit {
+            features.push("segwit");
+        }
+        if self.taproot {
+            features.push("taproot");
+        }
+        if self.csv {
+            features.push("csv");
+        }
+        if self.cltv {
+            features.push("cltv");
+        }
+        if self.rbf {
+            features.push("rbf");
+        }
+        if self.ctv {
+            features.push("ctv");
+        }
         features
     }
 }
@@ -342,126 +357,126 @@ impl FeatureContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_segwit_activation_mainnet() {
         let registry = FeatureRegistry::mainnet();
-        
+
         // Before activation
         assert!(!registry.is_feature_active("segwit", 481_823, 1503539000));
-        
+
         // At activation height
         assert!(registry.is_feature_active("segwit", 481_824, 1503539857));
-        
+
         // After activation
         assert!(registry.is_feature_active("segwit", 500_000, 1504000000));
     }
-    
+
     #[test]
     fn test_taproot_activation_mainnet() {
         let registry = FeatureRegistry::mainnet();
-        
+
         // Before activation
         assert!(!registry.is_feature_active("taproot", 709_631, 1636934000));
-        
+
         // At activation height
         assert!(registry.is_feature_active("taproot", 709_632, 1636934400));
-        
+
         // After activation
         assert!(registry.is_feature_active("taproot", 800_000, 1640000000));
     }
-    
+
     #[test]
     fn test_always_active_features() {
         let registry = FeatureRegistry::mainnet();
-        
+
         // RBF, CSV, CLTV should always be active
         assert!(registry.is_feature_active("rbf", 0, 1231006505));
         assert!(registry.is_feature_active("csv", 0, 1231006505));
         assert!(registry.is_feature_active("cltv", 0, 1231006505));
         assert!(registry.is_feature_active("rbf", 1_000_000, 2000000000));
     }
-    
+
     #[test]
     fn test_regtest_all_features_active() {
         let registry = FeatureRegistry::regtest();
-        
+
         // All features should be active from genesis on regtest
         assert!(registry.is_feature_active("segwit", 0, 1231006505));
         assert!(registry.is_feature_active("taproot", 0, 1231006505));
         assert!(registry.is_feature_active("rbf", 0, 1231006505));
         assert!(registry.is_feature_active("fast_mining", 0, 1231006505));
     }
-    
+
     #[test]
     fn test_testnet_earlier_activations() {
         let registry = FeatureRegistry::testnet();
-        
+
         // SegWit activated earlier on testnet
         assert!(!registry.is_feature_active("segwit", 465_599, 1493596000));
         assert!(registry.is_feature_active("segwit", 465_600, 1493596800));
         assert!(registry.is_feature_active("segwit", 500_000, 1500000000));
     }
-    
+
     #[test]
     fn test_feature_not_found() {
         let registry = FeatureRegistry::mainnet();
-        
+
         // Non-existent feature should return false
         assert!(!registry.is_feature_active("nonexistent", 1_000_000, 2000000000));
     }
-    
+
     #[test]
     fn test_get_feature() {
         let registry = FeatureRegistry::mainnet();
-        
+
         let segwit = registry.get_feature("segwit").unwrap();
         assert_eq!(segwit.feature_name, "segwit");
         assert_eq!(segwit.bip_number, Some(141));
         assert_eq!(segwit.activation_method, ActivationMethod::BIP9);
-        
+
         assert!(registry.get_feature("nonexistent").is_none());
     }
-    
+
     #[test]
     fn test_list_features() {
         let mainnet = FeatureRegistry::mainnet();
         let features = mainnet.list_features();
-        
+
         assert!(features.contains(&"segwit".to_string()));
         assert!(features.contains(&"taproot".to_string()));
         assert!(features.contains(&"rbf".to_string()));
         assert!(features.contains(&"csv".to_string()));
         assert!(features.contains(&"cltv".to_string()));
     }
-    
+
     #[test]
     fn test_activation_methods() {
         let mainnet = FeatureRegistry::mainnet();
-        
+
         let segwit = mainnet.get_feature("segwit").unwrap();
         assert_eq!(segwit.activation_method, ActivationMethod::BIP9);
-        
+
         let rbf = mainnet.get_feature("rbf").unwrap();
         assert_eq!(rbf.activation_method, ActivationMethod::AlwaysActive);
     }
-    
+
     #[test]
     fn test_bip9_height_and_timestamp() {
         let registry = FeatureRegistry::mainnet();
-        
+
         // BIP9 features activate if either height OR timestamp is met
         // Test height met but timestamp not met (should still activate)
         assert!(registry.is_feature_active("segwit", 481_824, 1500000000));
-        
+
         // Test timestamp met but height not met (should still activate)
         assert!(registry.is_feature_active("segwit", 481_000, 1503539857));
     }
-    
+
     #[test]
     fn test_feature_context_creation() {
         let registry = FeatureRegistry::mainnet();
-        
+
         // Before SegWit activation
         let ctx_before = registry.create_context(481_823, 1503539000);
         assert!(!ctx_before.segwit);
@@ -469,28 +484,28 @@ mod tests {
         assert!(ctx_before.csv); // CSV is always active
         assert!(ctx_before.cltv); // CLTV is always active
         assert!(ctx_before.rbf); // RBF is always active
-        
+
         // At SegWit activation
         let ctx_at_segwit = registry.create_context(481_824, 1503539857);
         assert!(ctx_at_segwit.segwit);
         assert!(!ctx_at_segwit.taproot);
-        
+
         // At Taproot activation
         let ctx_at_taproot = registry.create_context(709_632, 1636934400);
         assert!(ctx_at_taproot.segwit);
         assert!(ctx_at_taproot.taproot);
-        
+
         // After all activations
         let ctx_after = registry.create_context(800_000, 1640000000);
         assert!(ctx_after.segwit);
         assert!(ctx_after.taproot);
     }
-    
+
     #[test]
     fn test_feature_context_is_active() {
         let registry = FeatureRegistry::mainnet();
         let ctx = registry.create_context(800_000, 1640000000);
-        
+
         assert!(ctx.is_active("segwit"));
         assert!(ctx.is_active("taproot"));
         assert!(ctx.is_active("csv"));
@@ -499,11 +514,11 @@ mod tests {
         assert!(!ctx.is_active("ctv")); // CTV not activated
         assert!(!ctx.is_active("nonexistent"));
     }
-    
+
     #[test]
     fn test_feature_context_active_features() {
         let registry = FeatureRegistry::mainnet();
-        
+
         // Before any activations
         let ctx_before = registry.create_context(0, 1231006505);
         let active = ctx_before.active_features();
@@ -512,7 +527,7 @@ mod tests {
         assert!(active.contains(&"rbf"));
         assert!(!active.contains(&"segwit"));
         assert!(!active.contains(&"taproot"));
-        
+
         // After all activations
         let ctx_after = registry.create_context(800_000, 1640000000);
         let active = ctx_after.active_features();
@@ -522,12 +537,12 @@ mod tests {
         assert!(active.contains(&"cltv"));
         assert!(active.contains(&"rbf"));
     }
-    
+
     #[test]
     fn test_feature_context_regtest() {
         let registry = FeatureRegistry::regtest();
         let ctx = registry.create_context(0, 1231006505);
-        
+
         // All features should be active from genesis on regtest
         assert!(ctx.segwit);
         assert!(ctx.taproot);
@@ -535,16 +550,15 @@ mod tests {
         assert!(ctx.cltv);
         assert!(ctx.rbf);
     }
-    
+
     #[test]
     fn test_feature_context_from_registry() {
         let registry = FeatureRegistry::mainnet();
         let ctx = FeatureContext::from_registry(&registry, 800_000, 1640000000);
-        
+
         assert!(ctx.segwit);
         assert!(ctx.taproot);
         assert_eq!(ctx.height, 800_000);
         assert_eq!(ctx.timestamp, 1640000000);
     }
 }
-
