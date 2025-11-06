@@ -64,7 +64,7 @@ impl FeatureActivation {
                 // BIP9 uses both height and timestamp for safety
                 // Feature is active if either condition is met after grace period
                 let height_active = self.activation_height.is_some_and(|h| height >= h);
-                let timestamp_active = self.activation_timestamp.map_or(false, |t| timestamp >= t);
+                let timestamp_active = self.activation_timestamp.is_some_and(|t| timestamp >= t);
                 height_active || timestamp_active
             }
         }
