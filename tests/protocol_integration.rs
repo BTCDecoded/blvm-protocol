@@ -2,13 +2,13 @@
 //!
 //! End-to-end tests for protocol engine functionality
 
-use consensus_proof::types::{OutPoint, TransactionInput, TransactionOutput, UTXO};
-use consensus_proof::{Block, BlockHeader, Transaction, ValidationResult};
-use protocol_engine::{BitcoinProtocolEngine, NetworkParameters, ProtocolVersion};
+use bllvm_consensus::types::{OutPoint, TransactionInput, TransactionOutput, UTXO};
+use bllvm_consensus::{Block, BlockHeader, Transaction, ValidationResult};
+use bllvm_protocol::{BitcoinProtocolEngine, NetworkParameters, ProtocolVersion};
 use std::collections::HashMap;
 
 #[test]
-fn test_end_to_end_protocol_engine_initialization() {
+fn test_end_to_end_bllvm_protocol_initialization() {
     // Test that we can create engines for all protocol versions
     let mainnet = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
     let testnet = BitcoinProtocolEngine::new(ProtocolVersion::Testnet3).unwrap();

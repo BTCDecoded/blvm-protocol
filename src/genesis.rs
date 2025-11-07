@@ -2,7 +2,7 @@
 //!
 //! Provides actual Bitcoin genesis blocks for mainnet, testnet, and regtest networks.
 
-use consensus_proof::types::*;
+use bllvm_consensus::types::*;
 
 /// Create Bitcoin mainnet genesis block
 pub fn mainnet_genesis() -> Block {

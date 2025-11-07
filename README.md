@@ -14,15 +14,15 @@ This is **Tier 3** of the 5-tier Bitcoin Commons architecture (BLLVM technology 
 
 ```
 1. Orange Paper (mathematical foundation)
-2. consensus-proof (pure math implementation)
-3. protocol-engine (Bitcoin abstraction) ← THIS CRATE
-4. reference-node (full node implementation)
-5. developer-sdk (governance infrastructure)
+2. bllvm-consensus (pure math implementation)
+3. bllvm-protocol (Bitcoin abstraction) ← THIS CRATE
+4. bllvm-node (full node implementation)
+5. bllvm-sdk (governance infrastructure)
 ```
 
 ## Purpose
 
-The protocol-engine sits between the pure mathematical consensus rules (consensus-proof) and the full Bitcoin implementation (reference-node). It provides:
+The bllvm-protocol sits between the pure mathematical consensus rules (bllvm-consensus) and the full Bitcoin implementation (bllvm-node). It provides:
 
 ### Protocol Abstraction
 - **Multiple Variants**: Support for mainnet, testnet, and regtest
@@ -136,7 +136,7 @@ All dependencies are pinned to exact versions for security:
 
 ```toml
 # Consensus layer
-consensus-proof = { git = "https://github.com/BTCDecoded/consensus-proof", tag = "v0.1.0" }
+bllvm-consensus = { git = "https://github.com/BTCDecoded/bllvm-consensus", tag = "v0.1.0" }
 
 # Serialization - EXACT VERSIONS
 serde = "=1.0.193"

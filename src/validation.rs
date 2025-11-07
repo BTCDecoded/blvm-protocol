@@ -5,8 +5,8 @@
 //! and protocol-specific validation logic.
 
 use crate::{BitcoinProtocolEngine, NetworkParameters, ProtocolVersion, Result};
-use consensus_proof::types::{OutPoint, UTXO};
-use consensus_proof::{Block, Transaction, ValidationResult};
+use bllvm_consensus::types::{OutPoint, UTXO};
+use bllvm_consensus::{Block, Transaction, ValidationResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -176,7 +176,7 @@ impl BitcoinProtocolEngine {
         // Check block size limits
         let block_size = self.calculate_block_size(block);
         if block_size > context.validation_rules.max_block_size {
-            return Err(consensus_proof::error::ConsensusError::BlockValidation(
+            return Err(bllvm_consensus::error::ConsensusError::BlockValidation(
                 "Block size exceeds maximum".to_string(),
             ));
         }
@@ -184,7 +184,7 @@ impl BitcoinProtocolEngine {
         // Check transaction count limits
         if block.transactions.len() > 10000 {
             // Reasonable limit
-            return Err(consensus_proof::error::ConsensusError::BlockValidation(
+            return Err(bllvm_consensus::error::ConsensusError::BlockValidation(
                 "Too many transactions in block".to_string(),
             ));
         }
@@ -207,7 +207,7 @@ impl BitcoinProtocolEngine {
         let tx_size = self.calculate_transaction_size(tx);
         if tx_size > context.validation_rules.max_tx_size {
             return Err(
-                consensus_proof::error::ConsensusError::TransactionValidation(
+                bllvm_consensus::error::ConsensusError::TransactionValidation(
                     "Transaction size exceeds maximum".to_string(),
                 ),
             );
@@ -217,7 +217,7 @@ impl BitcoinProtocolEngine {
         for input in &tx.inputs {
             if input.script_sig.len() > context.validation_rules.max_script_size as usize {
                 return Err(
-                    consensus_proof::error::ConsensusError::TransactionValidation(
+                    bllvm_consensus::error::ConsensusError::TransactionValidation(
                         "Script size exceeds maximum".to_string(),
                     ),
                 );
@@ -227,7 +227,7 @@ impl BitcoinProtocolEngine {
         for output in &tx.outputs {
             if output.script_pubkey.len() > context.validation_rules.max_script_size as usize {
                 return Err(
-                    consensus_proof::error::ConsensusError::TransactionValidation(
+                    bllvm_consensus::error::ConsensusError::TransactionValidation(
                         "Script size exceeds maximum".to_string(),
                     ),
                 );
@@ -292,8 +292,8 @@ impl BitcoinProtocolEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use consensus_proof::types::{OutPoint, TransactionInput, TransactionOutput};
-    use consensus_proof::{Block, BlockHeader, Transaction};
+    use bllvm_consensus::types::{OutPoint, TransactionInput, TransactionOutput};
+    use bllvm_consensus::{Block, BlockHeader, Transaction};
     use std::collections::HashMap;
 
     #[test]

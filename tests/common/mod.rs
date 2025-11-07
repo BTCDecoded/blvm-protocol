@@ -1,10 +1,10 @@
-//! Common test utilities for protocol-engine tests
+//! Common test utilities for bllvm-protocol tests
 //! 
 //! This module provides shared test utilities for building test data,
 //! creating mock objects, and setting up test scenarios.
 
-use consensus_proof::{Block, Transaction, BlockHeader};
-use consensus_proof::types::{OutPoint, UTXO, TxInput, TxOutput};
+use bllvm_consensus::{Block, Transaction, BlockHeader};
+use bllvm_consensus::types::{OutPoint, UTXO, TxInput, TxOutput};
 use crate::{BitcoinProtocolEngine, ProtocolVersion, NetworkParameters, NetworkConstants};
 use std::collections::HashMap;
 
@@ -306,6 +306,7 @@ pub mod helpers {
             .build()
     }
 }
+
 
 
 

@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 
 // Re-export commonly used types from consensus-proof for convenience
 // This allows upper layers (like reference-node) to depend only on protocol-engine
-pub use consensus_proof::{
+pub use bllvm_consensus::{
     Block, BlockHeader, ByteString, ConsensusError, ConsensusProof, Hash, Integer, Natural,
     OutPoint, Result, Transaction, TransactionInput, TransactionOutput, UtxoSet, ValidationResult,
     UTXO,
@@ -26,28 +26,28 @@ pub use consensus_proof::{
 
 // Re-export commonly used modules
 pub mod mempool {
-    pub use consensus_proof::mempool::*;
+    pub use bllvm_consensus::mempool::*;
 }
 pub mod segwit {
-    pub use consensus_proof::segwit::*;
+    pub use bllvm_consensus::segwit::*;
 }
 pub mod block {
-    pub use consensus_proof::block::*;
+    pub use bllvm_consensus::block::*;
 }
 pub mod mining {
-    pub use consensus_proof::mining::*;
+    pub use bllvm_consensus::mining::*;
 }
 pub mod serialization {
-    pub use consensus_proof::serialization::*;
+    pub use bllvm_consensus::serialization::*;
 }
 pub mod network {
-    pub use consensus_proof::network::*;
+    pub use bllvm_consensus::network::*;
 }
 pub mod types {
-    pub use consensus_proof::types::*;
+    pub use bllvm_consensus::types::*;
 }
 pub mod error {
-    pub use consensus_proof::error::*;
+    pub use bllvm_consensus::error::*;
 }
 
 // Re-export feature and economic modules for convenience
@@ -129,8 +129,8 @@ impl BitcoinProtocolEngine {
         &self,
         block: &Block,
         utxos: &std::collections::HashMap<
-            consensus_proof::types::OutPoint,
-            consensus_proof::types::UTXO,
+            bllvm_consensus::types::OutPoint,
+            bllvm_consensus::types::UTXO,
         >,
         height: u64,
     ) -> Result<ValidationResult> {
@@ -240,18 +240,18 @@ impl NetworkParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use consensus_proof::types::{BlockHeader, OutPoint, TransactionInput, TransactionOutput};
+    use bllvm_consensus::types::{BlockHeader, OutPoint, TransactionInput, TransactionOutput};
     use std::collections::HashMap;
 
     #[test]
-    fn test_protocol_engine_creation() {
+    fn test_bllvm_protocol_creation() {
         let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
         assert_eq!(engine.get_protocol_version(), ProtocolVersion::BitcoinV1);
         assert_eq!(engine.get_network_params().network_name, "mainnet");
     }
 
     #[test]
-    fn test_protocol_engine_creation_all_variants() {
+    fn test_bllvm_protocol_creation_all_variants() {
         // Test mainnet
         let mainnet = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
         assert_eq!(mainnet.get_protocol_version(), ProtocolVersion::BitcoinV1);
