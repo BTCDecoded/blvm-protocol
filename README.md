@@ -2,6 +2,8 @@
 
 **Bitcoin protocol abstraction layer for multiple variants and evolution.**
 
+> **For verified system status**: See [SYSTEM_STATUS.md](https://github.com/BTCDecoded/.github/blob/main/SYSTEM_STATUS.md) in the BTCDecoded organization repository.
+
 This crate provides a Bitcoin protocol abstraction layer that enables:
 - Multiple Bitcoin variants (mainnet, testnet, regtest)
 - Protocol evolution support (Bitcoin V1, V2, etc.)
