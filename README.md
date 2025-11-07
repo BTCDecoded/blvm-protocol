@@ -19,7 +19,7 @@ This is **Tier 3** of the 5-tier Bitcoin Commons architecture (BLLVM technology 
 2. bllvm-consensus (pure math implementation)
 3. bllvm-protocol (Bitcoin abstraction) ← THIS CRATE
 4. bllvm-node (full node implementation)
-5. bllvm-sdk (governance infrastructure)
+5. bllvm-sdk (developer toolkit)
 ```
 
 ## Purpose
