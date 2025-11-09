@@ -37,12 +37,13 @@ pub mod block {
 pub mod mining {
     pub use bllvm_consensus::mining::*;
 }
+pub mod pow {
+    pub use bllvm_consensus::pow::*;
+}
 pub mod serialization {
     pub use bllvm_consensus::serialization::*;
 }
-pub mod network {
-    pub use bllvm_consensus::network::*;
-}
+pub mod network;
 pub mod types {
     pub use bllvm_consensus::types::*;
 }
@@ -60,6 +61,12 @@ pub mod genesis;
 pub mod network_params;
 pub mod validation;
 pub mod variants;
+
+// Protocol-level BIP implementations
+pub mod address;  // BIP173/350/351: Bech32/Bech32m address encoding
+pub mod bip157;   // BIP157: Client-side block filtering network protocol
+pub mod bip158;   // BIP158: Compact block filters
+pub mod payment;  // BIP70: Payment protocol (P2P variant)
 
 /// Bitcoin Protocol Engine
 ///
