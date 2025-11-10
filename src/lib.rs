@@ -40,6 +40,11 @@ pub mod mining {
 pub mod pow {
     pub use bllvm_consensus::pow::*;
 }
+
+#[cfg(feature = "utxo-commitments")]
+pub mod utxo_commitments {
+    pub use bllvm_consensus::utxo_commitments::*;
+}
 pub mod serialization {
     pub use bllvm_consensus::serialization::*;
 }
@@ -63,10 +68,10 @@ pub mod validation;
 pub mod variants;
 
 // Protocol-level BIP implementations
-pub mod address;  // BIP173/350/351: Bech32/Bech32m address encoding
-pub mod bip157;   // BIP157: Client-side block filtering network protocol
-pub mod bip158;   // BIP158: Compact block filters
-pub mod payment;  // BIP70: Payment protocol (P2P variant)
+pub mod address; // BIP173/350/351: Bech32/Bech32m address encoding
+pub mod bip157; // BIP157: Client-side block filtering network protocol
+pub mod bip158; // BIP158: Compact block filters
+pub mod payment; // BIP70: Payment protocol (P2P variant)
 
 /// Bitcoin Protocol Engine
 ///
