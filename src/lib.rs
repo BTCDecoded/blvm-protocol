@@ -41,6 +41,10 @@ pub mod pow {
     pub use bllvm_consensus::pow::*;
 }
 
+pub mod sigop {
+    pub use bllvm_consensus::sigop::*;
+}
+
 #[cfg(feature = "utxo-commitments")]
 pub mod utxo_commitments {
     pub use bllvm_consensus::utxo_commitments::*;

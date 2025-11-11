@@ -4,9 +4,9 @@
 //! Protocol-specific limits and validation are handled here, with consensus
 //! validation delegated to the consensus layer.
 
-use crate::{BitcoinProtocolEngine, Result};
 use crate::validation::ProtocolValidationContext;
-use bllvm_consensus::types::{OutPoint, UTXO, UtxoSet};
+use crate::{BitcoinProtocolEngine, Result};
+use bllvm_consensus::types::{OutPoint, UtxoSet, UTXO};
 use bllvm_consensus::{Block, BlockHeader, Hash, Transaction, ValidationResult};
 
 /// NetworkMessage: Bitcoin P2P protocol message types
@@ -226,16 +226,12 @@ pub fn process_network_message(
         NetworkMessage::VerAck => process_verack_message(peer_state),
         NetworkMessage::Addr(addr) => process_addr_message(addr, peer_state),
         NetworkMessage::Inv(inv) => process_inv_message(inv, chain_access),
-        NetworkMessage::GetData(getdata) => {
-            process_getdata_message(getdata, chain_access)
-        }
+        NetworkMessage::GetData(getdata) => process_getdata_message(getdata, chain_access),
         NetworkMessage::GetHeaders(getheaders) => {
             process_getheaders_message(getheaders, chain_access)
         }
         NetworkMessage::Headers(headers) => process_headers_message(headers),
-        NetworkMessage::Block(block) => {
-            process_block_message(engine, block, utxo_set, height)
-        }
+        NetworkMessage::Block(block) => process_block_message(engine, block, utxo_set, height),
         NetworkMessage::Tx(tx) => process_tx_message(engine, tx, height),
         NetworkMessage::Ping(ping) => process_ping_message(ping, peer_state),
         NetworkMessage::Pong(pong) => process_pong_message(pong, peer_state),
@@ -368,16 +364,16 @@ fn process_getheaders_message(
 ) -> Result<NetworkResponse> {
     // Use chain access to find headers (if provided)
     if let Some(chain) = chain_access {
-        let headers = chain.get_headers_for_locator(
-            &getheaders.block_locator_hashes,
-            &getheaders.hash_stop,
-        );
+        let headers =
+            chain.get_headers_for_locator(&getheaders.block_locator_hashes, &getheaders.hash_stop);
         return Ok(NetworkResponse::SendMessage(NetworkMessage::Headers(
             HeadersMessage { headers },
         )));
     }
 
-    Ok(NetworkResponse::Reject("Chain access not available".to_string()))
+    Ok(NetworkResponse::Reject(
+        "Chain access not available".to_string(),
+    ))
 }
 
 /// Process headers message
@@ -406,20 +402,20 @@ fn process_block_message(
 
     // Delegate to consensus via protocol engine (requires utxo_set and height)
     if let (Some(utxos), Some(h)) = (utxo_set, height) {
-        let context = ProtocolValidationContext::new(
-            engine.get_protocol_version(),
-            h,
-        )?;
+        let context = ProtocolValidationContext::new(engine.get_protocol_version(), h)?;
         let result = engine.validate_block_with_protocol(block, utxos, h, &context)?;
 
         match result {
             ValidationResult::Valid => Ok(NetworkResponse::Ok),
-            ValidationResult::Invalid(reason) => {
-                Ok(NetworkResponse::Reject(format!("Invalid block: {}", reason)))
-            }
+            ValidationResult::Invalid(reason) => Ok(NetworkResponse::Reject(format!(
+                "Invalid block: {}",
+                reason
+            ))),
         }
     } else {
-        Ok(NetworkResponse::Reject("Missing validation context".to_string()))
+        Ok(NetworkResponse::Reject(
+            "Missing validation context".to_string(),
+        ))
     }
 }
 
@@ -430,25 +426,21 @@ fn process_tx_message(
     height: Option<u64>,
 ) -> Result<NetworkResponse> {
     // Check protocol limits and validate
-    let context = ProtocolValidationContext::new(
-        engine.get_protocol_version(),
-        height.unwrap_or(0),
-    )?;
+    let context =
+        ProtocolValidationContext::new(engine.get_protocol_version(), height.unwrap_or(0))?;
     let result = engine.validate_transaction_with_protocol(tx, &context)?;
 
     match result {
         ValidationResult::Valid => Ok(NetworkResponse::Ok),
-        ValidationResult::Invalid(reason) => {
-            Ok(NetworkResponse::Reject(format!("Invalid transaction: {}", reason)))
-        }
+        ValidationResult::Invalid(reason) => Ok(NetworkResponse::Reject(format!(
+            "Invalid transaction: {}",
+            reason
+        ))),
     }
 }
 
 /// Process ping message
-fn process_ping_message(
-    ping: &PingMessage,
-    peer_state: &mut PeerState,
-) -> Result<NetworkResponse> {
+fn process_ping_message(ping: &PingMessage, peer_state: &mut PeerState) -> Result<NetworkResponse> {
     let pong = NetworkMessage::Pong(PongMessage { nonce: ping.nonce });
     Ok(NetworkResponse::SendMessage(pong))
 }
@@ -465,9 +457,7 @@ fn process_pong_message(pong: &PongMessage, peer_state: &mut PeerState) -> Resul
 }
 
 /// Process mempool message
-fn process_mempool_message(
-    chain_access: Option<&dyn ChainStateAccess>,
-) -> Result<NetworkResponse> {
+fn process_mempool_message(chain_access: Option<&dyn ChainStateAccess>) -> Result<NetworkResponse> {
     // Send all mempool transactions (if chain access provided)
     if let Some(chain) = chain_access {
         let mempool_txs = chain.get_mempool_transactions();
@@ -493,4 +483,3 @@ fn process_feefilter_message(
     peer_state.min_fee_rate = Some(feefilter.feerate);
     Ok(NetworkResponse::Ok)
 }
-

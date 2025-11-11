@@ -42,6 +42,8 @@ bech32 = "=0.9"
 production = ["bllvm-consensus/production"]
 # UTXO commitments module (passed through from bllvm-consensus)
 utxo-commitments = ["bllvm-consensus/utxo-commitments"]
+# Sigop counting module (always available, no feature flag needed)
+# sigop module is always compiled in bllvm-consensus
 
 [dev-dependencies]
 tempfile = "=3.8.1"

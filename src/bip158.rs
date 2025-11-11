@@ -64,7 +64,7 @@ impl BitWriter {
             self.current_byte |= 1u8 << (7 - self.bit_count);
         }
         self.bit_count += 1;
-        
+
         if self.bit_count == 8 {
             self.data.push(self.current_byte);
             self.current_byte = 0;
@@ -270,15 +270,15 @@ pub fn match_filter(filter: &CompactBlockFilter, script: &[u8]) -> bool {
     }
 
     let n = filter.num_elements as u64;
-    
+
     // Hash script to range [0, N*M)
     let script_hash = hash_to_range(script, n, BIP158_M);
-    
+
     // Decode filter to reconstruct sorted set
     let mut reader = BitReader::new(&filter.filter_data);
     let mut decoded_values = Vec::new();
     let mut current_value = 0u64;
-    
+
     // Decode all differences and reconstruct values
     for _ in 0..filter.num_elements {
         if let Some(diff) = golomb_rice_decode(&mut reader, BIP158_P) {
@@ -289,7 +289,7 @@ pub fn match_filter(filter: &CompactBlockFilter, script: &[u8]) -> bool {
             return false;
         }
     }
-    
+
     // Check if script_hash is in the decoded set
     decoded_values.binary_search(&script_hash).is_ok()
 }
@@ -327,20 +327,20 @@ mod tests {
     #[test]
     fn test_golomb_rice_encode_decode_roundtrip() {
         let test_values = vec![0, 1, 2, 10, 100, 1000, 10000];
-        
+
         for value in test_values {
             let encoded = golomb_rice_encode(value, BIP158_P);
             let mut reader = BitReader::new(&encoded);
             let decoded = golomb_rice_decode(&mut reader, BIP158_P);
-            
+
             assert_eq!(decoded, Some(value), "Roundtrip failed for value {}", value);
         }
     }
 
     #[test]
     fn test_build_and_match_filter() {
-        use crate::{Transaction, TransactionInput, TransactionOutput, OutPoint};
-        
+        use crate::{OutPoint, Transaction, TransactionInput, TransactionOutput};
+
         // Create a test transaction
         let tx = Transaction {
             version: 1,
@@ -358,18 +358,18 @@ mod tests {
             }],
             lock_time: 0,
         };
-        
+
         // Build filter
         let filter = build_block_filter(&[tx.clone()], &[]).unwrap();
         assert!(filter.num_elements > 0);
-        
+
         // Match the script that's in the filter
         let script_in_filter = &tx.outputs[0].script_pubkey;
         assert!(match_filter(&filter, script_in_filter));
-        
+
         // Match a script that's not in the filter
         let script_not_in_filter = vec![0x53, 0x54]; // OP_3 OP_4
-        // Note: May have false positives due to GCS nature, but should generally work
+                                                     // Note: May have false positives due to GCS nature, but should generally work
         let matched = match_filter(&filter, &script_not_in_filter);
         // False positives are possible, so we can't assert false
         // But we can verify the filter works for scripts that are definitely in it

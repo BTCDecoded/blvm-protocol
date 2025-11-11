@@ -356,7 +356,7 @@ pub enum Bip70Error {
 }
 
 /// BIP70 Payment Protocol client (for making payments via P2P)
-/// 
+///
 /// Note: Node-specific message creation functions are in bllvm-node.
 /// This struct provides protocol-level validation only.
 pub struct PaymentProtocolClient;
@@ -422,7 +422,7 @@ impl PaymentProtocolClient {
 }
 
 /// BIP70 Payment Protocol server (for receiving payments via P2P)
-/// 
+///
 /// Note: Node-specific message creation functions are in bllvm-node.
 /// This struct provides protocol-level processing only.
 pub struct PaymentProtocolServer;
@@ -463,16 +463,17 @@ impl PaymentProtocolServer {
 
         // Validate merchant_data matches original request
         if let Some(ref payment_merchant_data) = payment.merchant_data {
-            if let Some(ref request_merchant_data) = original_request.payment_details.merchant_data {
+            if let Some(ref request_merchant_data) = original_request.payment_details.merchant_data
+            {
                 if payment_merchant_data != request_merchant_data {
                     return Err(Bip70Error::ValidationError(
-                        "Merchant data mismatch".to_string()
+                        "Merchant data mismatch".to_string(),
                     ));
                 }
             }
         } else if original_request.payment_details.merchant_data.is_some() {
             return Err(Bip70Error::ValidationError(
-                "Payment missing merchant data".to_string()
+                "Payment missing merchant data".to_string(),
             ));
         }
 
