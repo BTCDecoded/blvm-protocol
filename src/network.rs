@@ -6,7 +6,7 @@
 
 use crate::validation::ProtocolValidationContext;
 use crate::{BitcoinProtocolEngine, Result};
-use bllvm_consensus::types::{OutPoint, UtxoSet, UTXO};
+use bllvm_consensus::types::UtxoSet;
 use bllvm_consensus::{Block, BlockHeader, Hash, Transaction, ValidationResult};
 
 /// NetworkMessage: Bitcoin P2P protocol message types
