@@ -59,9 +59,6 @@ pub mod types {
 pub mod error {
     pub use bllvm_consensus::error::*;
 }
-pub mod mining {
-    pub use consensus_proof::mining::*;
-}
 
 // Re-export feature and economic modules for convenience
 pub use economic::EconomicParameters;
