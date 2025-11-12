@@ -153,6 +153,7 @@ impl<'a> BitReader<'a> {
     }
 
     /// Get current bit offset
+    #[allow(dead_code)]
     fn bit_offset(&self) -> usize {
         self.bit_offset
     }
