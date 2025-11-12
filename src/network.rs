@@ -440,7 +440,10 @@ fn process_tx_message(
 }
 
 /// Process ping message
-fn process_ping_message(ping: &PingMessage, _peer_state: &mut PeerState) -> Result<NetworkResponse> {
+fn process_ping_message(
+    ping: &PingMessage,
+    _peer_state: &mut PeerState,
+) -> Result<NetworkResponse> {
     let pong = NetworkMessage::Pong(PongMessage { nonce: ping.nonce });
     Ok(NetworkResponse::SendMessage(pong))
 }
