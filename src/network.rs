@@ -408,8 +408,7 @@ fn process_block_message(
         match result {
             ValidationResult::Valid => Ok(NetworkResponse::Ok),
             ValidationResult::Invalid(reason) => Ok(NetworkResponse::Reject(format!(
-                "Invalid block: {}",
-                reason
+                "Invalid block: {reason}"
             ))),
         }
     } else {
@@ -433,8 +432,7 @@ fn process_tx_message(
     match result {
         ValidationResult::Valid => Ok(NetworkResponse::Ok),
         ValidationResult::Invalid(reason) => Ok(NetworkResponse::Reject(format!(
-            "Invalid transaction: {}",
-            reason
+            "Invalid transaction: {reason}"
         ))),
     }
 }
