@@ -205,8 +205,8 @@ impl PaymentRequest {
             .ok_or_else(|| Bip70Error::SignatureError("No signature".to_string()))?;
 
         // Parse public key
-        let pubkey = secp256k1::PublicKey::from_slice(&pubkey)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid public key: {}", e)))?;
+        let pubkey = secp256k1::PublicKey::from_slice(pubkey)
+            .map_err(|e| Bip70Error::SignatureError(format!("Invalid public key: {e}")))?;
 
         // Parse signature
         let signature = Signature::from_compact(signature_bytes)
@@ -395,7 +395,7 @@ impl PaymentProtocolClient {
     ) -> Result<(), Bip70Error> {
         // Verify merchant signature
         let pubkey = secp256k1::PublicKey::from_slice(merchant_pubkey)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid pubkey: {}", e)))?;
+            .map_err(|e| Bip70Error::SignatureError(format!("Invalid pubkey: {e}")))?;
 
         // Serialize payment_ack for verification
         let serialized = bincode::serialize(payment_ack)
