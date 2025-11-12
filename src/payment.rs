@@ -517,7 +517,7 @@ impl PaymentProtocolServer {
         merchant_pubkey: &[u8],
     ) -> Result<(), Bip70Error> {
         let pubkey = secp256k1::PublicKey::from_slice(merchant_pubkey)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid pubkey: {}", e)))?;
+            .map_err(|e| Bip70Error::SignatureError(format!("Invalid pubkey: {e}")))?;
 
         let serialized = bincode::serialize(&signed_refund.address)
             .map_err(|e| Bip70Error::SerializationError(e.to_string()))?;

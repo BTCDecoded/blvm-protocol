@@ -27,7 +27,7 @@ impl FilterHeader {
         let first_hash = hasher.finalize();
 
         let mut hasher2 = Sha256::new();
-        hasher2.update(&first_hash);
+        hasher2.update(first_hash);
         let filter_hash_bytes = hasher2.finalize();
 
         let mut filter_hash = [0u8; 32];
@@ -45,7 +45,7 @@ impl FilterHeader {
             let first_hash = hasher.finalize();
 
             let mut hasher2 = Sha256::new();
-            hasher2.update(&first_hash);
+            hasher2.update(first_hash);
             let header_hash_bytes = hasher2.finalize();
 
             let mut header_hash = [0u8; 32];
@@ -73,7 +73,7 @@ impl FilterHeader {
         let first_hash = hasher.finalize();
 
         let mut hasher2 = Sha256::new();
-        hasher2.update(&first_hash);
+        hasher2.update(first_hash);
         let hash_bytes = hasher2.finalize();
 
         let mut header_hash = [0u8; 32];
