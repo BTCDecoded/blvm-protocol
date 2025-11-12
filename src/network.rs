@@ -407,9 +407,9 @@ fn process_block_message(
 
         match result {
             ValidationResult::Valid => Ok(NetworkResponse::Ok),
-            ValidationResult::Invalid(reason) => Ok(NetworkResponse::Reject(format!(
-                "Invalid block: {reason}"
-            ))),
+            ValidationResult::Invalid(reason) => {
+                Ok(NetworkResponse::Reject(format!("Invalid block: {reason}")))
+            }
         }
     } else {
         Ok(NetworkResponse::Reject(
