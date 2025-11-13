@@ -185,8 +185,10 @@ mod tests {
         let header1 = FilterHeader::new(&empty_filter, None);
         let header2 = FilterHeader::new(&empty_filter, Some(&header1));
 
-        // Headers should be different when chained
-        assert_ne!(header1.filter_hash, header2.filter_hash);
+        // Filter hashes should be the same (same filter data)
+        assert_eq!(header1.filter_hash, header2.filter_hash);
+        // Header hashes should be different when chained
+        assert_ne!(header1.header_hash(), header2.header_hash());
         assert_eq!(header2.prev_header_hash, header1.header_hash());
     }
 }
