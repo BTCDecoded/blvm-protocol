@@ -371,7 +371,7 @@ mod tests {
             },
             transactions: vec![Transaction {
                 version: 1,
-                inputs: vec![TransactionInput {
+                inputs: bllvm_consensus::tx_inputs![TransactionInput {
                     prevout: OutPoint {
                         hash: [0u8; 32],
                         index: 0xffffffff,
@@ -379,7 +379,7 @@ mod tests {
                     script_sig: vec![0x01, 0x00], // Height 0
                     sequence: 0xffffffff,
                 }],
-                outputs: vec![TransactionOutput {
+                outputs: bllvm_consensus::tx_outputs![TransactionOutput {
                     value: 50_0000_0000,
                     script_pubkey: vec![
                         0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -387,7 +387,7 @@ mod tests {
                     ], // P2PKH
                 }],
                 lock_time: 0,
-            }],
+            }].into_boxed_slice(),
         };
 
         // This should pass validation for a genesis block

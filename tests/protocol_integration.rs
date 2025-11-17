@@ -42,7 +42,7 @@ fn test_full_block_validation_workflow() {
         },
         transactions: vec![Transaction {
             version: 1,
-            inputs: vec![TransactionInput {
+            inputs: bllvm_consensus::tx_inputs![TransactionInput {
                 prevout: OutPoint {
                     hash: [0u8; 32],
                     index: 0xffffffff,
@@ -50,7 +50,7 @@ fn test_full_block_validation_workflow() {
                 script_sig: vec![0x01, 0x00], // Height 0
                 sequence: 0xffffffff,
             }],
-            outputs: vec![TransactionOutput {
+            outputs: bllvm_consensus::tx_outputs![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
                     0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -58,7 +58,7 @@ fn test_full_block_validation_workflow() {
                 ], // P2PKH
             }],
             lock_time: 0,
-        }],
+        }].into_boxed_slice(),
     };
 
     // Validate the block
@@ -83,7 +83,7 @@ fn test_multi_block_chain_validation() {
         },
         transactions: vec![Transaction {
             version: 1,
-            inputs: vec![TransactionInput {
+            inputs: bllvm_consensus::tx_inputs![TransactionInput {
                 prevout: OutPoint {
                     hash: [0u8; 32],
                     index: 0xffffffff,
@@ -91,7 +91,7 @@ fn test_multi_block_chain_validation() {
                 script_sig: vec![0x01, 0x00], // Height 0
                 sequence: 0xffffffff,
             }],
-            outputs: vec![TransactionOutput {
+            outputs: bllvm_consensus::tx_outputs![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
                     0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -99,7 +99,7 @@ fn test_multi_block_chain_validation() {
                 ], // P2PKH
             }],
             lock_time: 0,
-        }],
+        }].into_boxed_slice(),
     };
 
     // Validate first block
@@ -134,7 +134,7 @@ fn test_multi_block_chain_validation() {
         },
         transactions: vec![Transaction {
             version: 1,
-            inputs: vec![TransactionInput {
+            inputs: bllvm_consensus::tx_inputs![TransactionInput {
                 prevout: OutPoint {
                     hash: [0u8; 32],
                     index: 0,
@@ -142,7 +142,7 @@ fn test_multi_block_chain_validation() {
                 script_sig: vec![0x41, 0x04], // Signature
                 sequence: 0xffffffff,
             }],
-            outputs: vec![TransactionOutput {
+            outputs: bllvm_consensus::tx_outputs![TransactionOutput {
                 value: 25_0000_0000,
                 script_pubkey: vec![
                     0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -150,7 +150,7 @@ fn test_multi_block_chain_validation() {
                 ], // P2PKH
             }],
             lock_time: 0,
-        }],
+        }].into_boxed_slice(),
     };
 
     // Validate second block

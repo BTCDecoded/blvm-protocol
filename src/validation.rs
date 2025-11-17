@@ -464,10 +464,10 @@ mod tests {
             },
             transactions: vec![Transaction {
                 version: 1,
-                inputs: vec![],
-                outputs: vec![],
+                inputs: bllvm_consensus::tx_inputs![],
+                outputs: bllvm_consensus::tx_outputs![],
                 lock_time: 0,
-            }],
+            }].into_boxed_slice(),
         };
 
         // This should pass validation
