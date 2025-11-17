@@ -56,6 +56,15 @@ pub mod network;
 pub mod types {
     pub use bllvm_consensus::types::*;
 }
+// Re-export macros from bllvm-consensus for convenience
+#[cfg(feature = "production")]
+pub use bllvm_consensus::tx_inputs;
+#[cfg(feature = "production")]
+pub use bllvm_consensus::tx_outputs;
+#[cfg(not(feature = "production"))]
+pub use bllvm_consensus::tx_inputs;
+#[cfg(not(feature = "production"))]
+pub use bllvm_consensus::tx_outputs;
 pub mod error {
     pub use bllvm_consensus::error::*;
 }
