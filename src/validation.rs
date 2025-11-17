@@ -177,7 +177,7 @@ impl BitcoinProtocolEngine {
         let block_size = self.calculate_block_size(block);
         if block_size > context.validation_rules.max_block_size {
             return Err(bllvm_consensus::error::ConsensusError::BlockValidation(
-                "Block size exceeds maximum".to_string(),
+                "Block size exceeds maximum".into(),
             ));
         }
 
@@ -185,7 +185,7 @@ impl BitcoinProtocolEngine {
         if block.transactions.len() > 10000 {
             // Reasonable limit
             return Err(bllvm_consensus::error::ConsensusError::BlockValidation(
-                "Too many transactions in block".to_string(),
+                "Too many transactions in block".into(),
             ));
         }
 
@@ -208,7 +208,7 @@ impl BitcoinProtocolEngine {
         if tx_size > context.validation_rules.max_tx_size {
             return Err(
                 bllvm_consensus::error::ConsensusError::TransactionValidation(
-                    "Transaction size exceeds maximum".to_string(),
+                    "Transaction size exceeds maximum".into(),
                 ),
             );
         }
@@ -218,7 +218,7 @@ impl BitcoinProtocolEngine {
             if input.script_sig.len() > context.validation_rules.max_script_size as usize {
                 return Err(
                     bllvm_consensus::error::ConsensusError::TransactionValidation(
-                        "Script size exceeds maximum".to_string(),
+                        "Script size exceeds maximum".into(),
                     ),
                 );
             }
@@ -228,7 +228,7 @@ impl BitcoinProtocolEngine {
             if output.script_pubkey.len() > context.validation_rules.max_script_size as usize {
                 return Err(
                     bllvm_consensus::error::ConsensusError::TransactionValidation(
-                        "Script size exceeds maximum".to_string(),
+                        "Script size exceeds maximum".into(),
                     ),
                 );
             }
