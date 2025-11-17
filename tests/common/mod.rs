@@ -83,7 +83,7 @@ impl TestBlockBuilder {
     pub fn build(self) -> Block {
         Block {
             header: self.header,
-            transactions: self.transactions,
+            transactions: self.transactions.into_boxed_slice(),
         }
     }
 }
