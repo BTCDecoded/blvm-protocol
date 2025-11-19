@@ -4,6 +4,9 @@
 *.pdb
 **/*.rmeta
 
+# Cargo.lock for libraries (should not be committed)
+Cargo.lock
+
 # Coverage reports and profiling
 /coverage/
 /target/tarpaulin/
