@@ -191,7 +191,7 @@ mod tests {
 
         // At first halving
         let first_halving_height = 210_000;
-        let before_halving_subsidy = first_halving_height * 50_0000_0000;
+        let _before_halving_subsidy = first_halving_height * 50_0000_0000;
         // Approximate calculation (simplified)
         assert!(params.total_supply_at_height(first_halving_height) > 0);
     }
