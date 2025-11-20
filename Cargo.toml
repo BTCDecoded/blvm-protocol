@@ -33,6 +33,7 @@ thiserror = "=1.0.69"
 sha2 = "=0.10.9"
 ripemd = "=0.1.3"
 secp256k1 = "=0.28.2"  # For BIP70 payment protocol signatures
+hex = "=0.4"  # For hex encoding/decoding
 
 # Address encoding (BIP173/350/351)
 bech32 = "=0.9"
