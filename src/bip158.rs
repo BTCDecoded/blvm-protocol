@@ -352,11 +352,13 @@ mod tests {
                 },
                 script_sig: vec![],
                 sequence: 0xffffffff,
-            }].into(),
+            }]
+            .into(),
             outputs: vec![TransactionOutput {
                 value: 1000,
                 script_pubkey: vec![0x51, 0x52], // OP_1 OP_2
-            }].into(),
+            }]
+            .into(),
             lock_time: 0,
         };
 
