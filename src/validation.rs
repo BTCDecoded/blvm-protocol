@@ -491,14 +491,14 @@ mod tests {
                 },
                 script_sig: vec![0x41, 0x04], // Small signature
                 sequence: 0xffffffff,
-            }],
+            }].into(),
             outputs: vec![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
                     0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 ], // P2PKH
-            }],
+            }].into(),
             lock_time: 0,
         };
 
@@ -522,14 +522,14 @@ mod tests {
                 },
                 script_sig: vec![0x41, 0x04], // Small script sig
                 sequence: 0xffffffff,
-            }],
+            }].into(),
             outputs: vec![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
                     0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 ], // Small script pubkey
-            }],
+            }].into(),
             lock_time: 0,
         };
 

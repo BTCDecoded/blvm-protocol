@@ -172,14 +172,14 @@ fn test_transaction_creation_and_validation_workflow() {
             },
             script_sig: vec![0x41, 0x04], // Signature
             sequence: 0xffffffff,
-        }],
+        }].into(),
         outputs: vec![TransactionOutput {
             value: 50_0000_0000,
             script_pubkey: vec![
                 0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             ], // P2PKH
-        }],
+        }].into(),
         lock_time: 0,
     };
 
@@ -219,7 +219,7 @@ fn test_utxo_tracking_across_transactions() {
             },
             script_sig: vec![0x41, 0x04], // Signature
             sequence: 0xffffffff,
-        }],
+        }].into(),
         outputs: vec![
             TransactionOutput {
                 value: 50_0000_0000,
@@ -235,7 +235,7 @@ fn test_utxo_tracking_across_transactions() {
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 ], // P2PKH
             },
-        ],
+        ].into(),
         lock_time: 0,
     };
 
@@ -288,14 +288,14 @@ fn test_concurrent_validation_requests() {
                     },
                     script_sig: vec![0x41, 0x04],
                     sequence: 0xffffffff,
-                }],
+                }].into(),
                 outputs: vec![TransactionOutput {
                     value: 50_0000_0000,
                     script_pubkey: vec![
                         0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     ],
-                }],
+                }].into(),
                 lock_time: 0,
             };
 
