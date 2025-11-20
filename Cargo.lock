@@ -178,6 +178,7 @@ dependencies = [
  "bincode",
  "bllvm-consensus",
  "cargo-tarpaulin",
+ "hex",
  "ripemd",
  "secp256k1",
  "serde",

@@ -22,6 +22,7 @@ use secp256k1::ecdsa::Signature;
 use secp256k1::{Message, Secp256k1};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use hex;
 
 /// BIP70 Payment Protocol version
 pub const PAYMENT_PROTOCOL_VERSION: u32 = 1;
@@ -98,6 +99,77 @@ pub struct PaymentACK {
     pub payment: Payment,
     /// Confirmation memo from merchant
     pub memo: Option<String>,
+    /// Merchant signature over PaymentACK (optional)
+    pub signature: Option<Vec<u8>>,
+}
+
+impl PaymentACK {
+    /// Sign PaymentACK with merchant's private key
+    pub fn sign(&mut self, private_key: &secp256k1::SecretKey) -> Result<(), Bip70Error> {
+        // Serialize PaymentACK for signing (excluding signature field)
+        let mut ack_for_signing = self.clone();
+        ack_for_signing.signature = None;
+        
+        let serialized = bincode::serialize(&ack_for_signing)
+            .map_err(|e| Bip70Error::SerializationError(e.to_string()))?;
+
+        // Hash PaymentACK
+        let mut hasher = Sha256::new();
+        hasher.update(&serialized);
+        let hash = hasher.finalize();
+
+        // Create message for signing
+        let message = Message::from_digest_slice(&hash)
+            .map_err(|e| Bip70Error::SignatureError(format!("Invalid message: {e}")))?;
+
+        // Sign with secp256k1
+        let secp = Secp256k1::new();
+        let signature = secp.sign_ecdsa(&message, private_key);
+
+        // Store signature
+        self.signature = Some(signature.serialize_compact().to_vec());
+
+        Ok(())
+    }
+
+    /// Verify PaymentACK signature
+    pub fn verify_signature(&self, merchant_pubkey: &[u8]) -> Result<(), Bip70Error> {
+        let signature_bytes = self
+            .signature
+            .as_ref()
+            .ok_or_else(|| Bip70Error::SignatureError("No signature".to_string()))?;
+
+        // Parse public key
+        let pubkey = secp256k1::PublicKey::from_slice(merchant_pubkey)
+            .map_err(|e| Bip70Error::SignatureError(format!("Invalid public key: {e}")))?;
+
+        // Parse signature
+        let signature = Signature::from_compact(signature_bytes)
+            .map_err(|e| Bip70Error::SignatureError(format!("Invalid signature: {e}")))?;
+
+        // Serialize PaymentACK for verification (excluding signature)
+        let mut ack_for_verification = self.clone();
+        ack_for_verification.signature = None;
+        
+        let serialized = bincode::serialize(&ack_for_verification)
+            .map_err(|e| Bip70Error::SerializationError(e.to_string()))?;
+
+        // Hash PaymentACK
+        let mut hasher = Sha256::new();
+        hasher.update(&serialized);
+        let hash = hasher.finalize();
+
+        // Create message for verification
+        let message = Message::from_digest_slice(&hash)
+            .map_err(|e| Bip70Error::SignatureError(format!("Invalid message: {e}")))?;
+
+        // Verify signature
+        let secp = Secp256k1::new();
+        secp.verify_ecdsa(&message, &signature, &pubkey)
+            .map_err(|_| Bip70Error::SignatureError("PaymentACK signature verification failed".to_string()))?;
+
+        Ok(())
+    }
 }
 
 impl PaymentRequest {
@@ -388,34 +460,49 @@ impl PaymentProtocolClient {
     }
 
     /// Validate PaymentACK from merchant (protocol-level validation)
+    /// 
+    /// This is a legacy method for backward compatibility.
+    /// Prefer using PaymentACK::verify_signature() directly.
     pub fn validate_payment_ack(
         payment_ack: &PaymentACK,
         merchant_signature: &[u8],
         merchant_pubkey: &[u8],
     ) -> Result<(), Bip70Error> {
-        // Verify merchant signature
-        let pubkey = secp256k1::PublicKey::from_slice(merchant_pubkey)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid pubkey: {e}")))?;
+        // If PaymentACK has embedded signature, use that
+        if let Some(ref sig) = payment_ack.signature {
+            if !sig.is_empty() {
+                return payment_ack.verify_signature(merchant_pubkey);
+            }
+        }
 
-        // Serialize payment_ack for verification
-        let serialized = bincode::serialize(payment_ack)
-            .map_err(|e| Bip70Error::SerializationError(e.to_string()))?;
+        // Legacy: Verify external signature (for backward compatibility)
+        if !merchant_signature.is_empty() {
+            let pubkey = secp256k1::PublicKey::from_slice(merchant_pubkey)
+                .map_err(|e| Bip70Error::SignatureError(format!("Invalid pubkey: {e}")))?;
 
-        let mut hasher = Sha256::new();
-        hasher.update(&serialized);
-        let hash = hasher.finalize();
+            // Serialize payment_ack for verification (excluding signature field)
+            let mut ack_for_verification = payment_ack.clone();
+            ack_for_verification.signature = None;
+            
+            let serialized = bincode::serialize(&ack_for_verification)
+                .map_err(|e| Bip70Error::SerializationError(e.to_string()))?;
 
-        let message = Message::from_digest_slice(&hash)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid message: {e}")))?;
+            let mut hasher = Sha256::new();
+            hasher.update(&serialized);
+            let hash = hasher.finalize();
 
-        let signature = Signature::from_compact(merchant_signature)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid signature: {e}")))?;
+            let message = Message::from_digest_slice(&hash)
+                .map_err(|e| Bip70Error::SignatureError(format!("Invalid message: {e}")))?;
 
-        let secp = Secp256k1::new();
-        secp.verify_ecdsa(&message, &signature, &pubkey)
-            .map_err(|_| {
-                Bip70Error::SignatureError("PaymentACK signature verification failed".to_string())
-            })?;
+            let signature = Signature::from_compact(merchant_signature)
+                .map_err(|e| Bip70Error::SignatureError(format!("Invalid signature: {e}")))?;
+
+            let secp = Secp256k1::new();
+            secp.verify_ecdsa(&message, &signature, &pubkey)
+                .map_err(|_| {
+                    Bip70Error::SignatureError("PaymentACK signature verification failed".to_string())
+                })?;
+        }
 
         Ok(())
     }
@@ -451,7 +538,7 @@ impl PaymentProtocolServer {
     pub fn process_payment(
         payment: &Payment,
         original_request: &PaymentRequest,
-        _merchant_private_key: Option<&secp256k1::SecretKey>,
+        merchant_private_key: Option<&secp256k1::SecretKey>,
     ) -> Result<PaymentACK, Bip70Error> {
         // Validate payment
         payment.validate()?;
@@ -477,11 +564,69 @@ impl PaymentProtocolServer {
             ));
         }
 
+        // Verify transactions match PaymentRequest outputs
+        Self::verify_payment_transactions(payment, original_request)?;
+
         // Create payment ACK
-        Ok(PaymentACK {
+        let mut payment_ack = PaymentACK {
             payment: payment.clone(),
             memo: Some("Payment received".to_string()),
-        })
+            signature: None, // Will be set by sign() method
+        };
+
+        // Sign PaymentACK if merchant key provided
+        if let Some(private_key) = merchant_private_key {
+            payment_ack.sign(private_key)?;
+        }
+
+        Ok(payment_ack)
+    }
+
+    /// Verify that payment transactions match PaymentRequest outputs
+    fn verify_payment_transactions(
+        payment: &Payment,
+        original_request: &PaymentRequest,
+    ) -> Result<(), Bip70Error> {
+        use crate::Transaction;
+
+        // Deserialize all transactions
+        let mut all_outputs = Vec::new();
+        for tx_bytes in &payment.transactions {
+            let tx: Transaction = bincode::deserialize(tx_bytes)
+                .map_err(|e| Bip70Error::SerializationError(format!("Invalid transaction: {e}")))?;
+            
+            // Collect all outputs from this transaction
+            for output in &tx.outputs {
+                all_outputs.push(PaymentOutput {
+                    script: output.script_pubkey.clone(),
+                    amount: Some(output.value as u64), // Convert i64 to u64
+                });
+            }
+        }
+
+        // Check that all requested outputs are present
+        // Note: Payment may include additional outputs (change, refunds), but must include all requested
+        for requested_output in &original_request.payment_details.outputs {
+            let found = all_outputs.iter().any(|output| {
+                output.script == requested_output.script
+                    && match (output.amount, requested_output.amount) {
+                        (Some(amt), Some(req_amt)) => amt >= req_amt, // Allow overpayment
+                        (Some(_), None) => true, // Requested "all available"
+                        (None, Some(_)) => false, // Output has no amount but request requires one
+                        (None, None) => true, // Both "all available"
+                    }
+            });
+
+            if !found {
+                return Err(Bip70Error::ValidationError(format!(
+                    "Payment missing required output: script={}, amount={:?}",
+                    hex::encode(&requested_output.script),
+                    requested_output.amount
+                )));
+            }
+        }
+
+        Ok(())
     }
 
     /// Sign a refund address for inclusion in PaymentRequest
