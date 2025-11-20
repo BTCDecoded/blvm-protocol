@@ -6,7 +6,7 @@
 //! BIP350: Bech32m encoding for Taproot addresses (bc1p...)
 //! BIP351: Version 1 witness encoding for Taproot
 
-use bllvm_protocol::address::{BitcoinAddress, AddressError, Network};
+use bllvm_protocol::address::{AddressError, BitcoinAddress, Network};
 
 /// Test helper: Create a valid P2WPKH witness program (20 bytes)
 fn create_p2wpkh_program() -> Vec<u8> {
@@ -33,7 +33,7 @@ fn test_bech32_mainnet_p2wpkh_encoding() {
     let program = create_p2wpkh_program();
     let addr = BitcoinAddress::new(Network::Mainnet, 0, program).unwrap();
     let encoded = addr.encode().unwrap();
-    
+
     assert!(encoded.starts_with("bc1"));
     assert_eq!(addr.witness_version, 0);
     assert_eq!(addr.witness_program.len(), 20);
@@ -47,7 +47,7 @@ fn test_bech32m_mainnet_p2tr_encoding() {
     let program = create_p2tr_program();
     let addr = BitcoinAddress::new(Network::Mainnet, 1, program).unwrap();
     let encoded = addr.encode().unwrap();
-    
+
     assert!(encoded.starts_with("bc1p"));
     assert_eq!(addr.witness_version, 1);
     assert_eq!(addr.witness_program.len(), 32);
@@ -62,7 +62,7 @@ fn test_bech32_testnet_encoding() {
     let program = create_p2wpkh_program();
     let addr = BitcoinAddress::new(Network::Testnet, 0, program).unwrap();
     let encoded = addr.encode().unwrap();
-    
+
     assert!(encoded.starts_with("tb1"));
     assert_eq!(addr.network, Network::Testnet);
 }
@@ -73,7 +73,7 @@ fn test_bech32_regtest_encoding() {
     let program = create_p2wpkh_program();
     let addr = BitcoinAddress::new(Network::Regtest, 0, program).unwrap();
     let encoded = addr.encode().unwrap();
-    
+
     assert!(encoded.starts_with("bcrt1"));
     assert_eq!(addr.network, Network::Regtest);
 }
@@ -84,7 +84,7 @@ fn test_bech32_mainnet_p2wsh_encoding() {
     let program = create_p2wsh_program();
     let addr = BitcoinAddress::new(Network::Mainnet, 0, program).unwrap();
     let encoded = addr.encode().unwrap();
-    
+
     assert!(encoded.starts_with("bc1"));
     assert_eq!(addr.witness_version, 0);
     assert_eq!(addr.witness_program.len(), 32);
@@ -101,7 +101,7 @@ fn test_bech32_decoding_valid_address() {
     let program = create_p2wpkh_program();
     let addr1 = BitcoinAddress::new(Network::Mainnet, 0, program.clone()).unwrap();
     let encoded = addr1.encode().unwrap();
-    
+
     let addr2 = BitcoinAddress::decode(&encoded).unwrap();
     assert_eq!(addr2.network, Network::Mainnet);
     assert_eq!(addr2.witness_version, 0);
@@ -115,7 +115,7 @@ fn test_bech32m_decoding_valid_address() {
     let program = create_p2tr_program();
     let addr1 = BitcoinAddress::new(Network::Mainnet, 1, program.clone()).unwrap();
     let encoded = addr1.encode().unwrap();
-    
+
     let addr2 = BitcoinAddress::decode(&encoded).unwrap();
     assert_eq!(addr2.network, Network::Mainnet);
     assert_eq!(addr2.witness_version, 1);
@@ -130,7 +130,7 @@ fn test_address_roundtrip_encoding() {
     let addr1 = BitcoinAddress::new(Network::Mainnet, 0, program.clone()).unwrap();
     let addr_str = addr1.encode().unwrap();
     let addr2 = BitcoinAddress::decode(&addr_str).unwrap();
-    
+
     assert_eq!(addr1.network, addr2.network);
     assert_eq!(addr1.witness_version, addr2.witness_version);
     assert_eq!(addr1.witness_program, addr2.witness_program);
@@ -143,7 +143,7 @@ fn test_address_roundtrip_taproot() {
     let addr1 = BitcoinAddress::new(Network::Mainnet, 1, program.clone()).unwrap();
     let addr_str = addr1.encode().unwrap();
     let addr2 = BitcoinAddress::decode(&addr_str).unwrap();
-    
+
     assert_eq!(addr1.network, addr2.network);
     assert_eq!(addr1.witness_version, addr2.witness_version);
     assert_eq!(addr1.witness_program, addr2.witness_program);
@@ -166,7 +166,7 @@ fn test_bech32_decoding_invalid_hrp() {
     assert!(result.is_err());
     // Check that it's either InvalidEncoding (from bech32) or InvalidHRP
     match result {
-        Err(AddressError::InvalidHRP) | Err(AddressError::InvalidEncoding) => {},
+        Err(AddressError::InvalidHRP) | Err(AddressError::InvalidEncoding) => {}
         Err(e) => panic!("Unexpected error: {:?}", e),
         Ok(_) => panic!("Should have failed"),
     }
@@ -210,10 +210,10 @@ fn test_address_network_mismatch() {
     let program = create_p2wpkh_program();
     let mainnet_addr = BitcoinAddress::new(Network::Mainnet, 0, program.clone()).unwrap();
     let testnet_addr = BitcoinAddress::new(Network::Testnet, 0, program).unwrap();
-    
+
     let mainnet_encoded = mainnet_addr.encode().unwrap();
     let testnet_encoded = testnet_addr.encode().unwrap();
-    
+
     assert_ne!(mainnet_encoded, testnet_encoded);
     assert!(mainnet_encoded.starts_with("bc1"));
     assert!(testnet_encoded.starts_with("tb1"));
@@ -255,10 +255,10 @@ fn test_address_type_detection() {
     // Test address_type() for all types
     let p2wpkh = BitcoinAddress::new(Network::Mainnet, 0, create_p2wpkh_program()).unwrap();
     assert_eq!(p2wpkh.address_type(), "P2WPKH");
-    
+
     let p2wsh = BitcoinAddress::new(Network::Mainnet, 0, create_p2wsh_program()).unwrap();
     assert_eq!(p2wsh.address_type(), "P2WSH");
-    
+
     let p2tr = BitcoinAddress::new(Network::Mainnet, 1, create_p2tr_program()).unwrap();
     assert_eq!(p2tr.address_type(), "P2TR");
 }
@@ -279,11 +279,11 @@ fn test_network_hrp_values() {
 fn test_all_networks_p2wpkh() {
     // Test P2WPKH encoding for all networks
     let program = create_p2wpkh_program();
-    
+
     let mainnet = BitcoinAddress::new(Network::Mainnet, 0, program.clone()).unwrap();
     let testnet = BitcoinAddress::new(Network::Testnet, 0, program.clone()).unwrap();
     let regtest = BitcoinAddress::new(Network::Regtest, 0, program).unwrap();
-    
+
     assert!(mainnet.encode().unwrap().starts_with("bc1"));
     assert!(testnet.encode().unwrap().starts_with("tb1"));
     assert!(regtest.encode().unwrap().starts_with("bcrt1"));
@@ -293,13 +293,12 @@ fn test_all_networks_p2wpkh() {
 fn test_all_networks_p2tr() {
     // Test P2TR encoding for all networks
     let program = create_p2tr_program();
-    
+
     let mainnet = BitcoinAddress::new(Network::Mainnet, 1, program.clone()).unwrap();
     let testnet = BitcoinAddress::new(Network::Testnet, 1, program.clone()).unwrap();
     let regtest = BitcoinAddress::new(Network::Regtest, 1, program).unwrap();
-    
+
     assert!(mainnet.encode().unwrap().starts_with("bc1p"));
     assert!(testnet.encode().unwrap().starts_with("tb1p"));
     assert!(regtest.encode().unwrap().starts_with("bcrt1p"));
 }
-

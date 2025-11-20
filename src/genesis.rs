@@ -50,7 +50,8 @@ pub fn mainnet_genesis() -> Block {
                 ],
             }],
             lock_time: 0,
-        }].into_boxed_slice(),
+        }]
+        .into_boxed_slice(),
     }
 }
 
@@ -100,7 +101,8 @@ pub fn testnet_genesis() -> Block {
                 ],
             }],
             lock_time: 0,
-        }].into_boxed_slice(),
+        }]
+        .into_boxed_slice(),
     }
 }
 
@@ -150,6 +152,7 @@ pub fn regtest_genesis() -> Block {
                 ],
             }],
             lock_time: 0,
-        }].into_boxed_slice(),
+        }]
+        .into_boxed_slice(),
     }
 }

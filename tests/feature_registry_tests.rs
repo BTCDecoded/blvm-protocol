@@ -3,8 +3,7 @@
 //! Tests for feature activation tracking and protocol version compatibility.
 
 use bllvm_protocol::features::{
-    FeatureRegistry, FeatureActivation, ActivationMethod,
-    FeatureContext
+    ActivationMethod, FeatureActivation, FeatureContext, FeatureRegistry,
 };
 use bllvm_protocol::ProtocolVersion;
 
@@ -31,7 +30,11 @@ fn create_taproot_activation() -> FeatureActivation {
 }
 
 /// Test helper: Create a feature context from registry
-fn create_feature_context(registry: &FeatureRegistry, height: u64, timestamp: u64) -> FeatureContext {
+fn create_feature_context(
+    registry: &FeatureRegistry,
+    height: u64,
+    timestamp: u64,
+) -> FeatureContext {
     FeatureContext::from_registry(registry, height, timestamp)
 }
 
@@ -43,7 +46,7 @@ fn create_feature_context(registry: &FeatureRegistry, height: u64, timestamp: u6
 fn test_feature_registry_creation() {
     // Test creating a feature registry
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
-    
+
     // Should have features registered
     assert!(!registry.features.is_empty());
 }
@@ -54,7 +57,7 @@ fn test_feature_registry_for_different_protocols() {
     let mainnet = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
     let testnet = FeatureRegistry::for_protocol(ProtocolVersion::Testnet3);
     let regtest = FeatureRegistry::for_protocol(ProtocolVersion::Regtest);
-    
+
     // All should have features
     assert!(!mainnet.features.is_empty());
     assert!(!testnet.features.is_empty());
@@ -70,15 +73,15 @@ fn test_feature_activation_check_segwit() {
     // Test checking if SegWit is active
     let activation = create_segwit_activation();
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
-    
+
     // Before activation
     let before_context = create_feature_context(&registry, 481823, 1503539856);
     assert!(!activation.is_active_at(before_context.height, before_context.timestamp));
-    
+
     // At activation height
     let at_context = create_feature_context(&registry, 481824, 1503539857);
     assert!(activation.is_active_at(at_context.height, at_context.timestamp));
-    
+
     // After activation
     let after_context = create_feature_context(&registry, 481825, 1503539858);
     assert!(activation.is_active_at(after_context.height, after_context.timestamp));
@@ -89,11 +92,11 @@ fn test_feature_activation_check_taproot() {
     // Test checking if Taproot is active
     let activation = create_taproot_activation();
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
-    
+
     // Before activation
     let before_context = create_feature_context(&registry, 709631, 1638316799);
     assert!(!activation.is_active_at(before_context.height, before_context.timestamp));
-    
+
     // At activation
     let at_context = create_feature_context(&registry, 709632, 1638316800);
     assert!(activation.is_active_at(at_context.height, at_context.timestamp));
@@ -109,7 +112,7 @@ fn test_feature_activation_always_active() {
         activation_method: ActivationMethod::AlwaysActive,
         bip_number: None,
     };
-    
+
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
     let context = create_feature_context(&registry, 0, 0);
     assert!(activation.is_active_at(context.height, context.timestamp));
@@ -125,7 +128,7 @@ fn test_feature_activation_hard_fork() {
         activation_method: ActivationMethod::HardFork,
         bip_number: None,
     };
-    
+
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
     let context = create_feature_context(&registry, 0, 0);
     // Hard forks activate immediately at genesis
@@ -142,17 +145,17 @@ fn test_feature_activation_height_based() {
         activation_method: ActivationMethod::HeightBased,
         bip_number: None,
     };
-    
+
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
-    
+
     // Before activation height
     let before = create_feature_context(&registry, 999, 0);
     assert!(!activation.is_active_at(before.height, before.timestamp));
-    
+
     // At activation height
     let at = create_feature_context(&registry, 1000, 0);
     assert!(activation.is_active_at(at.height, at.timestamp));
-    
+
     // After activation height
     let after = create_feature_context(&registry, 1001, 0);
     assert!(activation.is_active_at(after.height, after.timestamp));
@@ -168,17 +171,17 @@ fn test_feature_activation_timestamp_based() {
         activation_method: ActivationMethod::Timestamp,
         bip_number: None,
     };
-    
+
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
-    
+
     // Before activation timestamp
     let before = create_feature_context(&registry, 0, 999999999);
     assert!(!activation.is_active_at(before.height, before.timestamp));
-    
+
     // At activation timestamp
     let at = create_feature_context(&registry, 0, 1000000000);
     assert!(activation.is_active_at(at.height, at.timestamp));
-    
+
     // After activation timestamp
     let after = create_feature_context(&registry, 0, 1000000001);
     assert!(activation.is_active_at(after.height, after.timestamp));
@@ -188,18 +191,18 @@ fn test_feature_activation_timestamp_based() {
 fn test_feature_activation_bip9() {
     // Test BIP9 activation method (uses both height and timestamp)
     let activation = create_segwit_activation();
-    
+
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
-    
+
     // BIP9 activates if either height OR timestamp condition is met
     // Before both
     let before = create_feature_context(&registry, 481823, 1503539856);
     assert!(!activation.is_active_at(before.height, before.timestamp));
-    
+
     // At height but before timestamp
     let height_met = create_feature_context(&registry, 481824, 1503539856);
     assert!(activation.is_active_at(height_met.height, height_met.timestamp));
-    
+
     // At timestamp but before height
     let timestamp_met = create_feature_context(&registry, 481823, 1503539857);
     assert!(activation.is_active_at(timestamp_met.height, timestamp_met.timestamp));
@@ -213,7 +216,7 @@ fn test_feature_activation_bip9() {
 fn test_feature_registry_contains_segwit() {
     // Test that mainnet registry contains SegWit
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
-    
+
     let segwit = registry.get_feature("segwit");
     assert!(segwit.is_some());
     assert_eq!(segwit.unwrap().feature_name, "segwit");
@@ -223,7 +226,7 @@ fn test_feature_registry_contains_segwit() {
 fn test_feature_registry_contains_taproot() {
     // Test that mainnet registry contains Taproot
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
-    
+
     let taproot = registry.get_feature("taproot");
     assert!(taproot.is_some());
     assert_eq!(taproot.unwrap().feature_name, "taproot");
@@ -233,11 +236,11 @@ fn test_feature_registry_contains_taproot() {
 fn test_feature_registry_multiple_features() {
     // Test that registry contains multiple features
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
-    
+
     // Should have multiple features registered
     let features = registry.list_features();
     assert!(features.len() >= 2);
-    
+
     // Check for common features
     assert!(features.contains(&"segwit".to_string()));
     assert!(features.contains(&"taproot".to_string()));
@@ -252,7 +255,7 @@ fn test_feature_context_creation() {
     // Test creating a feature context
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
     let context = create_feature_context(&registry, 100000, 1234567890);
-    
+
     assert_eq!(context.height, 100000);
     assert_eq!(context.timestamp, 1234567890);
 }
@@ -262,10 +265,10 @@ fn test_feature_context_different_protocols() {
     // Test feature context with different protocol versions
     let mainnet_registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
     let testnet_registry = FeatureRegistry::for_protocol(ProtocolVersion::Testnet3);
-    
+
     let mainnet_context = create_feature_context(&mainnet_registry, 100000, 1234567890);
     let testnet_context = create_feature_context(&testnet_registry, 100000, 1234567890);
-    
+
     // Contexts should have same height/timestamp but may have different feature states
     assert_eq!(mainnet_context.height, testnet_context.height);
     assert_eq!(mainnet_context.timestamp, testnet_context.timestamp);
@@ -279,11 +282,11 @@ fn test_feature_context_different_protocols() {
 fn test_activation_method_variants() {
     // Test all activation method variants exist
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
-    
+
     // Check different activation methods are used
     let segwit = registry.get_feature("segwit").unwrap();
     assert_eq!(segwit.activation_method, ActivationMethod::BIP9);
-    
+
     let rbf = registry.get_feature("rbf").unwrap();
     assert_eq!(rbf.activation_method, ActivationMethod::AlwaysActive);
 }
@@ -292,17 +295,16 @@ fn test_activation_method_variants() {
 fn test_activation_method_usage() {
     // Test that different activation methods work correctly
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
-    
+
     // BIP9 feature (SegWit)
     let segwit = registry.get_feature("segwit").unwrap();
     assert_eq!(segwit.activation_method, ActivationMethod::BIP9);
-    
+
     // AlwaysActive feature (RBF)
     let rbf = registry.get_feature("rbf").unwrap();
     assert_eq!(rbf.activation_method, ActivationMethod::AlwaysActive);
-    
+
     // Verify they activate differently
     assert!(!registry.is_feature_active("segwit", 0, 0));
     assert!(registry.is_feature_active("rbf", 0, 0));
 }
-

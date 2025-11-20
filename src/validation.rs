@@ -467,7 +467,8 @@ mod tests {
                 inputs: bllvm_consensus::tx_inputs![],
                 outputs: bllvm_consensus::tx_outputs![],
                 lock_time: 0,
-            }].into_boxed_slice(),
+            }]
+            .into_boxed_slice(),
         };
 
         // This should pass validation
@@ -491,14 +492,16 @@ mod tests {
                 },
                 script_sig: vec![0x41, 0x04], // Small signature
                 sequence: 0xffffffff,
-            }].into(),
+            }]
+            .into(),
             outputs: vec![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
                     0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 ], // P2PKH
-            }].into(),
+            }]
+            .into(),
             lock_time: 0,
         };
 
@@ -522,14 +525,16 @@ mod tests {
                 },
                 script_sig: vec![0x41, 0x04], // Small script sig
                 sequence: 0xffffffff,
-            }].into(),
+            }]
+            .into(),
             outputs: vec![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
                     0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 ], // Small script pubkey
-            }].into(),
+            }]
+            .into(),
             lock_time: 0,
         };
 

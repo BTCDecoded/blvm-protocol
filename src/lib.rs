@@ -59,10 +59,10 @@ pub mod types {
 // Re-export macros from bllvm-consensus for convenience
 #[cfg(feature = "production")]
 pub use bllvm_consensus::tx_inputs;
-#[cfg(feature = "production")]
-pub use bllvm_consensus::tx_outputs;
 #[cfg(not(feature = "production"))]
 pub use bllvm_consensus::tx_inputs;
+#[cfg(feature = "production")]
+pub use bllvm_consensus::tx_outputs;
 #[cfg(not(feature = "production"))]
 pub use bllvm_consensus::tx_outputs;
 pub mod error {
@@ -387,7 +387,8 @@ mod tests {
                     ], // P2PKH
                 }],
                 lock_time: 0,
-            }].into_boxed_slice(),
+            }]
+            .into_boxed_slice(),
         };
 
         // This should pass validation for a genesis block
@@ -409,14 +410,16 @@ mod tests {
                 },
                 script_sig: vec![0x41, 0x04], // Simple signature
                 sequence: 0xffffffff,
-            }].into(),
+            }]
+            .into(),
             outputs: vec![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
                     0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 ], // P2PKH
-            }].into(),
+            }]
+            .into(),
             lock_time: 0,
         };
 

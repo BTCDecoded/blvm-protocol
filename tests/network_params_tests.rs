@@ -3,8 +3,8 @@
 //! Additional tests for network parameters and genesis blocks.
 //! Note: Basic tests exist in src/network_params.rs, these complement them.
 
-use bllvm_protocol::network_params::{NetworkConstants, Checkpoint};
-use bllvm_protocol::genesis::{mainnet_genesis, testnet_genesis, regtest_genesis};
+use bllvm_protocol::genesis::{mainnet_genesis, regtest_genesis, testnet_genesis};
+use bllvm_protocol::network_params::{Checkpoint, NetworkConstants};
 use bllvm_protocol::ProtocolVersion;
 
 // ============================================================================
@@ -17,7 +17,7 @@ fn test_genesis_blocks_are_different() {
     let mainnet_gen = mainnet_genesis();
     let testnet_gen = testnet_genesis();
     let regtest_gen = regtest_genesis();
-    
+
     // Verify they're different (check timestamps - testnet and regtest have same timestamp, so check nonces)
     assert_ne!(mainnet_gen.header.timestamp, testnet_gen.header.timestamp);
     // Testnet and regtest have same timestamp, but different nonces
@@ -32,7 +32,7 @@ fn test_genesis_blocks_have_coinbase() {
     let mainnet_gen = mainnet_genesis();
     let testnet_gen = testnet_genesis();
     let regtest_gen = regtest_genesis();
-    
+
     // All should have at least one transaction (coinbase)
     assert!(!mainnet_gen.transactions.is_empty());
     assert!(!testnet_gen.transactions.is_empty());
@@ -45,10 +45,10 @@ fn test_genesis_block_timestamps() {
     let mainnet_gen = mainnet_genesis();
     let testnet_gen = testnet_genesis();
     let regtest_gen = regtest_genesis();
-    
+
     // Mainnet genesis: Jan 3, 2009
     assert_eq!(mainnet_gen.header.timestamp, 1231006505);
-    
+
     // Testnet and regtest should have different timestamps
     assert_ne!(mainnet_gen.header.timestamp, testnet_gen.header.timestamp);
     assert_ne!(mainnet_gen.header.timestamp, regtest_gen.header.timestamp);
@@ -64,12 +64,12 @@ fn test_network_constants_consistency() {
     let mainnet = NetworkConstants::mainnet().unwrap();
     let testnet = NetworkConstants::testnet().unwrap();
     let regtest = NetworkConstants::regtest().unwrap();
-    
+
     // All should have valid magic bytes
     assert_ne!(mainnet.magic_bytes, [0u8; 4]);
     assert_ne!(testnet.magic_bytes, [0u8; 4]);
     assert_ne!(regtest.magic_bytes, [0u8; 4]);
-    
+
     // All should have valid ports
     assert!(mainnet.default_port > 0);
     assert!(testnet.default_port > 0);
@@ -82,7 +82,7 @@ fn test_network_constants_for_all_versions() {
     let mainnet = NetworkConstants::for_version(ProtocolVersion::BitcoinV1).unwrap();
     let testnet = NetworkConstants::for_version(ProtocolVersion::Testnet3).unwrap();
     let regtest = NetworkConstants::for_version(ProtocolVersion::Regtest).unwrap();
-    
+
     assert_eq!(mainnet.network_name, "mainnet");
     assert_eq!(testnet.network_name, "testnet");
     assert_eq!(regtest.network_name, "regtest");
@@ -100,7 +100,7 @@ fn test_checkpoint_structure() {
         hash: [0x01; 32],
         timestamp: 1231006505,
     };
-    
+
     assert_eq!(checkpoint.height, 11111);
     assert_eq!(checkpoint.hash, [0x01; 32]);
     assert_eq!(checkpoint.timestamp, 1231006505);
@@ -118,10 +118,9 @@ fn test_checkpoint_validation() {
         ],
         timestamp: 1231006505,
     };
-    
+
     // Verify checkpoint has valid structure
     assert!(checkpoint.height > 0);
     assert_ne!(checkpoint.hash, [0u8; 32]);
     assert!(checkpoint.timestamp > 0);
 }
-

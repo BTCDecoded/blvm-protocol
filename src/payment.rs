@@ -18,11 +18,11 @@
 //! - Signed refund addresses prevent refund attacks
 //! - P2P routing preserves customer privacy (no direct merchant connection)
 
+use hex;
 use secp256k1::ecdsa::Signature;
 use secp256k1::{Message, Secp256k1};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use hex;
 
 /// BIP70 Payment Protocol version
 pub const PAYMENT_PROTOCOL_VERSION: u32 = 1;
@@ -109,7 +109,7 @@ impl PaymentACK {
         // Serialize PaymentACK for signing (excluding signature field)
         let mut ack_for_signing = self.clone();
         ack_for_signing.signature = None;
-        
+
         let serialized = bincode::serialize(&ack_for_signing)
             .map_err(|e| Bip70Error::SerializationError(e.to_string()))?;
 
@@ -150,7 +150,7 @@ impl PaymentACK {
         // Serialize PaymentACK for verification (excluding signature)
         let mut ack_for_verification = self.clone();
         ack_for_verification.signature = None;
-        
+
         let serialized = bincode::serialize(&ack_for_verification)
             .map_err(|e| Bip70Error::SerializationError(e.to_string()))?;
 
@@ -166,7 +166,9 @@ impl PaymentACK {
         // Verify signature
         let secp = Secp256k1::new();
         secp.verify_ecdsa(&message, &signature, &pubkey)
-            .map_err(|_| Bip70Error::SignatureError("PaymentACK signature verification failed".to_string()))?;
+            .map_err(|_| {
+                Bip70Error::SignatureError("PaymentACK signature verification failed".to_string())
+            })?;
 
         Ok(())
     }
@@ -460,7 +462,7 @@ impl PaymentProtocolClient {
     }
 
     /// Validate PaymentACK from merchant (protocol-level validation)
-    /// 
+    ///
     /// This is a legacy method for backward compatibility.
     /// Prefer using PaymentACK::verify_signature() directly.
     pub fn validate_payment_ack(
@@ -483,7 +485,7 @@ impl PaymentProtocolClient {
             // Serialize payment_ack for verification (excluding signature field)
             let mut ack_for_verification = payment_ack.clone();
             ack_for_verification.signature = None;
-            
+
             let serialized = bincode::serialize(&ack_for_verification)
                 .map_err(|e| Bip70Error::SerializationError(e.to_string()))?;
 
@@ -500,7 +502,9 @@ impl PaymentProtocolClient {
             let secp = Secp256k1::new();
             secp.verify_ecdsa(&message, &signature, &pubkey)
                 .map_err(|_| {
-                    Bip70Error::SignatureError("PaymentACK signature verification failed".to_string())
+                    Bip70Error::SignatureError(
+                        "PaymentACK signature verification failed".to_string(),
+                    )
                 })?;
         }
 
@@ -594,7 +598,7 @@ impl PaymentProtocolServer {
         for tx_bytes in &payment.transactions {
             let tx: Transaction = bincode::deserialize(tx_bytes)
                 .map_err(|e| Bip70Error::SerializationError(format!("Invalid transaction: {e}")))?;
-            
+
             // Collect all outputs from this transaction
             for output in &tx.outputs {
                 all_outputs.push(PaymentOutput {
@@ -611,9 +615,9 @@ impl PaymentProtocolServer {
                 output.script == requested_output.script
                     && match (output.amount, requested_output.amount) {
                         (Some(amt), Some(req_amt)) => amt >= req_amt, // Allow overpayment
-                        (Some(_), None) => true, // Requested "all available"
+                        (Some(_), None) => true,                      // Requested "all available"
                         (None, Some(_)) => false, // Output has no amount but request requires one
-                        (None, None) => true, // Both "all available"
+                        (None, None) => true,     // Both "all available"
                     }
             });
 
