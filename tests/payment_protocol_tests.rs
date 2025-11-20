@@ -212,6 +212,7 @@ fn test_payment_ack_creation() {
     let ack = PaymentACK {
         payment: payment.clone(),
         memo: Some("Payment received".to_string()),
+        signature: None,
     };
     
     assert_eq!(ack.payment.transactions.len(), payment.transactions.len());
@@ -226,6 +227,7 @@ fn test_payment_ack_without_memo() {
     let ack = PaymentACK {
         payment,
         memo: None,
+        signature: None,
     };
     
     assert!(ack.memo.is_none());
