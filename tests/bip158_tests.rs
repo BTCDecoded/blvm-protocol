@@ -171,7 +171,7 @@ fn test_match_filter_negative_match() {
     // Should not match script that's not in the block
     // Note: Due to false positives, this might still match, but with low probability
     // For deterministic testing, we use distinct scripts
-    let matches = match_filter(&filter, &script_not_in_block);
+    let _matches = match_filter(&filter, &script_not_in_block);
     // We can't assert false here due to false positives, but we can verify the filter works
     assert!(filter.num_elements > 0);
 }

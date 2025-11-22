@@ -552,6 +552,34 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
       
+      - name: Verify published crate is available
+        if: |
+          env.CARGO_REGISTRY_TOKEN != '' &&
+          steps.check-version.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          CRATE_NAME=$(grep -E '^name = ' Cargo.toml | sed -E 's/^name = "([^"]+)".*/\1/')
+          echo "Verifying ${CRATE_NAME} v${VERSION} is available on crates.io..."
+          
+          # Try to fetch the crate info
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if cargo search "$CRATE_NAME" --limit 1 2>/dev/null | grep -q "v${VERSION}"; then
+              echo "✅ ${CRATE_NAME} v${VERSION} is now available on crates.io"
+              echo "📦 Crate page: https://crates.io/crates/${CRATE_NAME}/${VERSION}"
+              break
+            else
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+              if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                echo "⏳ Waiting for crates.io to index (attempt $RETRY_COUNT/$MAX_RETRIES)..."
+                sleep 10
+              else
+                echo "⚠️  ${CRATE_NAME} v${VERSION} not yet visible on crates.io (may take a few minutes)"
+              fi
+            fi
+          done
+      
       - name: Create git tag
         run: |
           VERSION_TAG="${{ steps.version.outputs.version_tag }}"
@@ -567,20 +595,68 @@ jobs:
             echo "✅ Created and pushed tag ${VERSION_TAG}"
           fi
       
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          VERSION_TAG="${{ steps.version.outputs.version_tag }}"
+          CRATE_NAME=$(grep -E '^name = ' Cargo.toml | sed -E 's/^name = "([^"]+)".*/\1/')
+          DESCRIPTION=$(grep -E '^description = ' Cargo.toml | sed -E 's/^description = "([^"]+)".*/\1/' || echo "Bitcoin protocol abstraction layer")
+          
+          # Get commit range for this release
+          if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            COMMIT_RANGE="${{ github.event.before }}..${{ github.sha }}"
+            COMMIT_COUNT=$(git rev-list --count "$COMMIT_RANGE" 2>/dev/null || echo "?")
+          else
+            COMMIT_RANGE="HEAD~10..HEAD"
+            COMMIT_COUNT="?"
+          fi
+          
+          cat > /tmp/release_notes.md << EOF
+          ## $VERSION_TAG
+          
+          **$DESCRIPTION**
+          
+          ### 📦 Installation
+          
+          Add to your \`Cargo.toml\`:
+          
+          \`\`\`toml
+          [dependencies]
+          $CRATE_NAME = "$VERSION"
+          \`\`\`
+          
+          Or install via cargo:
+          
+          \`\`\`bash
+          cargo add $CRATE_NAME@$VERSION
+          \`\`\`
+          
+          ### 🔗 Links
+          
+          - **Crates.io**: [${CRATE_NAME} v${VERSION}](https://crates.io/crates/${CRATE_NAME}/${VERSION})
+          - **Documentation**: [docs.rs/${CRATE_NAME}/${VERSION}](https://docs.rs/${CRATE_NAME}/${VERSION})
+          - **Repository**: [GitHub](https://github.com/${{ github.repository }})
+          
+          ### 📝 Changes
+          
+          This release includes $COMMIT_COUNT commits since the last release.
+          
+          **Published to crates.io**: ${{ steps.check-version.outputs.exists == 'false' && '✅ Yes' || '⚠️  Already exists or skipped' }}
+          
+          See [full commit history](https://github.com/${{ github.repository }}/compare/$COMMIT_RANGE) for details.
+          EOF
+          
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          cat /tmp/release_notes.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.version_tag }}
           name: Release ${{ steps.version.outputs.version_tag }}
-          body: |
-            ## ${{ steps.version.outputs.version_tag }}
-            
-            Automated release of bllvm-protocol.
-            
-            **Published to crates.io**: ${{ steps.check-version.outputs.exists == 'false' && '✅ Yes' || '⚠️  Already exists or skipped' }}
-            
-            ### Changes
-            See [commit history](https://github.com/${{ github.repository }}/compare/${{ github.event.before }}...${{ github.sha }})
+          body: ${{ steps.release_notes.outputs.notes }}
           draft: false
           prerelease: false
         env:

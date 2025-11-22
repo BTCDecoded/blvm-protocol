@@ -125,8 +125,8 @@ fn test_validation_context_max_sizes() {
 #[test]
 fn test_block_size_validation() {
     // Test block size validation
-    let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
-    let context = ProtocolValidationContext::new(ProtocolVersion::BitcoinV1, 0).unwrap();
+    let _engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
+    let _context = ProtocolValidationContext::new(ProtocolVersion::BitcoinV1, 0).unwrap();
 
     // Create a simple block (should be well under limit)
     let block = Block {
@@ -150,8 +150,8 @@ fn test_block_size_validation() {
 #[test]
 fn test_transaction_size_validation() {
     // Test transaction size validation
-    let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
-    let context = ProtocolValidationContext::new(ProtocolVersion::BitcoinV1, 0).unwrap();
+    let _engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
+    let _context = ProtocolValidationContext::new(ProtocolVersion::BitcoinV1, 0).unwrap();
 
     // Create a simple transaction (should be well under limit)
     let tx = create_simple_transaction();

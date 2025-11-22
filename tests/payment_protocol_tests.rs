@@ -4,8 +4,8 @@
 //! Specification: https://github.com/bitcoin/bips/blob/master/bip-0070.mediawiki
 
 use bllvm_protocol::payment::{
-    Bip70Error, Payment, PaymentACK, PaymentDetails, PaymentOutput, PaymentProtocolClient,
-    PaymentProtocolServer, PaymentRequest, SignedRefundAddress,
+    Bip70Error, Payment, PaymentACK, PaymentDetails, PaymentOutput, PaymentProtocolServer,
+    PaymentRequest, SignedRefundAddress,
 };
 use secp256k1::{Secp256k1, SecretKey};
 
@@ -309,13 +309,13 @@ fn test_signed_refund_address_structure() {
 fn test_bip70_error_types() {
     // Test that BIP70 error types can be created and formatted
     let expired = Bip70Error::Expired;
-    assert!(format!("{}", expired).contains("expired"));
+    assert!(format!("{expired}").contains("expired"));
 
     let invalid = Bip70Error::InvalidRequest("test".to_string());
-    assert!(format!("{}", invalid).contains("test"));
+    assert!(format!("{invalid}").contains("test"));
 
     let payment_error = Bip70Error::InvalidPayment("test".to_string());
-    assert!(format!("{}", payment_error).contains("test"));
+    assert!(format!("{payment_error}").contains("test"));
 }
 
 #[test]

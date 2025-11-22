@@ -3,8 +3,8 @@
 //! End-to-end tests for protocol engine functionality
 
 use bllvm_consensus::types::{OutPoint, TransactionInput, TransactionOutput, UTXO};
-use bllvm_consensus::{Block, BlockHeader, Transaction, ValidationResult};
-use bllvm_protocol::{BitcoinProtocolEngine, NetworkParameters, ProtocolVersion};
+use bllvm_consensus::{Block, BlockHeader, Transaction};
+use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 use std::collections::HashMap;
 
 #[test]
