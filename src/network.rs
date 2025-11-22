@@ -22,7 +22,7 @@ pub enum NetworkMessage {
     GetHeaders(GetHeadersMessage),
     Headers(HeadersMessage),
     Block(Block),
-    Tx(Transaction),
+    Tx(Box<Transaction>),
     Ping(PingMessage),
     Pong(PongMessage),
     MemPool,
@@ -112,7 +112,7 @@ pub struct InventoryVector {
 #[derive(Debug, Clone)]
 pub enum NetworkResponse {
     Ok,
-    SendMessage(NetworkMessage),
+    SendMessage(Box<NetworkMessage>),
     SendMessages(Vec<NetworkMessage>),
     Reject(String),
 }
@@ -157,7 +157,7 @@ impl Default for PeerState {
 #[derive(Debug, Clone)]
 pub enum ChainObject {
     Block(Block),
-    Transaction(Transaction),
+    Transaction(Box<Transaction>),
 }
 
 impl ChainObject {
@@ -257,7 +257,9 @@ fn process_version_message(
     peer_state.start_height = version.start_height;
 
     // Send verack response
-    Ok(NetworkResponse::SendMessage(NetworkMessage::VerAck))
+    Ok(NetworkResponse::SendMessage(Box::new(
+        NetworkMessage::VerAck,
+    )))
 }
 
 /// Process verack message
@@ -301,10 +303,10 @@ fn process_inv_message(
         }
 
         if !needed_items.is_empty() {
-            return Ok(NetworkResponse::SendMessage(NetworkMessage::GetData(
-                GetDataMessage {
+            return Ok(NetworkResponse::SendMessage(Box::new(
+                NetworkMessage::GetData(GetDataMessage {
                     inventory: needed_items,
-                },
+                }),
             )));
         }
     }
@@ -333,7 +335,7 @@ fn process_getdata_message(
                     1 => {
                         // MSG_TX
                         if let Some(tx) = obj.as_transaction() {
-                            responses.push(NetworkMessage::Tx(tx.clone()));
+                            responses.push(NetworkMessage::Tx(Box::new(tx.clone())));
                         }
                     }
                     2 => {
@@ -366,8 +368,8 @@ fn process_getheaders_message(
     if let Some(chain) = chain_access {
         let headers =
             chain.get_headers_for_locator(&getheaders.block_locator_hashes, &getheaders.hash_stop);
-        return Ok(NetworkResponse::SendMessage(NetworkMessage::Headers(
-            HeadersMessage { headers },
+        return Ok(NetworkResponse::SendMessage(Box::new(
+            NetworkMessage::Headers(HeadersMessage { headers }),
         )));
     }
 
@@ -443,7 +445,7 @@ fn process_ping_message(
     _peer_state: &mut PeerState,
 ) -> Result<NetworkResponse> {
     let pong = NetworkMessage::Pong(PongMessage { nonce: ping.nonce });
-    Ok(NetworkResponse::SendMessage(pong))
+    Ok(NetworkResponse::SendMessage(Box::new(pong)))
 }
 
 /// Process pong message
@@ -465,7 +467,7 @@ fn process_mempool_message(chain_access: Option<&dyn ChainStateAccess>) -> Resul
         let mut responses = Vec::new();
 
         for tx in mempool_txs {
-            responses.push(NetworkMessage::Tx(tx));
+            responses.push(NetworkMessage::Tx(Box::new(tx)));
         }
 
         if !responses.is_empty() {
