@@ -38,24 +38,8 @@ impl std::fmt::Display for AddressError {
 
 impl std::error::Error for AddressError {}
 
-/// Network identifier for addresses
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Network {
-    Mainnet,
-    Testnet,
-    Regtest,
-}
-
-impl Network {
-    /// Get human-readable part (HRP) for Bech32 encoding
-    pub fn hrp(&self) -> &'static str {
-        match self {
-            Network::Mainnet => "bc",
-            Network::Testnet => "tb",
-            Network::Regtest => "bcrt",
-        }
-    }
-}
+// Re-export Network from bllvm-consensus to avoid duplication
+pub use bllvm_consensus::types::Network;
 
 /// Encoded Bitcoin address
 #[derive(Debug, Clone, PartialEq, Eq)]
