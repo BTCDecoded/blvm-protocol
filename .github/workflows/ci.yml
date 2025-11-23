@@ -465,6 +465,8 @@ jobs:
     needs: build
     runs-on: [self-hosted, Linux, X64, builds]
     if: |
+      always() &&
+      needs.build.result == 'success' &&
       (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
       (github.event_name != 'push' || github.event.head_commit == null || 
