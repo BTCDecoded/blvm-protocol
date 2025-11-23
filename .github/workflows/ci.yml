@@ -745,7 +745,7 @@ jobs:
             echo "✅ Publish complete - version should be available on crates.io"
           else
             # Check if error is due to version already existing
-            if echo "$PUBLISH_OUTPUT" | grep -qi "already exists"; then
+            if echo "$PUBLISH_OUTPUT" | grep -qiE "(already exists|already been uploaded|already exists on crates.io)"; then
               echo "⚠️  Version ${VERSION} already exists on crates.io (detected during publish)"
               echo "published=false" >> $GITHUB_OUTPUT
               exit 0
