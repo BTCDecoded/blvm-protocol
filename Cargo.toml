@@ -1,6 +1,6 @@
 [package]
 name = "bllvm-protocol"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Bitcoin Commons Team"]
 description = "Bitcoin Commons BLLVM: Bitcoin protocol abstraction layer for multiple variants and evolution"
@@ -18,7 +18,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 # Consensus layer - Local path for development
-bllvm-consensus = { path = "../bllvm-consensus", package = "bllvm-consensus" }
+bllvm-consensus = "[1m[32mbllvm-consensus[0m = 0.1.2    # Bitcoin Commons BLLVM: Direct mathematical implementation of Bitcoin consensus rules from the Oran…"
 
 # Serialization - EXACT VERSIONS for security
 serde = { version = "=1.0.228", features = ["derive"] }  # Updated for iroh 0.95 compatibility
