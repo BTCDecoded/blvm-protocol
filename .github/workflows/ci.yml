@@ -530,9 +530,9 @@ jobs:
       - name: Get latest bllvm-consensus version from crates.io
         id: consensus-version
         run: |
-          CONSENSUS_VER=$(cargo search bllvm-consensus --limit 1 2>/dev/null | head -1 | sed -E 's/^bllvm-consensus = "([^"]+)".*/\1/' || echo "")
+          CONSENSUS_VER=$(cargo search bllvm-consensus --limit 1 2>/dev/null | head -1 | sed -E 's/.*bllvm-consensus = "([0-9]+\.[0-9]+\.[0-9]+)".*/\1/' || echo "")
           if [ -z "$CONSENSUS_VER" ]; then
-            echo "❌ bllvm-consensus not found on crates.io. It must be published first."
+            echo "ERROR: bllvm-consensus not found on crates.io. It must be published first."
             exit 1
           fi
           echo "version=${CONSENSUS_VER}" >> $GITHUB_OUTPUT
