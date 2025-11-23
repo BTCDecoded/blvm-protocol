@@ -558,11 +558,6 @@ jobs:
           echo "  bllvm-consensus: ${CONSENSUS_VER}"
           grep -E "^(version|bllvm-consensus)" Cargo.toml
       
-      - name: "Note: Cargo.toml changes are temporary for publishing only"
-        run: |
-          echo "NOTE: Cargo.toml has been modified with crates.io versions for publishing"
-          echo "These changes are NOT committed - source code keeps local path dependencies for dev"
-      
       - name: Check for crates.io token
         run: |
           if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
