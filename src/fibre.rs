@@ -43,7 +43,7 @@ impl FecChunk {
     /// Serialize chunk to FIBRE packet format
     pub fn serialize(&self) -> Result<Vec<u8>, FibreProtocolError> {
         let mut packet = Vec::with_capacity(HEADER_SIZE + self.data.len() + 4);
-        
+
         // Magic
         packet.extend_from_slice(&FIBRE_MAGIC);
         // Version
@@ -64,26 +64,30 @@ impl FecChunk {
         packet.extend_from_slice(&(self.data.len() as u32).to_be_bytes());
         // Data
         packet.extend_from_slice(&self.data);
-        
+
         // Checksum (CRC32)
         let checksum = crc32fast::hash(&packet);
         packet.extend_from_slice(&checksum.to_be_bytes());
-        
+
         Ok(packet)
     }
-    
+
     /// Deserialize chunk from FIBRE packet format
     pub fn deserialize(data: &[u8]) -> Result<Self, FibreProtocolError> {
         // Validate minimum size
         if data.len() < HEADER_SIZE + 4 {
-            return Err(FibreProtocolError::InvalidPacket("Packet too short".to_string()));
+            return Err(FibreProtocolError::InvalidPacket(
+                "Packet too short".to_string(),
+            ));
         }
-        
+
         // Verify magic
-        if &data[0..4] != &FIBRE_MAGIC {
-            return Err(FibreProtocolError::InvalidPacket("Invalid magic bytes".to_string()));
+        if data[0..4] != FIBRE_MAGIC {
+            return Err(FibreProtocolError::InvalidPacket(
+                "Invalid magic bytes".to_string(),
+            ));
         }
-        
+
         // Verify checksum
         let received_checksum = u32::from_be_bytes([
             data[data.len() - 4],
@@ -93,37 +97,46 @@ impl FecChunk {
         ]);
         let calculated_checksum = crc32fast::hash(&data[..data.len() - 4]);
         if received_checksum != calculated_checksum {
-            return Err(FibreProtocolError::InvalidPacket("Checksum mismatch".to_string()));
+            return Err(FibreProtocolError::InvalidPacket(
+                "Checksum mismatch".to_string(),
+            ));
         }
-        
+
         // Parse fields
         let version = data[4];
         if version != FIBRE_VERSION {
-            return Err(FibreProtocolError::InvalidPacket(format!("Unsupported version: {}", version)));
+            return Err(FibreProtocolError::InvalidPacket(format!(
+                "Unsupported version: {version}"
+            )));
         }
-        
+
         let packet_type = data[5];
         if packet_type != PACKET_TYPE_CHUNK {
-            return Err(FibreProtocolError::InvalidPacket(format!("Unexpected packet type: {}", packet_type)));
+            return Err(FibreProtocolError::InvalidPacket(format!(
+                "Unexpected packet type: {packet_type}"
+            )));
         }
-        
-        let block_hash: Hash = data[6..38].try_into()
+
+        let block_hash: Hash = data[6..38]
+            .try_into()
             .map_err(|_| FibreProtocolError::InvalidPacket("Invalid block hash".to_string()))?;
         let sequence = u64::from_be_bytes(data[38..46].try_into().unwrap());
         let index = u32::from_be_bytes(data[46..50].try_into().unwrap());
         let total_chunks = u32::from_be_bytes(data[50..54].try_into().unwrap());
         let data_chunks = u32::from_be_bytes(data[54..58].try_into().unwrap());
         let data_length = u32::from_be_bytes(data[58..62].try_into().unwrap()) as usize;
-        
+
         // Validate data length
         if data.len() < HEADER_SIZE + data_length + 4 {
-            return Err(FibreProtocolError::InvalidPacket("Packet data length mismatch".to_string()));
+            return Err(FibreProtocolError::InvalidPacket(
+                "Packet data length mismatch".to_string(),
+            ));
         }
-        
+
         // Extract data
         let chunk_data = data[62..62 + data_length].to_vec();
         let chunk_size = chunk_data.len();
-        
+
         Ok(FecChunk {
             index,
             total_chunks,
@@ -178,11 +191,21 @@ pub struct FibreConfig {
     pub max_assemblies: usize,
 }
 
-fn default_true() -> bool { true }
-fn default_fec_parity_ratio() -> f64 { 0.2 }
-fn default_chunk_timeout() -> u64 { 2 }
-fn default_max_retries() -> u32 { 3 }
-fn default_max_assemblies() -> usize { 10 }
+fn default_true() -> bool {
+    true
+}
+fn default_fec_parity_ratio() -> f64 {
+    0.2
+}
+fn default_chunk_timeout() -> u64 {
+    2
+}
+fn default_max_retries() -> u32 {
+    3
+}
+fn default_max_assemblies() -> usize {
+    10
+}
 
 impl Default for FibreConfig {
     fn default() -> Self {
@@ -201,7 +224,7 @@ impl Default for FibreConfig {
 pub enum FibreProtocolError {
     #[error("Invalid packet: {0}")]
     InvalidPacket(String),
-    
+
     #[error("Serialization error: {0}")]
     SerializationError(String),
 }
@@ -209,7 +232,7 @@ pub enum FibreProtocolError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_fec_chunk_serialize_deserialize() {
         let chunk = FecChunk {
@@ -222,10 +245,10 @@ mod tests {
             sequence: 12345,
             magic: FIBRE_MAGIC,
         };
-        
+
         let serialized = chunk.serialize().unwrap();
         assert!(serialized.len() >= HEADER_SIZE + 5 + 4);
-        
+
         let deserialized = FecChunk::deserialize(&serialized).unwrap();
         assert_eq!(deserialized.index, chunk.index);
         assert_eq!(deserialized.total_chunks, chunk.total_chunks);
@@ -234,17 +257,17 @@ mod tests {
         assert_eq!(deserialized.block_hash, chunk.block_hash);
         assert_eq!(deserialized.sequence, chunk.sequence);
     }
-    
+
     #[test]
     fn test_fec_chunk_invalid_magic() {
         let mut data = vec![0u8; HEADER_SIZE + 4];
         data[0..4].copy_from_slice(&[0xFF; 4]); // Invalid magic
-        
+
         let result = FecChunk::deserialize(&data);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Invalid magic"));
     }
-    
+
     #[test]
     fn test_fec_chunk_invalid_checksum() {
         let chunk = FecChunk {
@@ -257,18 +280,18 @@ mod tests {
             sequence: 12345,
             magic: FIBRE_MAGIC,
         };
-        
+
         let serialized = chunk.serialize().unwrap();
         let mut corrupted = serialized.clone();
         // Corrupt checksum
         let last_idx = corrupted.len() - 1;
         corrupted[last_idx] ^= 0xFF;
-        
+
         let result = FecChunk::deserialize(&corrupted);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Checksum"));
     }
-    
+
     #[test]
     fn test_fibre_config_default() {
         let config = FibreConfig::default();
@@ -278,7 +301,7 @@ mod tests {
         assert_eq!(config.max_retries, 3);
         assert_eq!(config.max_assemblies, 10);
     }
-    
+
     #[test]
     fn test_fibre_capabilities_default() {
         let caps = FibreCapabilities::default();
@@ -287,4 +310,3 @@ mod tests {
         assert!(caps.min_latency);
     }
 }
-

@@ -84,8 +84,8 @@ pub mod variants;
 pub mod address; // BIP173/350/351: Bech32/Bech32m address encoding
 pub mod bip157; // BIP157: Client-side block filtering network protocol
 pub mod bip158; // BIP158: Compact block filters
-pub mod payment; // BIP70: Payment protocol (P2P variant)
-pub mod fibre; // FIBRE: Fast Internet Bitcoin Relay Engine protocol definitions
+pub mod fibre;
+pub mod payment; // BIP70: Payment protocol (P2P variant) // FIBRE: Fast Internet Bitcoin Relay Engine protocol definitions
 
 /// Bitcoin Protocol Engine
 ///
