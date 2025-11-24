@@ -1,6 +1,6 @@
 [package]
 name = "bllvm-protocol"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = ["Bitcoin Commons Team"]
 description = "Bitcoin Commons BLLVM: Bitcoin protocol abstraction layer for multiple variants and evolution"
@@ -37,6 +37,9 @@ hex = "=0.4"  # For hex encoding/decoding
 
 # Address encoding (BIP173/350/351)
 bech32 = "=0.9"
+
+# CRC32 for FIBRE packet checksums
+crc32fast = "=1.3"
 
 [features]
 # Production performance optimizations (passed through from bllvm-consensus)
