@@ -34,7 +34,7 @@ The bllvm-protocol sits between the pure mathematical consensus rules (bllvm-con
 - **Validation Rules**: Protocol-specific size limits and validation logic
 
 ### Protocol Evolution
-- **Version Support**: Current and future protocol versions
+- **Version Support**: Multiple protocol versions
 - **Feature Management**: Enable/disable features based on protocol version
 - **Breaking Changes**: Track and manage protocol evolution
 
@@ -228,7 +228,7 @@ assert!(engine.supports_feature("segwit"));
 
 ## Protocol Evolution
 
-### Current Protocol
+### Supported Protocol Features
 - Basic transactions and proof-of-work
 - Economic model and P2P networking
 - SegWit and Taproot support
@@ -243,7 +243,8 @@ assert!(engine.supports_feature("segwit"));
 - FIBRE support
 - Dandelion++ privacy relay
 
-### Future Protocol Versions
+### Protocol Version Support
+- Multiple protocol versions supported
 - Enhanced scripting capabilities
 - Privacy features
 - Advanced economic models
