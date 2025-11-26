@@ -4,9 +4,7 @@ This document covers repo-specific security boundaries. See the [BTCDecoded Secu
 
 ## Supported Versions
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+Security updates are provided for supported protocol versions. See the [CHANGELOG.md](CHANGELOG.md) for version history and support status.
 
 ## Reporting a Vulnerability
 
@@ -103,7 +101,7 @@ We may offer bug bounties for critical vulnerabilities. Contact us for details.
 ### Security Updates
 
 Security updates will be:
-- Released as patch versions (0.1.x)
+- Released as patch versions for security fixes
 - Clearly marked as security fixes
 - Backported to all supported versions
 - Announced on our security mailing list

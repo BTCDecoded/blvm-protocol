@@ -579,13 +579,10 @@ fn process_block_message(
 ) -> Result<NetworkResponse> {
     // Check protocol limits first (from config)
     if block.transactions.len() > config.validation.max_txs_per_block {
-        return Ok(NetworkResponse::Reject(
-            format!(
-                "Too many transactions (max {})",
-                config.validation.max_txs_per_block
-            )
-            .into(),
-        ));
+        return Err(crate::error::ProtocolError::MessageTooLarge {
+            size: block.transactions.len(),
+            max: config.validation.max_txs_per_block as usize,
+        });
     }
 
     // Delegate to consensus via protocol engine (requires utxo_set and height)
@@ -600,7 +597,9 @@ fn process_block_message(
             )),
         }
     } else {
-        Ok(NetworkResponse::Reject("Missing validation context".into()))
+        Err(crate::error::ProtocolError::Configuration(
+            "Missing validation context (utxo_set and height required)".into()
+        ))
     }
 }
 
