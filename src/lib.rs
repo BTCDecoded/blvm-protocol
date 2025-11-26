@@ -19,10 +19,16 @@ use serde::{Deserialize, Serialize};
 // Re-export commonly used types from consensus-proof for convenience
 // This allows upper layers (like reference-node) to depend only on protocol-engine
 pub use bllvm_consensus::{
-    Block, BlockHeader, ByteString, ConsensusError, ConsensusProof, Hash, Integer, Natural,
-    OutPoint, Result, Transaction, TransactionInput, TransactionOutput, UtxoSet, ValidationResult,
+    Block, BlockHeader, ByteString, ConsensusProof, Hash, Integer, Natural,
+    OutPoint, Transaction, TransactionInput, TransactionOutput, UtxoSet, ValidationResult,
     UTXO,
 };
+
+// Re-export consensus Result as ConsensusResult for backward compatibility
+pub use bllvm_consensus::error::Result as ConsensusResult;
+
+// Protocol-specific Result type
+pub use error::{ProtocolError, Result};
 
 // Re-export commonly used modules
 pub mod mempool {
@@ -75,9 +81,10 @@ pub use bllvm_consensus::tx_inputs;
 pub use bllvm_consensus::tx_outputs;
 #[cfg(not(feature = "production"))]
 pub use bllvm_consensus::tx_outputs;
-pub mod error {
-    pub use bllvm_consensus::error::*;
-}
+pub mod error;
+
+// Re-export consensus error types for backward compatibility
+pub use bllvm_consensus::error::ConsensusError;
 
 // Re-export feature and economic modules for convenience
 pub use economic::EconomicParameters;
@@ -190,13 +197,92 @@ impl BitcoinProtocolEngine {
     ) -> Result<ValidationResult> {
         let (result, _) = self
             .consensus
-            .validate_block(block, utxos.clone(), height)?;
+            .validate_block(block, utxos.clone(), height)
+            .map_err(ProtocolError::from)?;
         Ok(result)
     }
 
     /// Validate a transaction using this protocol's rules
     pub fn validate_transaction(&self, tx: &Transaction) -> Result<ValidationResult> {
-        self.consensus.validate_transaction(tx)
+        self.consensus
+            .validate_transaction(tx)
+            .map_err(ProtocolError::from)
+    }
+
+    /// Validate block with protocol rules and update UTXO set
+    ///
+    /// This method combines protocol validation (size limits, feature flags)
+    /// with consensus validation and UTXO set updates. This is the recommended
+    /// method for node implementations that need both validation and state updates.
+    ///
+    /// # Arguments
+    ///
+    /// * `block` - The block to validate and connect
+    /// * `witnesses` - Witness data for each transaction in the block
+    /// * `utxos` - Current UTXO set (will be cloned, not mutated)
+    /// * `height` - Current block height
+    /// * `recent_headers` - Optional recent block headers for median time-past calculation (BIP113)
+    /// * `context` - Protocol validation context
+    ///
+    /// # Returns
+    ///
+    /// Returns `(ValidationResult, UtxoSet)` where:
+    /// - `ValidationResult` indicates if the block is valid
+    /// - `UtxoSet` is the updated UTXO set after applying the block's transactions
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion, ProtocolValidationContext};
+    /// use bllvm_protocol::{Block, UtxoSet};
+    ///
+    /// let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1)?;
+    /// let context = ProtocolValidationContext::new(ProtocolVersion::BitcoinV1, 0)?;
+    /// let block = /* ... */;
+    /// let witnesses = vec![];
+    /// let utxos = UtxoSet::new();
+    ///
+    /// let (result, new_utxo_set) = engine.validate_and_connect_block(
+    ///     &block,
+    ///     &witnesses,
+    ///     &utxos,
+    ///     0,
+    ///     None,
+    ///     &context,
+    /// )?;
+    /// ```
+    pub fn validate_and_connect_block(
+        &self,
+        block: &Block,
+        witnesses: &[segwit::Witness],
+        utxos: &UtxoSet,
+        height: u64,
+        recent_headers: Option<&[BlockHeader]>,
+        context: &validation::ProtocolValidationContext,
+    ) -> Result<(ValidationResult, UtxoSet)> {
+        // First, protocol validation (size limits, feature flags)
+        let protocol_result = self.validate_block_with_protocol(block, utxos, height, context)?;
+        if !matches!(protocol_result, ValidationResult::Valid) {
+            return Ok((protocol_result, utxos.clone()));
+        }
+
+        // Then, consensus validation with UTXO update
+        // Convert protocol version to network type
+        let network = match self.protocol_version {
+            ProtocolVersion::BitcoinV1 => types::Network::Mainnet,
+            ProtocolVersion::Testnet3 => types::Network::Testnet,
+            ProtocolVersion::Regtest => types::Network::Regtest,
+        };
+        let (result, new_utxo_set, _undo_log) = bllvm_consensus::block::connect_block(
+            block,
+            witnesses,
+            utxos.clone(),
+            height,
+            recent_headers,
+            network,
+        )?;
+
+        Ok((result, new_utxo_set))
     }
 
     /// Check if this protocol supports a specific feature

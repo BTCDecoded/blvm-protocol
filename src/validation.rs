@@ -4,11 +4,15 @@
 //! the pure mathematical consensus rules with network-specific
 //! and protocol-specific validation logic.
 
-use crate::{BitcoinProtocolEngine, NetworkParameters, ProtocolVersion, Result};
+use crate::error::ProtocolError;
+use crate::{BitcoinProtocolEngine, NetworkParameters, ProtocolVersion};
 use bllvm_consensus::types::{OutPoint, UTXO};
 use bllvm_consensus::{Block, Transaction, ValidationResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+// Protocol-specific Result type
+type Result<T> = std::result::Result<T, ProtocolError>;
 
 /// Protocol-specific validation rules
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -176,16 +180,20 @@ impl BitcoinProtocolEngine {
         // Check block size limits
         let block_size = self.calculate_block_size(block);
         if block_size > context.validation_rules.max_block_size {
-            return Err(bllvm_consensus::error::ConsensusError::BlockValidation(
-                "Block size exceeds maximum".into(),
+            return Err(ProtocolError::Validation(
+                format!(
+                    "Block size exceeds maximum: {} bytes (max {} bytes)",
+                    block_size, context.validation_rules.max_block_size
+                )
+                .into(),
             ));
         }
 
         // Check transaction count limits
         if block.transactions.len() > 10000 {
             // Reasonable limit
-            return Err(bllvm_consensus::error::ConsensusError::BlockValidation(
-                "Too many transactions in block".into(),
+            return Err(ProtocolError::Validation(
+                "Too many transactions in block (max 10000)".into(),
             ));
         }
 
@@ -206,31 +214,39 @@ impl BitcoinProtocolEngine {
         // Check transaction size limits
         let tx_size = self.calculate_transaction_size(tx);
         if tx_size > context.validation_rules.max_tx_size {
-            return Err(
-                bllvm_consensus::error::ConsensusError::TransactionValidation(
-                    "Transaction size exceeds maximum".into(),
-                ),
-            );
+            return Err(ProtocolError::Validation(
+                format!(
+                    "Transaction size exceeds maximum: {} bytes (max {} bytes)",
+                    tx_size, context.validation_rules.max_tx_size
+                )
+                .into(),
+            ));
         }
 
         // Check script size limits
         for input in &tx.inputs {
             if input.script_sig.len() > context.validation_rules.max_script_size as usize {
-                return Err(
-                    bllvm_consensus::error::ConsensusError::TransactionValidation(
-                        "Script size exceeds maximum".into(),
-                    ),
-                );
+                return Err(ProtocolError::Validation(
+                    format!(
+                        "Script size exceeds maximum: {} bytes (max {} bytes)",
+                        input.script_sig.len(),
+                        context.validation_rules.max_script_size
+                    )
+                    .into(),
+                ));
             }
         }
 
         for output in &tx.outputs {
             if output.script_pubkey.len() > context.validation_rules.max_script_size as usize {
-                return Err(
-                    bllvm_consensus::error::ConsensusError::TransactionValidation(
-                        "Script size exceeds maximum".into(),
-                    ),
-                );
+                return Err(ProtocolError::Validation(
+                    format!(
+                        "Script size exceeds maximum: {} bytes (max {} bytes)",
+                        output.script_pubkey.len(),
+                        context.validation_rules.max_script_size
+                    )
+                    .into(),
+                ));
             }
         }
 
