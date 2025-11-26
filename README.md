@@ -8,6 +8,7 @@ This crate provides a Bitcoin protocol abstraction layer that enables:
 - Multiple Bitcoin variants (mainnet, testnet, regtest)
 - Protocol evolution support (Bitcoin V1, V2, etc.)
 - Economic model abstraction (PoW, future variants)
+- **Commons-specific protocol extensions** (UTXO commitments, ban list sharing)
 - Research-friendly interfaces
 
 ## Architecture Position
@@ -37,6 +38,12 @@ The bllvm-protocol sits between the pure mathematical consensus rules (bllvm-con
 - **Feature Management**: Enable/disable features based on protocol version
 - **Breaking Changes**: Track and manage protocol evolution
 
+### Commons-Specific Extensions
+- **UTXO Commitments**: Protocol messages for UTXO set synchronization and verification
+- **Filtered Blocks**: Spam-filtered block relay for efficient syncing
+- **Ban List Sharing**: Distributed ban list management
+- **Service Flags**: Standard and Commons-specific capability flags
+
 ## Core Components
 
 ### Protocol Variants
@@ -51,18 +58,29 @@ The bllvm-protocol sits between the pure mathematical consensus rules (bllvm-con
 - **Difficulty**: Proof-of-work targets
 - **Halving**: Block subsidy intervals
 
+### Network Messages
+- **Core P2P Messages**: Version, VerAck, Addr, Inv, GetData, GetHeaders, Headers, Block, Tx, Ping, Pong, MemPool, FeeFilter
+- **Additional Core Messages**: GetBlocks, GetAddr, NotFound, Reject, SendHeaders
+- **BIP152 (Compact Block Relay)**: SendCmpct, CmpctBlock, GetBlockTxn, BlockTxn
+- **Commons Extensions**: GetUTXOSet, UTXOSet, GetFilteredBlock, FilteredBlock, GetBanList, BanList
+
+### Service Flags
+- **Standard Flags**: NODE_NETWORK, NODE_WITNESS, NODE_COMPACT_FILTERS, etc.
+- **Commons Flags**: NODE_UTXO_COMMITMENTS, NODE_BAN_LIST_SHARING, NODE_FIBRE, NODE_DANDELION, NODE_PACKAGE_RELAY
+
 ### Validation Rules
 - **Size Limits**: Block, transaction, and script size limits
 - **Feature Flags**: SegWit, Taproot, RBF support
 - **Fee Rules**: Minimum and maximum fee rates
 - **Protocol Context**: Block height and network state
+- **DoS Protection**: Protocol-level message size limits
 
 ## Usage
 
 ### Basic Protocol Engine
 
 ```rust
-use protocol_engine::{BitcoinProtocolEngine, ProtocolVersion};
+use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 
 // Create a mainnet protocol engine
 let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1)?;
@@ -78,25 +96,92 @@ if engine.supports_feature("segwit") {
 }
 ```
 
+### Service Flags
+
+```rust
+use bllvm_protocol::service_flags::{self, standard, commons};
+
+// Check service flags
+let services = standard::NODE_NETWORK | standard::NODE_WITNESS | commons::NODE_FIBRE;
+assert!(service_flags::has_flag(services, standard::NODE_NETWORK));
+assert!(service_flags::has_flag(services, commons::NODE_FIBRE));
+
+// Get all Commons flags
+let commons_flags = service_flags::get_commons_flags();
+assert!(service_flags::has_flag(commons_flags, commons::NODE_FIBRE));
+assert!(service_flags::has_flag(commons_flags, commons::NODE_BAN_LIST_SHARING));
+```
+
+### Network Message Processing
+
+```rust
+use bllvm_protocol::network::{process_network_message, NetworkMessage, PeerState};
+use bllvm_protocol::BitcoinProtocolEngine;
+
+let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1)?;
+let mut peer_state = PeerState::new();
+
+// Process a version message
+let version_msg = NetworkMessage::Version(/* ... */);
+let response = process_network_message(
+    &engine,
+    &version_msg,
+    &mut peer_state,
+    None,
+    None,
+    None,
+)?;
+```
+
+### Commons Protocol Extensions
+
+```rust
+use bllvm_protocol::commons::{GetUTXOSetMessage, GetBanListMessage};
+use bllvm_protocol::network::NetworkMessage;
+
+// Request UTXO set at specific height
+let get_utxo = NetworkMessage::GetUTXOSet(GetUTXOSetMessage {
+    height: 700000,
+    block_hash: [/* ... */],
+});
+
+// Request ban list
+let get_banlist = NetworkMessage::GetBanList(GetBanListMessage {
+    request_id: 12345,
+    min_score: Some(100),
+});
+```
+
+### BIP152 Compact Block Relay
+
+```rust
+use bllvm_protocol::network::{NetworkMessage, SendCmpctMessage};
+
+// Negotiate compact block relay
+let sendcmpct = NetworkMessage::SendCmpct(SendCmpctMessage {
+    version: 2,  // Compact block version
+    prefer_cmpct: 1,  // Prefer compact blocks
+});
+```
+
 ### Protocol-Specific Validation
 
 ```rust
-use protocol_engine::{BitcoinProtocolEngine, ProtocolVersion, ProtocolValidationContext};
+use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 
 let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1)?;
-let context = ProtocolValidationContext::new(ProtocolVersion::BitcoinV1, 1000)?;
 
 // Validate block with protocol rules
-let result = engine.validate_block_with_protocol(&block, &context)?;
+let result = engine.validate_block(&block, &utxos, height)?;
 
 // Validate transaction with protocol rules
-let result = engine.validate_transaction_with_protocol(&tx, &context)?;
+let result = engine.validate_transaction(&tx)?;
 ```
 
 ### Regtest Mode
 
 ```rust
-use protocol_engine::{BitcoinProtocolEngine, ProtocolVersion};
+use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 
 // Create regtest protocol engine
 let engine = BitcoinProtocolEngine::new(ProtocolVersion::Regtest)?;
@@ -113,12 +198,67 @@ assert!(engine.supports_feature("segwit"));
 - Economic model and P2P networking
 - SegWit and Taproot support
 - RBF (Replace-By-Fee) support
+- BIP152 Compact Block Relay
+- BIP157 Block Filtering
+
+### Commons Extensions
+- UTXO Commitments protocol
+- Filtered block relay (spam filtering)
+- Ban list sharing
+- FIBRE support
+- Dandelion++ privacy relay
 
 ### Bitcoin V2 (Future)
 - Enhanced scripting capabilities
 - Privacy features
 - Advanced economic models
 - Protocol improvements
+
+## Modules
+
+### Core Modules
+- `network` - P2P network message types and processing
+- `service_flags` - Service flags for node capabilities
+- `commons` - Commons-specific protocol extensions
+- `varint` - Variable-length integer encoding
+- `economic` - Economic parameters and calculations
+- `features` - Feature activation and management
+- `validation` - Protocol-specific validation rules
+
+### BIP Implementations
+- `bip157` - Client-side block filtering (BIP157)
+- `bip158` - Compact block filters (BIP158)
+- `address` - Bech32/Bech32m address encoding (BIP173/350/351)
+- `payment` - Payment protocol (BIP70)
+- `fibre` - FIBRE protocol definitions
+
+## Testing
+
+```bash
+# Run all tests
+cargo test
+
+# Run network message tests
+cargo test --test network_message_tests
+
+# Run protocol limits tests
+cargo test --test protocol_limits_tests
+
+# Run with specific protocol version
+cargo test --features testnet
+
+# Run with UTXO commitments
+cargo test --features utxo-commitments
+```
+
+## Test Coverage
+
+- **125 passing tests** (up from 118)
+- Network message processing tests (22 tests)
+- Protocol limits tests (10 tests)
+- Service flags tests
+- Varint encoding tests
+- Protocol integration tests
 
 ## Security Considerations
 
@@ -132,17 +272,25 @@ assert!(engine.supports_feature("segwit"));
 - **Fast Mining**: Configurable difficulty for testing
 - **Isolated**: No connection to real networks
 
+### DoS Protection
+- Protocol-level message size limits
+- Address count limits (1000)
+- Inventory item limits (50000)
+- Header count limits (2000)
+- Transaction count limits (10000 per block)
+
 ## Dependencies
 
 All dependencies are pinned to exact versions for security:
 
 ```toml
 # Consensus layer
-bllvm-consensus = { git = "https://github.com/BTCDecoded/bllvm-consensus", tag = "v0.1.0" }
+bllvm-consensus = { path = "../bllvm-consensus" }
 
 # Serialization - EXACT VERSIONS
-serde = "=1.0.193"
+serde = "=1.0.228"
 serde_json = "=1.0.108"
+bincode = "=1.3.3"
 
 # Error handling - EXACT VERSIONS
 anyhow = "=1.0.93"
@@ -151,19 +299,7 @@ thiserror = "=1.0.69"
 # Cryptography - EXACT VERSIONS
 sha2 = "=0.10.9"
 ripemd = "=0.1.3"
-```
-
-## Testing
-
-```bash
-# Run all tests
-cargo test
-
-# Run with specific protocol version
-cargo test --features testnet
-
-# Run educational mode tests
-cargo test --features educational
+secp256k1 = "=0.28.2"
 ```
 
 ## License

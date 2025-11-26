@@ -56,6 +56,10 @@ pub mod network;
 pub mod service_flags;
 pub mod commons;
 pub mod varint;
+
+// Re-export commonly used types for convenience
+pub use service_flags::{standard as service_flags_standard, commons as service_flags_commons};
+pub use commons::{GetUTXOSetMessage, UTXOSetMessage, GetFilteredBlockMessage, FilteredBlockMessage, GetBanListMessage, BanListMessage};
 // Wire format module - framework in place, full implementation pending
 // pub mod wire;
 pub mod types {
