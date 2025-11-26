@@ -56,7 +56,8 @@ pub mod network;
 pub mod service_flags;
 pub mod commons;
 pub mod varint;
-pub mod wire;
+// Wire format module - framework in place, full implementation pending
+// pub mod wire;
 pub mod types {
     pub use bllvm_consensus::types::*;
 }
