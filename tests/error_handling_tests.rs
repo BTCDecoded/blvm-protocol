@@ -3,13 +3,13 @@
 //! Tests for handling malformed messages, protocol mismatches,
 //! invalid data, and error recovery scenarios.
 
+use bllvm_consensus::{BlockHeader, Hash};
 use bllvm_protocol::network::{
-    process_network_message, NetworkMessage, NetworkResponse, PeerState,
-    VersionMessage, AddrMessage, NetworkAddress, InvMessage, GetDataMessage,
-    HeadersMessage, GetHeadersMessage, RejectMessage,
+    process_network_message, AddrMessage, GetDataMessage, GetHeadersMessage, HeadersMessage,
+    InvMessage, NetworkAddress, NetworkMessage, NetworkResponse, PeerState, RejectMessage,
+    VersionMessage,
 };
 use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
-use bllvm_consensus::{BlockHeader, Hash};
 
 fn create_test_engine() -> BitcoinProtocolEngine {
     BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap()
@@ -27,7 +27,7 @@ fn create_test_peer_state() -> PeerState {
 fn test_version_message_too_old() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let version = VersionMessage {
         version: 60000, // Too old (minimum is 70001)
         services: 1,
@@ -55,7 +55,8 @@ fn test_version_message_too_old() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
         NetworkResponse::Reject(reason) => {
@@ -69,9 +70,9 @@ fn test_version_message_too_old() {
 fn test_version_message_invalid_user_agent_length() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let long_user_agent = "a".repeat(10000); // Exceeds protocol limit
-    
+
     let version = VersionMessage {
         version: 70015,
         services: 1,
@@ -99,11 +100,16 @@ fn test_version_message_invalid_user_agent_length() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
         NetworkResponse::Reject(reason) => {
-            assert!(reason.contains("user_agent") || reason.contains("too long") || reason.contains("256"));
+            assert!(
+                reason.contains("user_agent")
+                    || reason.contains("too long")
+                    || reason.contains("256")
+            );
         }
         _ => panic!("Expected Reject for invalid user agent length"),
     }
@@ -117,7 +123,7 @@ fn test_version_message_invalid_user_agent_length() {
 fn test_addr_message_too_many_addresses() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let addresses: Vec<NetworkAddress> = (0..1001)
         .map(|i| NetworkAddress {
             services: 1,
@@ -135,7 +141,8 @@ fn test_addr_message_too_many_addresses() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
         NetworkResponse::Reject(reason) => {
@@ -153,7 +160,7 @@ fn test_addr_message_too_many_addresses() {
 fn test_inv_message_too_many_items() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
         .map(|i| bllvm_protocol::network::InventoryVector {
             inv_type: 1,
@@ -170,7 +177,8 @@ fn test_inv_message_too_many_items() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
         NetworkResponse::Reject(reason) => {
@@ -184,13 +192,11 @@ fn test_inv_message_too_many_items() {
 fn test_inv_message_invalid_type() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
-    let inventory = vec![
-        bllvm_protocol::network::InventoryVector {
-            inv_type: 99, // Invalid type (valid: 1=tx, 2=block, 3=filtered block, 4=compact block)
-            hash: [0u8; 32],
-        },
-    ];
+
+    let inventory = vec![bllvm_protocol::network::InventoryVector {
+        inv_type: 99, // Invalid type (valid: 1=tx, 2=block, 3=filtered block, 4=compact block)
+        hash: [0u8; 32],
+    }];
 
     let inv = InvMessage { inventory };
 
@@ -201,7 +207,8 @@ fn test_inv_message_invalid_type() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should handle gracefully (may reject or ignore)
     match response {
@@ -218,7 +225,7 @@ fn test_inv_message_invalid_type() {
 fn test_getdata_message_too_many_items() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
         .map(|i| bllvm_protocol::network::InventoryVector {
             inv_type: 1,
@@ -235,7 +242,8 @@ fn test_getdata_message_too_many_items() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
         NetworkResponse::Reject(reason) => {
@@ -253,7 +261,7 @@ fn test_getdata_message_too_many_items() {
 fn test_headers_message_too_many_headers() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let headers: Vec<BlockHeader> = (0..2001)
         .map(|i| BlockHeader {
             version: 1,
@@ -274,7 +282,8 @@ fn test_headers_message_too_many_headers() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
         NetworkResponse::Reject(reason) => {
@@ -288,7 +297,7 @@ fn test_headers_message_too_many_headers() {
 fn test_getheaders_message_too_many_locators() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let locator: Vec<Hash> = (0..101)
         .map(|i| {
             let mut hash = [0u8; 32];
@@ -310,7 +319,8 @@ fn test_getheaders_message_too_many_locators() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
         NetworkResponse::Reject(reason) => {
@@ -328,7 +338,7 @@ fn test_getheaders_message_too_many_locators() {
 fn test_reject_message_invalid_name_length() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let reject = RejectMessage {
         message: "verylongmessagename".to_string(), // > 12 chars
         code: 0x10,
@@ -343,7 +353,8 @@ fn test_reject_message_invalid_name_length() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
         NetworkResponse::Reject(reason) => {
@@ -357,9 +368,9 @@ fn test_reject_message_invalid_name_length() {
 fn test_reject_message_reason_too_long() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let long_reason = "a".repeat(1000); // Exceeds protocol limit
-    
+
     let reject = RejectMessage {
         message: "block".to_string(),
         code: 0x10,
@@ -374,7 +385,8 @@ fn test_reject_message_reason_too_long() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
         NetworkResponse::Reject(reason) => {
@@ -392,7 +404,7 @@ fn test_reject_message_reason_too_long() {
 fn test_version_message_wrong_network() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     // Test with testnet engine but mainnet version message
     // (In practice, this would be caught by magic bytes, but we test the version handling)
     let version = VersionMessage {
@@ -423,7 +435,8 @@ fn test_version_message_wrong_network() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should return VerAck for valid version
     match response {
@@ -440,7 +453,7 @@ fn test_version_message_wrong_network() {
 fn test_empty_inventory_message() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let inv = InvMessage {
         inventory: vec![], // Empty inventory
     };
@@ -452,7 +465,8 @@ fn test_empty_inventory_message() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should handle empty inventory gracefully
     assert!(matches!(response, NetworkResponse::Ok));
@@ -462,7 +476,7 @@ fn test_empty_inventory_message() {
 fn test_empty_getdata_message() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let getdata = GetDataMessage {
         inventory: vec![], // Empty inventory
     };
@@ -474,7 +488,8 @@ fn test_empty_getdata_message() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should handle empty getdata gracefully
     assert!(matches!(response, NetworkResponse::Ok));
@@ -484,7 +499,7 @@ fn test_empty_getdata_message() {
 fn test_empty_headers_message() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let headers_msg = HeadersMessage {
         headers: vec![], // Empty headers
     };
@@ -496,9 +511,9 @@ fn test_empty_headers_message() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should handle empty headers gracefully
     assert!(matches!(response, NetworkResponse::Ok));
 }
-

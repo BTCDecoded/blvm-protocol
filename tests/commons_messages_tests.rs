@@ -5,15 +5,17 @@
 //! - Filtered Blocks (GetFilteredBlock, FilteredBlock)
 //! - Ban List Sharing (GetBanList, BanList)
 
+use bllvm_consensus::{BlockHeader, Hash, Transaction};
+use bllvm_protocol::commons::{BanEntry, BanListMessage, GetBanListMessage};
 #[cfg(feature = "utxo-commitments")]
 use bllvm_protocol::commons::{
-    GetUTXOSetMessage, UTXOSetMessage, UTXOCommitment,
-    GetFilteredBlockMessage, FilteredBlockMessage, FilterPreferences, SpamSummary,
+    FilterPreferences, FilteredBlockMessage, GetFilteredBlockMessage, GetUTXOSetMessage,
+    SpamSummary, UTXOCommitment, UTXOSetMessage,
 };
-use bllvm_protocol::commons::{GetBanListMessage, BanListMessage, BanEntry};
-use bllvm_protocol::network::{process_network_message, NetworkMessage, NetworkResponse, PeerState};
+use bllvm_protocol::network::{
+    process_network_message, NetworkMessage, NetworkResponse, PeerState,
+};
 use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
-use bllvm_consensus::{BlockHeader, Hash, Transaction};
 
 fn create_test_engine() -> BitcoinProtocolEngine {
     BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap()
@@ -32,7 +34,7 @@ fn create_test_peer_state() -> PeerState {
 fn test_getutxoset_message_processing() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let getutxoset = GetUTXOSetMessage {
         height: 700000,
         block_hash: [0x12; 32],
@@ -45,7 +47,8 @@ fn test_getutxoset_message_processing() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -55,7 +58,7 @@ fn test_getutxoset_message_processing() {
 fn test_getutxoset_zero_height() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let getutxoset = GetUTXOSetMessage {
         height: 0, // Genesis block
         block_hash: [0u8; 32],
@@ -68,7 +71,8 @@ fn test_getutxoset_zero_height() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -78,7 +82,7 @@ fn test_getutxoset_zero_height() {
 fn test_utxoset_message_processing() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let commitment = UTXOCommitment {
         merkle_root: [0xab; 32],
         total_supply: 21_000_000 * 100_000_000,
@@ -102,7 +106,8 @@ fn test_utxoset_message_processing() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -112,7 +117,7 @@ fn test_utxoset_message_processing() {
 fn test_utxoset_chunked_response() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let commitment = UTXOCommitment {
         merkle_root: [0xab; 32],
         total_supply: 21_000_000 * 100_000_000,
@@ -137,7 +142,8 @@ fn test_utxoset_chunked_response() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -151,7 +157,7 @@ fn test_utxoset_chunked_response() {
 fn test_getfilteredblock_message_processing() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let filter_prefs = FilterPreferences {
         filter_ordinals: true,
         filter_dust: true,
@@ -173,7 +179,8 @@ fn test_getfilteredblock_message_processing() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -183,7 +190,7 @@ fn test_getfilteredblock_message_processing() {
 fn test_getfilteredblock_no_bip158_filter() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let filter_prefs = FilterPreferences {
         filter_ordinals: false,
         filter_dust: false,
@@ -205,7 +212,8 @@ fn test_getfilteredblock_no_bip158_filter() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -215,7 +223,7 @@ fn test_getfilteredblock_no_bip158_filter() {
 fn test_filteredblock_message_processing() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let header = BlockHeader {
         version: 1,
         prev_block_hash: [0u8; 32],
@@ -272,7 +280,8 @@ fn test_filteredblock_message_processing() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -282,7 +291,7 @@ fn test_filteredblock_message_processing() {
 fn test_filteredblock_empty_transactions() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let header = BlockHeader {
         version: 1,
         prev_block_hash: [0u8; 32],
@@ -323,7 +332,8 @@ fn test_filteredblock_empty_transactions() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -336,7 +346,7 @@ fn test_filteredblock_empty_transactions() {
 fn test_getbanlist_message_processing() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let getbanlist = GetBanListMessage {
         request_id: 99999,
         min_score: Some(100), // Only bans with score >= 100
@@ -349,7 +359,8 @@ fn test_getbanlist_message_processing() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -358,7 +369,7 @@ fn test_getbanlist_message_processing() {
 fn test_getbanlist_no_min_score() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let getbanlist = GetBanListMessage {
         request_id: 99998,
         min_score: None, // Get all bans
@@ -371,7 +382,8 @@ fn test_getbanlist_no_min_score() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -380,7 +392,7 @@ fn test_getbanlist_no_min_score() {
 fn test_banlist_message_processing() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let mut ip = [0u8; 16];
     ip[15] = 192; // IPv4-mapped: ::ffff:192.168.1.1
     ip[14] = 168;
@@ -408,7 +420,8 @@ fn test_banlist_message_processing() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -417,7 +430,7 @@ fn test_banlist_message_processing() {
 fn test_banlist_empty_entries() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let banlist = BanListMessage {
         request_id: 99997,
         entries: vec![], // No bans
@@ -431,7 +444,8 @@ fn test_banlist_empty_entries() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -440,7 +454,7 @@ fn test_banlist_empty_entries() {
 fn test_banlist_with_signature() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let mut ip = [0u8; 16];
     ip[15] = 192;
     ip[14] = 168;
@@ -468,7 +482,8 @@ fn test_banlist_with_signature() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -477,7 +492,7 @@ fn test_banlist_with_signature() {
 fn test_banlist_multiple_entries() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let mut entries = Vec::new();
     for i in 0..10 {
         let mut ip = [0u8; 16];
@@ -508,8 +523,8 @@ fn test_banlist_multiple_entries() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
-

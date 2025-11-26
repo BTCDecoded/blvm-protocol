@@ -3,10 +3,10 @@
 //! Tests for protocol configuration system.
 
 use bllvm_protocol::config::{
-    ProtocolConfig, ProtocolValidationConfig, ServiceFlagsConfig, ProtocolFeaturesConfig,
-    FeeRateConfig, CompactBlockConfig, CommonsExtensionsConfig,
+    CommonsExtensionsConfig, CompactBlockConfig, FeeRateConfig, ProtocolConfig,
+    ProtocolFeaturesConfig, ProtocolValidationConfig, ServiceFlagsConfig,
 };
-use bllvm_protocol::{ProtocolVersion, service_flags};
+use bllvm_protocol::{service_flags, ProtocolVersion};
 
 #[test]
 fn test_protocol_config_default() {
@@ -36,9 +36,18 @@ fn test_service_flags_config() {
     };
 
     let flags = protocol_config.get_service_flags();
-    assert!(service_flags::has_flag(flags, service_flags::standard::NODE_NETWORK));
-    assert!(service_flags::has_flag(flags, service_flags::standard::NODE_WITNESS));
-    assert!(service_flags::has_flag(flags, service_flags::commons::NODE_FIBRE));
+    assert!(service_flags::has_flag(
+        flags,
+        service_flags::standard::NODE_NETWORK
+    ));
+    assert!(service_flags::has_flag(
+        flags,
+        service_flags::standard::NODE_WITNESS
+    ));
+    assert!(service_flags::has_flag(
+        flags,
+        service_flags::commons::NODE_FIBRE
+    ));
 }
 
 #[test]
@@ -90,4 +99,3 @@ fn test_protocol_validation_config() {
     assert_eq!(config.max_block_size, 8_000_000);
     assert_eq!(config.max_txs_per_block, 20_000);
 }
-

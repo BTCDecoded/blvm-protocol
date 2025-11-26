@@ -3,13 +3,12 @@
 //! Tests for maximum sizes, boundary conditions, and extreme scenarios
 //! to ensure protocol limits are properly enforced.
 
+use bllvm_consensus::{BlockHeader, Hash};
 use bllvm_protocol::network::{
-    process_network_message, NetworkMessage, NetworkResponse, PeerState,
-    AddrMessage, NetworkAddress, InvMessage, HeadersMessage,
-    GetHeadersMessage, GetBlocksMessage,
+    process_network_message, AddrMessage, GetBlocksMessage, GetHeadersMessage, HeadersMessage,
+    InvMessage, NetworkAddress, NetworkMessage, NetworkResponse, PeerState,
 };
 use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
-use bllvm_consensus::{BlockHeader, Hash};
 
 fn create_test_engine() -> BitcoinProtocolEngine {
     BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap()
@@ -27,7 +26,7 @@ fn create_test_peer_state() -> PeerState {
 fn test_addr_message_maximum_size() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     // Protocol limit: 1000 addresses
     let addresses: Vec<NetworkAddress> = (0..1000)
         .map(|i| NetworkAddress {
@@ -46,7 +45,8 @@ fn test_addr_message_maximum_size() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should accept exactly at the limit
     assert!(matches!(response, NetworkResponse::Ok));
@@ -56,7 +56,7 @@ fn test_addr_message_maximum_size() {
 fn test_inv_message_maximum_size() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     // Protocol limit: 50000 inventory items
     let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50000)
         .map(|i| bllvm_protocol::network::InventoryVector {
@@ -74,7 +74,8 @@ fn test_inv_message_maximum_size() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should accept exactly at the limit
     assert!(matches!(response, NetworkResponse::Ok));
@@ -84,7 +85,7 @@ fn test_inv_message_maximum_size() {
 fn test_headers_message_maximum_size() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     // Protocol limit: 2000 headers
     let headers: Vec<BlockHeader> = (0..2000)
         .map(|i| BlockHeader {
@@ -106,7 +107,8 @@ fn test_headers_message_maximum_size() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should accept exactly at the limit
     assert!(matches!(response, NetworkResponse::Ok));
@@ -116,7 +118,7 @@ fn test_headers_message_maximum_size() {
 fn test_getheaders_message_maximum_locators() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     // Protocol limit: 100 locator hashes
     let locator: Vec<Hash> = (0..100)
         .map(|i| {
@@ -139,12 +141,16 @@ fn test_getheaders_message_maximum_locators() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should accept exactly at the limit (returns Reject when no chain access, SendMessage when chain access provided)
     match response {
         NetworkResponse::Reject(_) | NetworkResponse::SendMessage(_) => {}
-        _ => panic!("Expected Reject (no chain access) or SendMessage, got {:?}", response),
+        _ => panic!(
+            "Expected Reject (no chain access) or SendMessage, got {:?}",
+            response
+        ),
     }
 }
 
@@ -152,7 +158,7 @@ fn test_getheaders_message_maximum_locators() {
 fn test_getblocks_message_maximum_locators() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     // Protocol limit: 100 locator hashes
     let locator: Vec<Hash> = (0..100)
         .map(|i| {
@@ -175,12 +181,16 @@ fn test_getblocks_message_maximum_locators() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should accept exactly at the limit (returns Ok when no chain access, SendMessage when chain access provided)
     match response {
         NetworkResponse::Ok | NetworkResponse::SendMessage(_) => {}
-        _ => panic!("Expected Ok (no chain access) or SendMessage, got {:?}", response),
+        _ => panic!(
+            "Expected Ok (no chain access) or SendMessage, got {:?}",
+            response
+        ),
     }
 }
 
@@ -192,7 +202,7 @@ fn test_getblocks_message_maximum_locators() {
 fn test_addr_message_one_over_limit() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     // One over the limit (1001 addresses)
     let addresses: Vec<NetworkAddress> = (0..1001)
         .map(|i| NetworkAddress {
@@ -211,7 +221,8 @@ fn test_addr_message_one_over_limit() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should reject one over the limit
     match response {
@@ -226,7 +237,7 @@ fn test_addr_message_one_over_limit() {
 fn test_inv_message_one_over_limit() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     // One over the limit (50001 items)
     let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
         .map(|i| bllvm_protocol::network::InventoryVector {
@@ -244,7 +255,8 @@ fn test_inv_message_one_over_limit() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should reject one over the limit
     match response {
@@ -259,7 +271,7 @@ fn test_inv_message_one_over_limit() {
 fn test_headers_message_one_over_limit() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     // One over the limit (2001 headers)
     let headers: Vec<BlockHeader> = (0..2001)
         .map(|i| BlockHeader {
@@ -281,7 +293,8 @@ fn test_headers_message_one_over_limit() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should reject one over the limit
     match response {
@@ -300,7 +313,7 @@ fn test_headers_message_one_over_limit() {
 fn test_addr_message_single_address() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let addr = AddrMessage {
         addresses: vec![NetworkAddress {
             services: 1,
@@ -316,7 +329,8 @@ fn test_addr_message_single_address() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should accept single address
     assert!(matches!(response, NetworkResponse::Ok));
@@ -326,7 +340,7 @@ fn test_addr_message_single_address() {
 fn test_inv_message_single_item() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let inv = InvMessage {
         inventory: vec![bllvm_protocol::network::InventoryVector {
             inv_type: 1,
@@ -341,7 +355,8 @@ fn test_inv_message_single_item() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should accept single inventory item
     assert!(matches!(response, NetworkResponse::Ok));
@@ -351,7 +366,7 @@ fn test_inv_message_single_item() {
 fn test_headers_message_single_header() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let headers_msg = HeadersMessage {
         headers: vec![BlockHeader {
             version: 1,
@@ -370,7 +385,8 @@ fn test_headers_message_single_header() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should accept single header
     assert!(matches!(response, NetworkResponse::Ok));
@@ -384,7 +400,7 @@ fn test_headers_message_single_header() {
 fn test_version_message_maximum_start_height() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let version = bllvm_protocol::network::VersionMessage {
         version: 70015,
         services: 1,
@@ -412,7 +428,8 @@ fn test_version_message_maximum_start_height() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should handle maximum values
     match response {
@@ -425,7 +442,7 @@ fn test_version_message_maximum_start_height() {
 fn test_getheaders_message_empty_locator() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let getheaders = GetHeadersMessage {
         version: 70015,
         block_locator_hashes: vec![], // Empty locator (genesis block)
@@ -439,12 +456,16 @@ fn test_getheaders_message_empty_locator() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should handle empty locator (request from genesis) - returns Reject when no chain access, SendMessage when chain access provided
     match response {
         NetworkResponse::Reject(_) | NetworkResponse::SendMessage(_) => {}
-        _ => panic!("Expected Reject (no chain access) or SendMessage, got {:?}", response),
+        _ => panic!(
+            "Expected Reject (no chain access) or SendMessage, got {:?}",
+            response
+        ),
     }
 }
 
@@ -452,7 +473,7 @@ fn test_getheaders_message_empty_locator() {
 fn test_getblocks_message_empty_locator() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let getblocks = GetBlocksMessage {
         version: 70015,
         block_locator_hashes: vec![], // Empty locator (genesis block)
@@ -466,12 +487,16 @@ fn test_getblocks_message_empty_locator() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should handle empty locator (request from genesis) - returns Ok when no chain access, SendMessage when chain access provided
     match response {
         NetworkResponse::Ok | NetworkResponse::SendMessage(_) => {}
-        _ => panic!("Expected Ok (no chain access) or SendMessage, got {:?}", response),
+        _ => panic!(
+            "Expected Ok (no chain access) or SendMessage, got {:?}",
+            response
+        ),
     }
 }
 
@@ -483,7 +508,7 @@ fn test_getblocks_message_empty_locator() {
 fn test_addr_message_empty() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let addr = AddrMessage {
         addresses: vec![], // Empty
     };
@@ -495,7 +520,8 @@ fn test_addr_message_empty() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should handle empty address list gracefully
     assert!(matches!(response, NetworkResponse::Ok));
@@ -505,7 +531,7 @@ fn test_addr_message_empty() {
 fn test_inv_message_empty() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let inv = InvMessage {
         inventory: vec![], // Empty
     };
@@ -517,7 +543,8 @@ fn test_inv_message_empty() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should handle empty inventory gracefully
     assert!(matches!(response, NetworkResponse::Ok));
@@ -527,7 +554,7 @@ fn test_inv_message_empty() {
 fn test_headers_message_empty() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    
+
     let headers_msg = HeadersMessage {
         headers: vec![], // Empty
     };
@@ -539,9 +566,9 @@ fn test_headers_message_empty() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should handle empty headers gracefully
     assert!(matches!(response, NetworkResponse::Ok));
 }
-

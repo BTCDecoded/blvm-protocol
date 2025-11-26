@@ -52,15 +52,20 @@ pub mod utxo_commitments {
 pub mod serialization {
     pub use bllvm_consensus::serialization::*;
 }
+pub mod commons;
 pub mod network;
 pub mod service_flags;
-pub mod commons;
 pub mod varint;
 
 // Re-export commonly used types for convenience
-pub use service_flags::{standard as service_flags_standard, commons as service_flags_commons};
-pub use commons::{GetUTXOSetMessage, UTXOSetMessage, GetFilteredBlockMessage, FilteredBlockMessage, GetBanListMessage, BanListMessage};
-pub use config::{ProtocolConfig, ProtocolValidationConfig, ServiceFlagsConfig, ProtocolFeaturesConfig};
+pub use commons::{
+    BanListMessage, FilteredBlockMessage, GetBanListMessage, GetFilteredBlockMessage,
+    GetUTXOSetMessage, UTXOSetMessage,
+};
+pub use config::{
+    ProtocolConfig, ProtocolFeaturesConfig, ProtocolValidationConfig, ServiceFlagsConfig,
+};
+pub use service_flags::{commons as service_flags_commons, standard as service_flags_standard};
 // Wire format module - framework in place, full implementation pending
 // pub mod wire;
 pub mod types {
@@ -83,13 +88,13 @@ pub mod error {
 pub use economic::EconomicParameters;
 pub use features::{ActivationMethod, FeatureActivation, FeatureContext, FeatureRegistry};
 
+pub mod config;
 pub mod economic;
 pub mod features;
 pub mod genesis;
 pub mod network_params;
 pub mod validation;
 pub mod variants;
-pub mod config;
 
 // Protocol-level BIP implementations
 pub mod address; // BIP173/350/351: Bech32/Bech32m address encoding

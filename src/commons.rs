@@ -128,4 +128,3 @@ pub struct BanListMessage {
     /// Optional signature over entire ban list
     pub list_signature: Option<Vec<u8>>,
 }
-
