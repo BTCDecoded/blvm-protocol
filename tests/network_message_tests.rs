@@ -3,6 +3,7 @@
 //! Tests for `process_network_message` and individual message handlers.
 //! These tests verify protocol-level message handling, limits, and responses.
 
+use std::sync::Arc;
 use bllvm_protocol::network::{
     process_network_message, AddrMessage, ChainStateAccess, FeeFilterMessage, GetBlocksMessage,
     GetDataMessage, HeadersMessage, InvMessage, NetworkAddress,
@@ -53,9 +54,9 @@ impl ChainStateAccess for MockChainStateAccess {
 
     fn get_object(&self, hash: &Hash) -> Option<bllvm_protocol::network::ChainObject> {
         if let Some(block) = self.blocks.get(hash) {
-            Some(bllvm_protocol::network::ChainObject::Block(block.clone()))
+            Some(bllvm_protocol::network::ChainObject::Block(Arc::new(block.clone())))
         } else if let Some(tx) = self.transactions.get(hash) {
-            Some(bllvm_protocol::network::ChainObject::Transaction(Box::new(tx.clone())))
+            Some(bllvm_protocol::network::ChainObject::Transaction(Arc::new(tx.clone())))
         } else {
             None
         }

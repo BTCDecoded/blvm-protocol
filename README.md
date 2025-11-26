@@ -96,6 +96,41 @@ if engine.supports_feature("segwit") {
 }
 ```
 
+### Configuration
+
+```rust
+use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion, ProtocolConfig};
+
+// Create protocol configuration
+let mut config = ProtocolConfig::default();
+config.service_flags.node_fibre = true;
+config.commons.utxo_commitments = true;
+config.validation.max_block_size = 4_000_000;
+
+// Load from environment variables
+let config = ProtocolConfig::from_env();
+
+// Get service flags from configuration
+let service_flags = config.get_service_flags();
+```
+
+### Configuration Options
+
+The protocol configuration system provides:
+
+- **Protocol Validation**: Size limits (block, transaction, script), transaction count limits, locator hash limits
+- **Service Flags**: Control which capabilities are advertised (NODE_NETWORK, NODE_WITNESS, Commons extensions)
+- **Protocol Features**: Enable/disable SegWit, Taproot, RBF, CTV, Compact Blocks, Compact Filters
+- **Fee Rates**: Minimum and maximum fee rate limits
+- **Compact Blocks**: BIP152 configuration (version preference, index limits)
+- **Commons Extensions**: UTXO commitments, filtered blocks, ban list sharing, filter preferences
+- **FIBRE**: Fast Internet Bitcoin Relay Engine configuration
+
+Configuration can be loaded from:
+- Environment variables (`BLLVM_PROTOCOL_<SECTION>_<KEY>`)
+- Programmatic configuration (struct initialization)
+- Configuration files (via serde serialization)
+
 ### Service Flags
 
 ```rust
@@ -256,6 +291,10 @@ cargo test --features utxo-commitments
 The test suite includes:
 - Network message processing tests
 - Protocol limits tests (DoS protection)
+- BIP152 compact block relay tests
+- Commons-specific message tests (UTXO commitments, filtered blocks, ban list)
+- Error handling tests (malformed messages, protocol mismatches)
+- Edge case tests (maximum sizes, boundary conditions)
 - Service flags tests
 - Varint encoding tests
 - Protocol integration tests
