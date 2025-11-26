@@ -77,10 +77,11 @@ pub fn get_commons_flags() -> u64 {
     {
         flags |= commons::NODE_UTXO_COMMITMENTS;
     }
-    flags | commons::NODE_DANDELION
+    flags |= commons::NODE_DANDELION
         | commons::NODE_PACKAGE_RELAY
         | commons::NODE_FIBRE
-        | commons::NODE_BAN_LIST_SHARING
+        | commons::NODE_BAN_LIST_SHARING;
+    flags
 }
 
 /// Check if node supports Commons features

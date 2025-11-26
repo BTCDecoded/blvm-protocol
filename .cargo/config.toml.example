@@ -1,0 +1,7 @@
+# Example .cargo/config.toml for local development
+# Copy this file to .cargo/config.toml to use local bllvm-consensus path
+
+[build]
+# Use local path replacement for development
+[replace]
+"bllvm-consensus:0.1.6" = { path = "../bllvm-consensus" }

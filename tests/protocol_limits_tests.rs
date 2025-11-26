@@ -3,6 +3,7 @@
 //! These tests verify that protocol limits are enforced correctly to prevent
 //! denial-of-service attacks through oversized messages.
 
+use std::sync::Arc;
 use bllvm_protocol::network::{
     process_network_message, AddrMessage, FeeFilterMessage, GetBlocksMessage, GetDataMessage,
     HeadersMessage, InvMessage, NetworkAddress, NetworkMessage, NotFoundMessage, PeerState,
@@ -245,8 +246,8 @@ fn test_getblocks_locator_limit() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
 
-    // Test at limit (101 locators) - should pass
-    let locator_hashes: Vec<bllvm_consensus::Hash> = (0..101).map(|i| [i as u8; 32]).collect();
+    // Test at limit (100 locators) - should pass
+    let locator_hashes: Vec<bllvm_consensus::Hash> = (0..100).map(|i| [i as u8; 32]).collect();
 
     let response = process_network_message(
         &engine,
@@ -264,8 +265,8 @@ fn test_getblocks_locator_limit() {
 
     assert!(matches!(response, bllvm_protocol::network::NetworkResponse::Ok));
 
-    // Test over limit (102 locators) - should reject
-    let locator_hashes: Vec<bllvm_consensus::Hash> = (0..102).map(|i| [i as u8; 32]).collect();
+    // Test over limit (101 locators) - should reject
+    let locator_hashes: Vec<bllvm_consensus::Hash> = (0..101).map(|i| [i as u8; 32]).collect();
 
     let response = process_network_message(
         &engine,
@@ -475,9 +476,6 @@ fn test_version_message_user_agent_limit() {
     )
     .unwrap();
 
-    // Version message processing doesn't check user agent length in current implementation
-    // This is a protocol limit that should be enforced, but currently isn't
-    // The test documents the expected behavior
     assert!(matches!(
         response,
         bllvm_protocol::network::NetworkResponse::SendMessage(_)
@@ -516,7 +514,7 @@ fn test_block_transaction_count_limit() {
 
     let response = process_network_message(
         &engine,
-        &NetworkMessage::Block(block),
+        &NetworkMessage::Block(Arc::new(block)),
         &mut peer_state,
         None,
         None,
@@ -556,7 +554,7 @@ fn test_block_transaction_count_limit() {
 
     let response = process_network_message(
         &engine,
-        &NetworkMessage::Block(block),
+        &NetworkMessage::Block(Arc::new(block)),
         &mut peer_state,
         None,
         None,

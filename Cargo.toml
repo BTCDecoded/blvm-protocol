@@ -17,8 +17,12 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-# Consensus layer - Local path for development
-bllvm-consensus = { path = "../bllvm-consensus", package = "bllvm-consensus" }
+# Consensus layer - Use crates.io version by default
+# To use local path for development, create .cargo/config.toml with:
+# [build]
+# [replace]
+# "bllvm-consensus:0.1.6" = { path = "../bllvm-consensus" }
+bllvm-consensus = "0.1.6"
 
 # Serialization - EXACT VERSIONS for security
 serde = { version = "=1.0.228", features = ["derive"] }  # Updated for iroh 0.95 compatibility

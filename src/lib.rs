@@ -60,6 +60,7 @@ pub mod varint;
 // Re-export commonly used types for convenience
 pub use service_flags::{standard as service_flags_standard, commons as service_flags_commons};
 pub use commons::{GetUTXOSetMessage, UTXOSetMessage, GetFilteredBlockMessage, FilteredBlockMessage, GetBanListMessage, BanListMessage};
+pub use config::{ProtocolConfig, ProtocolValidationConfig, ServiceFlagsConfig, ProtocolFeaturesConfig};
 // Wire format module - framework in place, full implementation pending
 // pub mod wire;
 pub mod types {
@@ -88,6 +89,7 @@ pub mod genesis;
 pub mod network_params;
 pub mod validation;
 pub mod variants;
+pub mod config;
 
 // Protocol-level BIP implementations
 pub mod address; // BIP173/350/351: Bech32/Bech32m address encoding
@@ -104,6 +106,7 @@ pub struct BitcoinProtocolEngine {
     consensus: ConsensusProof,
     protocol_version: ProtocolVersion,
     network_params: NetworkParameters,
+    config: ProtocolConfig,
 }
 
 /// Bitcoin protocol versions
@@ -137,8 +140,13 @@ pub struct NetworkParameters {
 }
 
 impl BitcoinProtocolEngine {
-    /// Create a new protocol engine for the specified variant
+    /// Create a new protocol engine for the specified variant with default configuration
     pub fn new(version: ProtocolVersion) -> Result<Self> {
+        Self::with_config(version, ProtocolConfig::default())
+    }
+
+    /// Create a new protocol engine with custom configuration
+    pub fn with_config(version: ProtocolVersion, config: ProtocolConfig) -> Result<Self> {
         let consensus = ConsensusProof::new();
         let network_params = NetworkParameters::for_version(version)?;
 
@@ -146,7 +154,18 @@ impl BitcoinProtocolEngine {
             consensus,
             protocol_version: version,
             network_params,
+            config,
         })
+    }
+
+    /// Get the protocol configuration
+    pub fn get_config(&self) -> &ProtocolConfig {
+        &self.config
+    }
+
+    /// Get mutable reference to protocol configuration
+    pub fn get_config_mut(&mut self) -> &mut ProtocolConfig {
+        &mut self.config
     }
 
     /// Get the current protocol version

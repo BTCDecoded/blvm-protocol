@@ -172,7 +172,7 @@ impl Default for FibreCapabilities {
 }
 
 /// FIBRE protocol configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FibreConfig {
     /// Enable FIBRE relay
     #[serde(default = "default_true")]
