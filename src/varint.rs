@@ -6,7 +6,8 @@
 //! - Values < 0xffffffff: encoded as 0xfe + 4 bytes (little-endian)
 //! - Values >= 0xffffffff: encoded as 0xff + 8 bytes (little-endian)
 
-use crate::{Result, ConsensusError};
+use crate::Result;
+use bllvm_consensus::ConsensusError;
 use std::io::{Read, Write};
 
 /// Maximum value for a varint (2^64 - 1)
@@ -15,23 +16,23 @@ pub const MAX_VARINT: u64 = u64::MAX;
 /// Read a variable-length integer from bytes
 pub fn read_varint<R: Read>(reader: &mut R) -> Result<u64> {
     let mut buf = [0u8; 1];
-    reader.read_exact(&mut buf).map_err(|e| ConsensusError::InvalidInput(format!("IO error: {}", e)))?;
+    reader.read_exact(&mut buf).map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e)))?;
     let first_byte = buf[0];
 
     match first_byte {
         0xfd => {
             let mut buf = [0u8; 2];
-            reader.read_exact(&mut buf).map_err(|e| ConsensusError::InvalidInput(format!("IO error: {}", e)))?;
+            reader.read_exact(&mut buf).map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e)))?;
             Ok(u16::from_le_bytes(buf) as u64)
         }
         0xfe => {
             let mut buf = [0u8; 4];
-            reader.read_exact(&mut buf).map_err(|e| ConsensusError::InvalidInput(format!("IO error: {}", e)))?;
+            reader.read_exact(&mut buf).map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e)))?;
             Ok(u32::from_le_bytes(buf) as u64)
         }
         0xff => {
             let mut buf = [0u8; 8];
-            reader.read_exact(&mut buf).map_err(|e| ConsensusError::InvalidInput(format!("IO error: {}", e)))?;
+            reader.read_exact(&mut buf).map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e)))?;
             Ok(u64::from_le_bytes(buf))
         }
         _ => Ok(first_byte as u64),

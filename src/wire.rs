@@ -9,7 +9,8 @@
 //! - Checksum: First 4 bytes of double SHA256 of payload
 //! - Payload: Message-specific data
 
-use crate::{Hash, Result, ConsensusError};
+use crate::{Hash, Result};
+use bllvm_consensus::ConsensusError;
 use crate::network::NetworkMessage;
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
@@ -74,7 +75,7 @@ pub fn serialize_message(
 
     // Validate payload size
     if payload.len() > MAX_MESSAGE_PAYLOAD {
-        return Err(crate::ConsensusError::InvalidInput(format!(
+        return Err(crate::ConsensusError::Serialization(format!(
             "Message payload too large: {} bytes",
             payload.len()
         )));
@@ -116,12 +117,12 @@ pub fn deserialize_message<R: Read>(
 
     // Read header
     let mut header = [0u8; MESSAGE_HEADER_SIZE];
-    reader.read_exact(&mut header).map_err(|e| ConsensusError::InvalidInput(format!("IO error: {}", e)))?;
+    reader.read_exact(&mut header).map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e)))?;
 
     // Check magic bytes
     let magic = [header[0], header[1], header[2], header[3]];
     if magic != expected_magic {
-        return Err(crate::ConsensusError::InvalidInput(format!(
+        return Err(crate::ConsensusError::Serialization(format!(
             "Invalid magic bytes: {:?}, expected {:?}",
             magic, expected_magic
         )));
@@ -131,14 +132,14 @@ pub fn deserialize_message<R: Read>(
     let command_bytes = &header[4..16];
     let command_len = command_bytes.iter().position(|&b| b == 0).unwrap_or(12);
     let command = std::str::from_utf8(&command_bytes[..command_len])
-        .map_err(|e| crate::ConsensusError::InvalidInput(format!("Invalid command: {}", e)))?;
+        .map_err(|e| crate::ConsensusError::Serialization(format!("Invalid command: {}", e)))?;
 
     // Read payload length
     let length_bytes = [header[16], header[17], header[18], header[19]];
     let payload_length = u32::from_le_bytes(length_bytes) as usize;
 
     if payload_length > MAX_MESSAGE_PAYLOAD {
-        return Err(crate::ConsensusError::InvalidInput(format!(
+        return Err(crate::ConsensusError::Serialization(format!(
             "Payload length too large: {} bytes",
             payload_length
         )));
@@ -150,13 +151,13 @@ pub fn deserialize_message<R: Read>(
     // Read payload
     let mut payload = vec![0u8; payload_length];
     if payload_length > 0 {
-        reader.read_exact(&mut payload).map_err(|e| ConsensusError::InvalidInput(format!("IO error: {}", e)))?;
+        reader.read_exact(&mut payload).map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e)))?;
     }
 
     // Verify checksum
     let calculated_checksum = calculate_checksum(&payload);
     if calculated_checksum != checksum {
-        return Err(crate::ConsensusError::InvalidInput(
+        return Err(crate::ConsensusError::Serialization(
             "Checksum mismatch".to_string(),
         ));
     }
@@ -196,7 +197,7 @@ pub fn deserialize_message<R: Read>(
         "getbanlist" => NetworkMessage::GetBanList(deserialize_getbanlist(&payload)?),
         "banlist" => NetworkMessage::BanList(deserialize_banlist(&payload)?),
         _ => {
-            return Err(crate::ConsensusError::InvalidInput(format!(
+            return Err(crate::ConsensusError::Serialization(format!(
                 "Unknown command: {}",
                 command
             )));
@@ -211,135 +212,135 @@ pub fn deserialize_message<R: Read>(
 
 fn serialize_version(v: &crate::network::VersionMessage) -> Result<Vec<u8>> {
     use bincode;
-    bincode::serialize(v).map_err(|e| crate::ConsensusError::InvalidInput(format!("Serialization error: {}", e)))
+    bincode::serialize(v).map_err(|e| crate::ConsensusError::Serialization(format!("Serialization error: {}", e)))
 }
 
 fn deserialize_version(data: &[u8]) -> Result<crate::network::VersionMessage> {
     use bincode;
-    bincode::deserialize(data).map_err(|e| crate::ConsensusError::InvalidInput(format!("Deserialization error: {}", e)))
+    bincode::deserialize(data).map_err(|e| crate::ConsensusError::Serialization(format!("Deserialization error: {}", e)))
 }
 
 // Stub implementations for other message types (would need full wire format encoding)
 fn serialize_addr(_a: &crate::network::AddrMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_addr(_data: &[u8]) -> Result<crate::network::AddrMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_inv(_i: &crate::network::InvMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_inv(_data: &[u8]) -> Result<crate::network::InvMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_getdata(_g: &crate::network::GetDataMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_getdata(_data: &[u8]) -> Result<crate::network::GetDataMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_getheaders(_gh: &crate::network::GetHeadersMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_getheaders(_data: &[u8]) -> Result<crate::network::GetHeadersMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_headers(_h: &crate::network::HeadersMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_headers(_data: &[u8]) -> Result<crate::network::HeadersMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_block(_b: &crate::Block) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_block(_data: &[u8]) -> Result<crate::Block> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_tx(_tx: &crate::Transaction) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_tx(_data: &[u8]) -> Result<crate::Transaction> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_ping(_p: &crate::network::PingMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_ping(_data: &[u8]) -> Result<crate::network::PingMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_pong(_p: &crate::network::PongMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_pong(_data: &[u8]) -> Result<crate::network::PongMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_feefilter(_f: &crate::network::FeeFilterMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_feefilter(_data: &[u8]) -> Result<crate::network::FeeFilterMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_getblocks(_gb: &crate::network::GetBlocksMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_getblocks(_data: &[u8]) -> Result<crate::network::GetBlocksMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_notfound(_nf: &crate::network::NotFoundMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_notfound(_data: &[u8]) -> Result<crate::network::NotFoundMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_reject(_r: &crate::network::RejectMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_reject(_data: &[u8]) -> Result<crate::network::RejectMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_sendcmpct(_sc: &crate::network::SendCmpctMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_sendcmpct(_data: &[u8]) -> Result<crate::network::SendCmpctMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_cmpctblock(_cb: &crate::network::CmpctBlockMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_cmpctblock(_data: &[u8]) -> Result<crate::network::CmpctBlockMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_getblocktxn(_gbt: &crate::network::GetBlockTxnMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_getblocktxn(_data: &[u8]) -> Result<crate::network::GetBlockTxnMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_blocktxn(_bt: &crate::network::BlockTxnMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_blocktxn(_data: &[u8]) -> Result<crate::network::BlockTxnMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 #[cfg(feature = "utxo-commitments")]
 fn serialize_getutxoset(_gus: &crate::commons::GetUTXOSetMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 #[cfg(feature = "utxo-commitments")]
 fn deserialize_getutxoset(_data: &[u8]) -> Result<crate::commons::GetUTXOSetMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 #[cfg(feature = "utxo-commitments")]
 fn serialize_utxoset(_us: &crate::commons::UTXOSetMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 #[cfg(feature = "utxo-commitments")]
 fn deserialize_utxoset(_data: &[u8]) -> Result<crate::commons::UTXOSetMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 #[cfg(feature = "utxo-commitments")]
 fn serialize_getfilteredblock(_gfb: &crate::commons::GetFilteredBlockMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 #[cfg(feature = "utxo-commitments")]
 fn deserialize_getfilteredblock(_data: &[u8]) -> Result<crate::commons::GetFilteredBlockMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 #[cfg(feature = "utxo-commitments")]
 fn serialize_filteredblock(_fb: &crate::commons::FilteredBlockMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 #[cfg(feature = "utxo-commitments")]
 fn deserialize_filteredblock(_data: &[u8]) -> Result<crate::commons::FilteredBlockMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_getbanlist(_gbl: &crate::commons::GetBanListMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_getbanlist(_data: &[u8]) -> Result<crate::commons::GetBanListMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
 fn serialize_banlist(_bl: &crate::commons::BanListMessage) -> Result<Vec<u8>> { Ok(vec![]) }
 fn deserialize_banlist(_data: &[u8]) -> Result<crate::commons::BanListMessage> { 
-    Err(crate::ConsensusError::InvalidInput("Not implemented".to_string()))
+    Err(crate::ConsensusError::Serialization("Not implemented".to_string()))
 }
 
