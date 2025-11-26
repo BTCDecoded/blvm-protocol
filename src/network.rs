@@ -5,7 +5,7 @@
 //! validation delegated to the consensus layer.
 
 use crate::validation::ProtocolValidationContext;
-use crate::{BitcoinProtocolEngine, Result, ProtocolConfig};
+use crate::{BitcoinProtocolEngine, ProtocolConfig, Result};
 use bllvm_consensus::types::UtxoSet;
 use bllvm_consensus::{Block, BlockHeader, Hash, Transaction, ValidationResult};
 use std::sync::Arc;
@@ -138,9 +138,9 @@ pub struct NotFoundMessage {
 /// Reject message rejecting a message with reason
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RejectMessage {
-    pub message: String, // Command name of rejected message
-    pub code: u8,        // Rejection code (0x01=malformed, 0x10=invalid, 0x11=obsolete, 0x12=duplicate, 0x40=nonstandard, 0x41=dust, 0x42=insufficientfee, 0x43=checkpoint)
-    pub reason: String,  // Human-readable reason
+    pub message: String,          // Command name of rejected message
+    pub code: u8, // Rejection code (0x01=malformed, 0x10=invalid, 0x11=obsolete, 0x12=duplicate, 0x40=nonstandard, 0x41=dust, 0x42=insufficientfee, 0x43=checkpoint)
+    pub reason: String, // Human-readable reason
     pub extra_data: Option<Hash>, // Optional hash for rejected object
 }
 
@@ -330,27 +330,37 @@ pub fn process_network_message(
             process_getheaders_message(getheaders, chain_access, config)
         }
         NetworkMessage::Headers(headers) => process_headers_message(headers, config),
-        NetworkMessage::Block(block) => process_block_message(engine, &block, utxo_set, height, config),
+        NetworkMessage::Block(block) => {
+            process_block_message(engine, &block, utxo_set, height, config)
+        }
         NetworkMessage::Tx(tx) => process_tx_message(engine, &tx, height),
         NetworkMessage::Ping(ping) => process_ping_message(ping, peer_state),
         NetworkMessage::Pong(pong) => process_pong_message(pong, peer_state),
         NetworkMessage::MemPool => process_mempool_message(chain_access),
         NetworkMessage::FeeFilter(feefilter) => process_feefilter_message(feefilter, peer_state),
-        NetworkMessage::GetBlocks(getblocks) => process_getblocks_message(getblocks, chain_access, config),
+        NetworkMessage::GetBlocks(getblocks) => {
+            process_getblocks_message(getblocks, chain_access, config)
+        }
         NetworkMessage::GetAddr => process_getaddr_message(peer_state, config),
         NetworkMessage::NotFound(notfound) => process_notfound_message(notfound, config),
         NetworkMessage::Reject(reject) => process_reject_message(reject, config),
         NetworkMessage::SendHeaders => process_sendheaders_message(peer_state),
-        NetworkMessage::SendCmpct(sendcmpct) => process_sendcmpct_message(sendcmpct, peer_state, config),
+        NetworkMessage::SendCmpct(sendcmpct) => {
+            process_sendcmpct_message(sendcmpct, peer_state, config)
+        }
         NetworkMessage::CmpctBlock(cmpctblock) => process_cmpctblock_message(cmpctblock),
-        NetworkMessage::GetBlockTxn(getblocktxn) => process_getblocktxn_message(getblocktxn, chain_access, config),
+        NetworkMessage::GetBlockTxn(getblocktxn) => {
+            process_getblocktxn_message(getblocktxn, chain_access, config)
+        }
         NetworkMessage::BlockTxn(blocktxn) => process_blocktxn_message(blocktxn),
         #[cfg(feature = "utxo-commitments")]
         NetworkMessage::GetUTXOSet(getutxoset) => process_getutxoset_message(getutxoset),
         #[cfg(feature = "utxo-commitments")]
         NetworkMessage::UTXOSet(utxoset) => process_utxoset_message(utxoset),
         #[cfg(feature = "utxo-commitments")]
-        NetworkMessage::GetFilteredBlock(getfiltered) => process_getfilteredblock_message(getfiltered),
+        NetworkMessage::GetFilteredBlock(getfiltered) => {
+            process_getfilteredblock_message(getfiltered)
+        }
         #[cfg(feature = "utxo-commitments")]
         NetworkMessage::FilteredBlock(filtered) => process_filteredblock_message(filtered),
         NetworkMessage::GetBanList(getbanlist) => process_getbanlist_message(getbanlist),
@@ -372,7 +382,11 @@ fn process_version_message(
     // Validate user agent length (from config)
     if version.user_agent.len() > config.network_limits.max_user_agent_length {
         return Ok(NetworkResponse::Reject(
-            format!("User agent too long (max {} bytes)", config.network_limits.max_user_agent_length).into()
+            format!(
+                "User agent too long (max {} bytes)",
+                config.network_limits.max_user_agent_length
+            )
+            .into(),
         ));
     }
 
@@ -403,7 +417,11 @@ fn process_addr_message(
     // Validate address count (from config)
     if addr.addresses.len() > config.network_limits.max_addr_addresses {
         return Ok(NetworkResponse::Reject(
-            format!("Too many addresses (max {})", config.network_limits.max_addr_addresses).into()
+            format!(
+                "Too many addresses (max {})",
+                config.network_limits.max_addr_addresses
+            )
+            .into(),
         ));
     }
 
@@ -422,7 +440,11 @@ fn process_inv_message(
     // Validate inventory count (from config)
     if inv.inventory.len() > config.network_limits.max_inv_items {
         return Ok(NetworkResponse::Reject(
-            format!("Too many inventory items (max {})", config.network_limits.max_inv_items).into()
+            format!(
+                "Too many inventory items (max {})",
+                config.network_limits.max_inv_items
+            )
+            .into(),
         ));
     }
 
@@ -456,7 +478,11 @@ fn process_getdata_message(
     // Validate request count (from config)
     if getdata.inventory.len() > config.network_limits.max_inv_items {
         return Ok(NetworkResponse::Reject(
-            format!("Too many getdata items (max {})", config.network_limits.max_inv_items).into()
+            format!(
+                "Too many getdata items (max {})",
+                config.network_limits.max_inv_items
+            )
+            .into(),
         ));
     }
 
@@ -502,7 +528,11 @@ fn process_getheaders_message(
     // Validate block locator size (from config)
     if getheaders.block_locator_hashes.len() > config.validation.max_locator_hashes {
         return Ok(NetworkResponse::Reject(
-            format!("Too many locator hashes (max {})", config.validation.max_locator_hashes).into()
+            format!(
+                "Too many locator hashes (max {})",
+                config.validation.max_locator_hashes
+            )
+            .into(),
         ));
     }
 
@@ -515,17 +545,22 @@ fn process_getheaders_message(
         )));
     }
 
-    Ok(NetworkResponse::Reject(
-        "Chain access not available".into()
-    ))
+    Ok(NetworkResponse::Reject("Chain access not available".into()))
 }
 
 /// Process headers message
-fn process_headers_message(headers: &HeadersMessage, config: &ProtocolConfig) -> Result<NetworkResponse> {
+fn process_headers_message(
+    headers: &HeadersMessage,
+    config: &ProtocolConfig,
+) -> Result<NetworkResponse> {
     // Validate header count (from config)
     if headers.headers.len() > config.network_limits.max_headers {
         return Ok(NetworkResponse::Reject(
-            format!("Too many headers (max {})", config.network_limits.max_headers).into()
+            format!(
+                "Too many headers (max {})",
+                config.network_limits.max_headers
+            )
+            .into(),
         ));
     }
 
@@ -545,7 +580,11 @@ fn process_block_message(
     // Check protocol limits first (from config)
     if block.transactions.len() > config.validation.max_txs_per_block {
         return Ok(NetworkResponse::Reject(
-            format!("Too many transactions (max {})", config.validation.max_txs_per_block).into()
+            format!(
+                "Too many transactions (max {})",
+                config.validation.max_txs_per_block
+            )
+            .into(),
         ));
     }
 
@@ -556,14 +595,12 @@ fn process_block_message(
 
         match result {
             ValidationResult::Valid => Ok(NetworkResponse::Ok),
-            ValidationResult::Invalid(reason) => {
-                Ok(NetworkResponse::Reject(format!("Invalid block: {reason}").into()))
-            }
+            ValidationResult::Invalid(reason) => Ok(NetworkResponse::Reject(
+                format!("Invalid block: {reason}").into(),
+            )),
         }
     } else {
-        Ok(NetworkResponse::Reject(
-            "Missing validation context".into()
-        ))
+        Ok(NetworkResponse::Reject("Missing validation context".into()))
     }
 }
 
@@ -581,7 +618,7 @@ fn process_tx_message(
     match result {
         ValidationResult::Valid => Ok(NetworkResponse::Ok),
         ValidationResult::Invalid(reason) => Ok(NetworkResponse::Reject(
-            format!("Invalid transaction: {reason}").into()
+            format!("Invalid transaction: {reason}").into(),
         )),
     }
 }
@@ -664,9 +701,9 @@ fn process_getblocks_message(
         }
 
         if !inventory.is_empty() {
-            return Ok(NetworkResponse::SendMessage(Box::new(
-                NetworkMessage::Inv(InvMessage { inventory }),
-            )));
+            return Ok(NetworkResponse::SendMessage(Box::new(NetworkMessage::Inv(
+                InvMessage { inventory },
+            ))));
         }
     }
 
@@ -674,18 +711,19 @@ fn process_getblocks_message(
 }
 
 /// Process getaddr message
-fn process_getaddr_message(peer_state: &mut PeerState, config: &ProtocolConfig) -> Result<NetworkResponse> {
+fn process_getaddr_message(
+    peer_state: &mut PeerState,
+    config: &ProtocolConfig,
+) -> Result<NetworkResponse> {
     // Return known addresses (if any)
     if !peer_state.known_addresses.is_empty() {
         // Limit to configured max addresses
-        let max_addrs = config.network_limits.max_addr_addresses.min(peer_state.known_addresses.len());
+        let max_addrs = config
+            .network_limits
+            .max_addr_addresses
+            .min(peer_state.known_addresses.len());
         let mut addresses = Vec::with_capacity(max_addrs);
-        addresses.extend(
-            peer_state.known_addresses
-                .iter()
-                .take(max_addrs)
-                .cloned()
-        );
+        addresses.extend(peer_state.known_addresses.iter().take(max_addrs).cloned());
 
         return Ok(NetworkResponse::SendMessage(Box::new(
             NetworkMessage::Addr(AddrMessage { addresses }),
@@ -696,11 +734,18 @@ fn process_getaddr_message(peer_state: &mut PeerState, config: &ProtocolConfig) 
 }
 
 /// Process notfound message
-fn process_notfound_message(notfound: &NotFoundMessage, config: &ProtocolConfig) -> Result<NetworkResponse> {
+fn process_notfound_message(
+    notfound: &NotFoundMessage,
+    config: &ProtocolConfig,
+) -> Result<NetworkResponse> {
     // Validate inventory count (from config)
     if notfound.inventory.len() > config.network_limits.max_inv_items {
         return Ok(NetworkResponse::Reject(
-            format!("Too many notfound items (max {})", config.network_limits.max_inv_items).into()
+            format!(
+                "Too many notfound items (max {})",
+                config.network_limits.max_inv_items
+            )
+            .into(),
         ));
     }
 
@@ -709,11 +754,16 @@ fn process_notfound_message(notfound: &NotFoundMessage, config: &ProtocolConfig)
 }
 
 /// Process reject message
-fn process_reject_message(reject: &RejectMessage, _config: &ProtocolConfig) -> Result<NetworkResponse> {
+fn process_reject_message(
+    reject: &RejectMessage,
+    _config: &ProtocolConfig,
+) -> Result<NetworkResponse> {
     // Validate message name length (Bitcoin protocol limit: 12 bytes)
     // This is a fixed protocol limit, not configurable
     if reject.message.len() > 12 {
-        return Ok(NetworkResponse::Reject("Invalid reject message name".into()));
+        return Ok(NetworkResponse::Reject(
+            "Invalid reject message name".into(),
+        ));
     }
 
     // Validate reason length (Bitcoin protocol limit: 111 bytes)
@@ -744,9 +794,11 @@ fn process_sendcmpct_message(
     // Validate version (must be 1 or 2, or match configured preferred version)
     let valid_versions = [1, 2];
     if !valid_versions.contains(&sendcmpct.version) {
-        return Ok(NetworkResponse::Reject("Invalid compact block version".into()));
+        return Ok(NetworkResponse::Reject(
+            "Invalid compact block version".into(),
+        ));
     }
-    
+
     // Check if compact blocks are enabled
     if !config.compact_blocks.enabled {
         return Ok(NetworkResponse::Reject("Compact blocks not enabled".into()));
@@ -774,7 +826,11 @@ fn process_getblocktxn_message(
     // Validate indices count (from config)
     if getblocktxn.indices.len() > config.compact_blocks.max_blocktxn_indices {
         return Ok(NetworkResponse::Reject(
-            format!("Too many transaction indices (max {})", config.compact_blocks.max_blocktxn_indices).into()
+            format!(
+                "Too many transaction indices (max {})",
+                config.compact_blocks.max_blocktxn_indices
+            )
+            .into(),
         ));
     }
 

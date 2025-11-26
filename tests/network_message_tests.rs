@@ -3,16 +3,15 @@
 //! Tests for `process_network_message` and individual message handlers.
 //! These tests verify protocol-level message handling, limits, and responses.
 
-use std::sync::Arc;
+use bllvm_consensus::{Block, BlockHeader, Hash, Transaction};
 use bllvm_protocol::network::{
     process_network_message, AddrMessage, ChainStateAccess, FeeFilterMessage, GetBlocksMessage,
-    GetDataMessage, HeadersMessage, InvMessage, NetworkAddress,
-    NetworkMessage, NetworkResponse, NotFoundMessage, PeerState, PingMessage, PongMessage,
-    RejectMessage, VersionMessage,
+    GetDataMessage, HeadersMessage, InvMessage, NetworkAddress, NetworkMessage, NetworkResponse,
+    NotFoundMessage, PeerState, PingMessage, PongMessage, RejectMessage, VersionMessage,
 };
 use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
-use bllvm_consensus::{Block, BlockHeader, Hash, Transaction};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Mock chain state access for testing
 struct MockChainStateAccess {
@@ -54,9 +53,13 @@ impl ChainStateAccess for MockChainStateAccess {
 
     fn get_object(&self, hash: &Hash) -> Option<bllvm_protocol::network::ChainObject> {
         if let Some(block) = self.blocks.get(hash) {
-            Some(bllvm_protocol::network::ChainObject::Block(Arc::new(block.clone())))
+            Some(bllvm_protocol::network::ChainObject::Block(Arc::new(
+                block.clone(),
+            )))
         } else if let Some(tx) = self.transactions.get(hash) {
-            Some(bllvm_protocol::network::ChainObject::Transaction(Arc::new(tx.clone())))
+            Some(bllvm_protocol::network::ChainObject::Transaction(Arc::new(
+                tx.clone(),
+            )))
         } else {
             None
         }
@@ -333,14 +336,12 @@ fn test_process_ping_pong() {
 
     // Should send pong
     match response {
-        NetworkResponse::SendMessage(msg) => {
-            match *msg {
-                NetworkMessage::Pong(pong) => {
-                    assert_eq!(pong.nonce, ping.nonce);
-                }
-                _ => panic!("Expected Pong message"),
+        NetworkResponse::SendMessage(msg) => match *msg {
+            NetworkMessage::Pong(pong) => {
+                assert_eq!(pong.nonce, ping.nonce);
             }
-        }
+            _ => panic!("Expected Pong message"),
+        },
         _ => panic!("Expected SendMessage with Pong"),
     }
 
@@ -411,14 +412,12 @@ fn test_process_getaddr_message() {
 
     // Should send addr message with known addresses
     match response {
-        NetworkResponse::SendMessage(msg) => {
-            match *msg {
-                NetworkMessage::Addr(addr) => {
-                    assert_eq!(addr.addresses.len(), 2);
-                }
-                _ => panic!("Expected Addr message"),
+        NetworkResponse::SendMessage(msg) => match *msg {
+            NetworkMessage::Addr(addr) => {
+                assert_eq!(addr.addresses.len(), 2);
             }
-        }
+            _ => panic!("Expected Addr message"),
+        },
         _ => panic!("Expected SendMessage with Addr"),
     }
 }
@@ -462,14 +461,12 @@ fn test_process_getblocks_message() {
 
     // Should send inv message with found blocks
     match response {
-        NetworkResponse::SendMessage(msg) => {
-            match *msg {
-                NetworkMessage::Inv(inv) => {
-                    assert!(!inv.inventory.is_empty());
-                }
-                _ => panic!("Expected Inv message"),
+        NetworkResponse::SendMessage(msg) => match *msg {
+            NetworkMessage::Inv(inv) => {
+                assert!(!inv.inventory.is_empty());
             }
-        }
+            _ => panic!("Expected Inv message"),
+        },
         _ => panic!("Expected SendMessage with Inv"),
     }
 }
@@ -811,4 +808,3 @@ fn test_process_mempool_message() {
         _ => panic!("Expected SendMessages with Tx"),
     }
 }
-

@@ -46,9 +46,9 @@ pub mod commons {
     pub const NODE_BAN_LIST_SHARING: u64 = 1 << 28;
 }
 
+pub use commons::*;
 /// Re-export commonly used flags
 pub use standard::*;
-pub use commons::*;
 
 /// Check if a service flag is set
 #[inline]
@@ -142,4 +142,3 @@ mod tests {
         assert!(supports_commons(services));
     }
 }
-

@@ -152,6 +152,8 @@ dependencies = [
 [[package]]
 name = "bllvm-consensus"
 version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4f1ba379960acabb26493fcfe42d4be53b1869540fe283734f05d77a4998a68c"
 dependencies = [
  "anyhow",
  "bincode",

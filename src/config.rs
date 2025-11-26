@@ -502,7 +502,7 @@ impl ProtocolConfig {
 
     /// Get service flags value from configuration
     pub fn get_service_flags(&self) -> u64 {
-        use crate::service_flags::{standard, commons, set_flag};
+        use crate::service_flags::{commons, set_flag, standard};
         let mut flags = 0u64;
 
         if self.service_flags.node_network {
@@ -537,4 +537,3 @@ impl ProtocolConfig {
         flags
     }
 }
-

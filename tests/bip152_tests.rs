@@ -4,15 +4,16 @@
 //! Tests cover SendCmpct negotiation, CmpctBlock reconstruction,
 //! GetBlockTxn/BlockTxn transaction fetching, and edge cases.
 
-use std::sync::Arc;
+use bllvm_consensus::{Block, BlockHeader, Hash, Transaction, TransactionInput, TransactionOutput};
 use bllvm_protocol::network::{
-    process_network_message, ChainStateAccess, NetworkMessage, NetworkResponse, PeerState,
-    SendCmpctMessage, CmpctBlockMessage, GetBlockTxnMessage, BlockTxnMessage, PrefilledTransaction,
+    process_network_message, BlockTxnMessage, ChainStateAccess, CmpctBlockMessage,
+    GetBlockTxnMessage, NetworkMessage, NetworkResponse, PeerState, PrefilledTransaction,
+    SendCmpctMessage,
 };
 use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
-use bllvm_consensus::{Block, BlockHeader, Hash, Transaction, TransactionInput, TransactionOutput};
-use std::collections::HashMap;
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Mock chain state for compact block testing
 struct MockChainForCompactBlocks {
@@ -37,9 +38,9 @@ impl ChainStateAccess for MockChainForCompactBlocks {
     }
 
     fn get_object(&self, hash: &Hash) -> Option<bllvm_protocol::network::ChainObject> {
-        self.blocks.get(hash).map(|b| {
-            bllvm_protocol::network::ChainObject::Block(Arc::new(b.clone()))
-        })
+        self.blocks
+            .get(hash)
+            .map(|b| bllvm_protocol::network::ChainObject::Block(Arc::new(b.clone())))
     }
 
     fn get_headers_for_locator(&self, _locator: &[Hash], _stop: &Hash) -> Vec<BlockHeader> {
@@ -57,7 +58,7 @@ fn create_test_engine() -> BitcoinProtocolEngine {
 
 fn calculate_block_hash(header: &BlockHeader) -> Hash {
     use sha2::{Digest, Sha256};
-    
+
     let mut bytes = Vec::with_capacity(80);
     bytes.extend_from_slice(&(header.version as u32).to_le_bytes());
     bytes.extend_from_slice(&header.prev_block_hash);
@@ -65,10 +66,10 @@ fn calculate_block_hash(header: &BlockHeader) -> Hash {
     bytes.extend_from_slice(&(header.timestamp as u32).to_le_bytes());
     bytes.extend_from_slice(&(header.bits as u32).to_le_bytes());
     bytes.extend_from_slice(&(header.nonce as u32).to_le_bytes());
-    
+
     let first_hash = Sha256::digest(&bytes);
     let second_hash = Sha256::digest(&first_hash);
-    
+
     let mut hash = [0u8; 32];
     hash.copy_from_slice(&second_hash);
     hash
@@ -76,7 +77,7 @@ fn calculate_block_hash(header: &BlockHeader) -> Hash {
 
 fn create_test_block_with_txs(tx_count: usize) -> (Hash, Block) {
     let mut transactions = Vec::new();
-    
+
     // Coinbase transaction
     transactions.push(Transaction {
         version: 1,
@@ -139,7 +140,7 @@ fn create_test_block_with_txs(tx_count: usize) -> (Hash, Block) {
 fn test_sendcmpct_version_1() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
-    
+
     let sendcmpct = SendCmpctMessage {
         version: 1,
         prefer_cmpct: 1,
@@ -152,7 +153,8 @@ fn test_sendcmpct_version_1() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -161,7 +163,7 @@ fn test_sendcmpct_version_1() {
 fn test_sendcmpct_version_2() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
-    
+
     let sendcmpct = SendCmpctMessage {
         version: 2,
         prefer_cmpct: 1,
@@ -174,7 +176,8 @@ fn test_sendcmpct_version_2() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -183,7 +186,7 @@ fn test_sendcmpct_version_2() {
 fn test_sendcmpct_invalid_version() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
-    
+
     let sendcmpct = SendCmpctMessage {
         version: 3, // Invalid (must be 1 or 2)
         prefer_cmpct: 1,
@@ -196,7 +199,8 @@ fn test_sendcmpct_invalid_version() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
         NetworkResponse::Reject(reason) => {
@@ -210,7 +214,7 @@ fn test_sendcmpct_invalid_version() {
 fn test_sendcmpct_prefer_cmpct_zero() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
-    
+
     let sendcmpct = SendCmpctMessage {
         version: 2,
         prefer_cmpct: 0, // Prefer full blocks
@@ -223,7 +227,8 @@ fn test_sendcmpct_prefer_cmpct_zero() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -236,7 +241,7 @@ fn test_sendcmpct_prefer_cmpct_zero() {
 fn test_cmpctblock_message_processing() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
-    
+
     let cmpctblock = CmpctBlockMessage {
         header: BlockHeader {
             version: 1,
@@ -257,7 +262,8 @@ fn test_cmpctblock_message_processing() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should acknowledge (actual reconstruction would happen in full implementation)
     assert!(matches!(response, NetworkResponse::Ok));
@@ -267,7 +273,7 @@ fn test_cmpctblock_message_processing() {
 fn test_cmpctblock_with_prefilled_txs() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
-    
+
     let tx = Transaction {
         version: 1,
         inputs: bllvm_consensus::tx_inputs![TransactionInput {
@@ -295,10 +301,7 @@ fn test_cmpctblock_with_prefilled_txs() {
             nonce: 0,
         },
         short_ids: vec![],
-        prefilled_txs: vec![PrefilledTransaction {
-            index: 0,
-            tx,
-        }],
+        prefilled_txs: vec![PrefilledTransaction { index: 0, tx }],
     };
 
     let response = process_network_message(
@@ -308,7 +311,8 @@ fn test_cmpctblock_with_prefilled_txs() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -322,7 +326,7 @@ fn test_getblocktxn_basic() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
     let mut chain = MockChainForCompactBlocks::new();
-    
+
     let (block_hash, block) = create_test_block_with_txs(5);
     chain.add_block(block_hash, block);
 
@@ -338,18 +342,17 @@ fn test_getblocktxn_basic() {
         Some(&chain),
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
-        NetworkResponse::SendMessage(msg) => {
-            match *msg {
-                NetworkMessage::BlockTxn(blocktxn) => {
-                    assert_eq!(blocktxn.block_hash, block_hash);
-                    assert_eq!(blocktxn.transactions.len(), 3);
-                }
-                _ => panic!("Expected BlockTxn message"),
+        NetworkResponse::SendMessage(msg) => match *msg {
+            NetworkMessage::BlockTxn(blocktxn) => {
+                assert_eq!(blocktxn.block_hash, block_hash);
+                assert_eq!(blocktxn.transactions.len(), 3);
             }
-        }
+            _ => panic!("Expected BlockTxn message"),
+        },
         _ => panic!("Expected SendMessage with BlockTxn"),
     }
 }
@@ -358,7 +361,7 @@ fn test_getblocktxn_basic() {
 fn test_getblocktxn_too_many_indices() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
-    
+
     let indices: Vec<u16> = (0..10001).collect(); // Exceeds protocol limit of 10000
 
     let getblocktxn = GetBlockTxnMessage {
@@ -373,7 +376,8 @@ fn test_getblocktxn_too_many_indices() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     match response {
         NetworkResponse::Reject(reason) => {
@@ -388,7 +392,7 @@ fn test_getblocktxn_invalid_block_hash() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
     let chain = MockChainForCompactBlocks::new();
-    
+
     let getblocktxn = GetBlockTxnMessage {
         block_hash: [0xff; 32], // Non-existent block
         indices: vec![1, 2],
@@ -401,7 +405,8 @@ fn test_getblocktxn_invalid_block_hash() {
         Some(&chain),
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should return Ok (no transactions found)
     assert!(matches!(response, NetworkResponse::Ok));
@@ -412,7 +417,7 @@ fn test_getblocktxn_out_of_bounds_indices() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
     let mut chain = MockChainForCompactBlocks::new();
-    
+
     let (block_hash, block) = create_test_block_with_txs(3); // Only 4 transactions total (1 coinbase + 3)
     chain.add_block(block_hash, block);
 
@@ -428,7 +433,8 @@ fn test_getblocktxn_out_of_bounds_indices() {
         Some(&chain),
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should return only valid transactions
     match response {
@@ -449,25 +455,23 @@ fn test_getblocktxn_out_of_bounds_indices() {
 fn test_blocktxn_message_processing() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
-    
-    let transactions = vec![
-        Transaction {
-            version: 1,
-            inputs: bllvm_consensus::tx_inputs![TransactionInput {
-                prevout: bllvm_consensus::types::OutPoint {
-                    hash: [0u8; 32],
-                    index: 0,
-                },
-                script_sig: vec![0x41, 0x04],
-                sequence: 0xffffffff,
-            }],
-            outputs: bllvm_consensus::tx_outputs![TransactionOutput {
-                value: 1000,
-                script_pubkey: vec![0x51],
-            }],
-            lock_time: 0,
-        },
-    ];
+
+    let transactions = vec![Transaction {
+        version: 1,
+        inputs: bllvm_consensus::tx_inputs![TransactionInput {
+            prevout: bllvm_consensus::types::OutPoint {
+                hash: [0u8; 32],
+                index: 0,
+            },
+            script_sig: vec![0x41, 0x04],
+            sequence: 0xffffffff,
+        }],
+        outputs: bllvm_consensus::tx_outputs![TransactionOutput {
+            value: 1000,
+            script_pubkey: vec![0x51],
+        }],
+        lock_time: 0,
+    }];
 
     let blocktxn = BlockTxnMessage {
         block_hash: [0u8; 32],
@@ -481,7 +485,8 @@ fn test_blocktxn_message_processing() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -494,7 +499,7 @@ fn test_blocktxn_message_processing() {
 fn test_cmpctblock_empty_short_ids() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
-    
+
     let cmpctblock = CmpctBlockMessage {
         header: BlockHeader {
             version: 1,
@@ -515,7 +520,8 @@ fn test_cmpctblock_empty_short_ids() {
         None,
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert!(matches!(response, NetworkResponse::Ok));
 }
@@ -525,7 +531,7 @@ fn test_getblocktxn_empty_indices() {
     let engine = create_test_engine();
     let mut peer_state = PeerState::new();
     let chain = MockChainForCompactBlocks::new();
-    
+
     let getblocktxn = GetBlockTxnMessage {
         block_hash: [0u8; 32],
         indices: vec![], // Empty indices
@@ -538,9 +544,9 @@ fn test_getblocktxn_empty_indices() {
         Some(&chain),
         None,
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     // Should return Ok (no transactions requested)
     assert!(matches!(response, NetworkResponse::Ok));
 }
-
