@@ -87,3 +87,6 @@ pnpm-lock.yaml
 # Misc
 .cache/
 *.pid
+
+# Local Cargo overrides (not committed - each developer sets up their own)
+.cargo/config.toml

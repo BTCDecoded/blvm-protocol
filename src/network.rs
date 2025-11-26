@@ -9,6 +9,11 @@ use crate::{BitcoinProtocolEngine, Result};
 use bllvm_consensus::types::UtxoSet;
 use bllvm_consensus::{Block, BlockHeader, Hash, Transaction, ValidationResult};
 
+// Commons module is always available (ban list sharing doesn't require utxo-commitments)
+pub mod commons {
+    pub use crate::commons::*;
+}
+
 /// NetworkMessage: Bitcoin P2P protocol message types
 ///
 /// Network message types for Bitcoin P2P protocol
@@ -27,6 +32,28 @@ pub enum NetworkMessage {
     Pong(PongMessage),
     MemPool,
     FeeFilter(FeeFilterMessage),
+    // Additional core P2P messages
+    GetBlocks(GetBlocksMessage),
+    GetAddr,
+    NotFound(NotFoundMessage),
+    Reject(RejectMessage),
+    SendHeaders,
+    // BIP152 Compact Block Relay
+    SendCmpct(SendCmpctMessage),
+    CmpctBlock(CmpctBlockMessage),
+    GetBlockTxn(GetBlockTxnMessage),
+    BlockTxn(BlockTxnMessage),
+    // Commons-specific protocol extensions
+    #[cfg(feature = "utxo-commitments")]
+    GetUTXOSet(commons::GetUTXOSetMessage),
+    #[cfg(feature = "utxo-commitments")]
+    UTXOSet(commons::UTXOSetMessage),
+    #[cfg(feature = "utxo-commitments")]
+    GetFilteredBlock(commons::GetFilteredBlockMessage),
+    #[cfg(feature = "utxo-commitments")]
+    FilteredBlock(commons::FilteredBlockMessage),
+    GetBanList(commons::GetBanListMessage),
+    BanList(commons::BanListMessage),
 }
 
 /// Version message for initial handshake
@@ -91,6 +118,76 @@ pub struct PongMessage {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FeeFilterMessage {
     pub feerate: u64,
+}
+
+/// GetBlocks message requesting blocks by locator
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GetBlocksMessage {
+    pub version: u32,
+    pub block_locator_hashes: Vec<Hash>,
+    pub hash_stop: Hash,
+}
+
+/// NotFound message indicating requested object not found
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotFoundMessage {
+    pub inventory: Vec<InventoryVector>,
+}
+
+/// Reject message rejecting a message with reason
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RejectMessage {
+    pub message: String, // Command name of rejected message
+    pub code: u8,        // Rejection code (0x01=malformed, 0x10=invalid, 0x11=obsolete, 0x12=duplicate, 0x40=nonstandard, 0x41=dust, 0x42=insufficientfee, 0x43=checkpoint)
+    pub reason: String,  // Human-readable reason
+    pub extra_data: Option<Hash>, // Optional hash for rejected object
+}
+
+/// SendCmpct message - Negotiate compact block relay support (BIP152)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SendCmpctMessage {
+    /// Compact block version (1 or 2)
+    pub version: u64,
+    /// Whether to prefer compact blocks (1) or regular blocks (0)
+    pub prefer_cmpct: u8,
+}
+
+/// CmpctBlock message - Compact block data (BIP152)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CmpctBlockMessage {
+    /// Block header
+    pub header: BlockHeader,
+    /// Short transaction IDs (6 bytes each)
+    pub short_ids: Vec<[u8; 6]>,
+    /// Prefilled transactions (transactions that are likely missing)
+    pub prefilled_txs: Vec<PrefilledTransaction>,
+}
+
+/// PrefilledTransaction - Transaction included in compact block
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrefilledTransaction {
+    /// Index in block (0 = coinbase)
+    pub index: u16,
+    /// Transaction data
+    pub tx: Transaction,
+}
+
+/// GetBlockTxn message - Request missing transactions from compact block (BIP152)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GetBlockTxnMessage {
+    /// Block hash for the compact block
+    pub block_hash: Hash,
+    /// Indices of transactions to request (0-indexed)
+    pub indices: Vec<u16>,
+}
+
+/// BlockTxn message - Response with requested transactions (BIP152)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BlockTxnMessage {
+    /// Block hash for the compact block
+    pub block_hash: Hash,
+    /// Requested transactions in order
+    pub transactions: Vec<Transaction>,
 }
 
 /// Network address structure
@@ -237,6 +334,25 @@ pub fn process_network_message(
         NetworkMessage::Pong(pong) => process_pong_message(pong, peer_state),
         NetworkMessage::MemPool => process_mempool_message(chain_access),
         NetworkMessage::FeeFilter(feefilter) => process_feefilter_message(feefilter, peer_state),
+        NetworkMessage::GetBlocks(getblocks) => process_getblocks_message(getblocks, chain_access),
+        NetworkMessage::GetAddr => process_getaddr_message(peer_state),
+        NetworkMessage::NotFound(notfound) => process_notfound_message(notfound),
+        NetworkMessage::Reject(reject) => process_reject_message(reject),
+        NetworkMessage::SendHeaders => process_sendheaders_message(peer_state),
+        NetworkMessage::SendCmpct(sendcmpct) => process_sendcmpct_message(sendcmpct, peer_state),
+        NetworkMessage::CmpctBlock(cmpctblock) => process_cmpctblock_message(cmpctblock),
+        NetworkMessage::GetBlockTxn(getblocktxn) => process_getblocktxn_message(getblocktxn, chain_access),
+        NetworkMessage::BlockTxn(blocktxn) => process_blocktxn_message(blocktxn),
+        #[cfg(feature = "utxo-commitments")]
+        NetworkMessage::GetUTXOSet(getutxoset) => process_getutxoset_message(getutxoset),
+        #[cfg(feature = "utxo-commitments")]
+        NetworkMessage::UTXOSet(utxoset) => process_utxoset_message(utxoset),
+        #[cfg(feature = "utxo-commitments")]
+        NetworkMessage::GetFilteredBlock(getfiltered) => process_getfilteredblock_message(getfiltered),
+        #[cfg(feature = "utxo-commitments")]
+        NetworkMessage::FilteredBlock(filtered) => process_filteredblock_message(filtered),
+        NetworkMessage::GetBanList(getbanlist) => process_getbanlist_message(getbanlist),
+        NetworkMessage::BanList(banlist) => process_banlist_message(banlist),
     }
 }
 
@@ -484,5 +600,216 @@ fn process_feefilter_message(
     peer_state: &mut PeerState,
 ) -> Result<NetworkResponse> {
     peer_state.min_fee_rate = Some(feefilter.feerate);
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process getblocks message
+fn process_getblocks_message(
+    getblocks: &GetBlocksMessage,
+    chain_access: Option<&dyn ChainStateAccess>,
+) -> Result<NetworkResponse> {
+    // Validate block locator size (protocol limit)
+    if getblocks.block_locator_hashes.len() > 101 {
+        return Ok(NetworkResponse::Reject("Too many locator hashes".to_string()));
+    }
+
+    // Use chain access to find blocks (if provided)
+    // Note: GetBlocks is similar to GetHeaders but returns full blocks
+    // For now, we'll delegate to GetHeaders logic or return inv message
+    if let Some(chain) = chain_access {
+        // Find blocks using locator and return inv message
+        let mut inventory = Vec::new();
+        for hash in &getblocks.block_locator_hashes {
+            if chain.has_object(hash) {
+                inventory.push(InventoryVector {
+                    inv_type: 2, // MSG_BLOCK
+                    hash: *hash,
+                });
+            }
+        }
+
+        if !inventory.is_empty() {
+            return Ok(NetworkResponse::SendMessage(Box::new(
+                NetworkMessage::Inv(InvMessage { inventory }),
+            )));
+        }
+    }
+
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process getaddr message
+fn process_getaddr_message(peer_state: &mut PeerState) -> Result<NetworkResponse> {
+    // Return known addresses (if any)
+    if !peer_state.known_addresses.is_empty() {
+        // Limit to 1000 addresses (protocol limit)
+        let addresses: Vec<NetworkAddress> = peer_state
+            .known_addresses
+            .iter()
+            .take(1000)
+            .cloned()
+            .collect();
+
+        return Ok(NetworkResponse::SendMessage(Box::new(
+            NetworkMessage::Addr(AddrMessage { addresses }),
+        )));
+    }
+
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process notfound message
+fn process_notfound_message(notfound: &NotFoundMessage) -> Result<NetworkResponse> {
+    // Validate inventory count (protocol limit)
+    if notfound.inventory.len() > 50000 {
+        return Ok(NetworkResponse::Reject(
+            "Too many notfound items".to_string(),
+        ));
+    }
+
+    // NotFound is informational - just acknowledge
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process reject message
+fn process_reject_message(reject: &RejectMessage) -> Result<NetworkResponse> {
+    // Validate message name length (protocol limit)
+    if reject.message.len() > 12 {
+        return Ok(NetworkResponse::Reject("Invalid reject message name".to_string()));
+    }
+
+    // Validate reason length (protocol limit)
+    if reject.reason.len() > 111 {
+        return Ok(NetworkResponse::Reject("Reject reason too long".to_string()));
+    }
+
+    // Reject is informational - log and acknowledge
+    // In production, this would trigger appropriate handling (ban peer, etc.)
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process sendheaders message
+fn process_sendheaders_message(_peer_state: &mut PeerState) -> Result<NetworkResponse> {
+    // Enable headers-only mode for this peer
+    // This is a flag that affects future GetHeaders responses
+    // For now, we just acknowledge (actual implementation would set a flag)
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process sendcmpct message (BIP152)
+fn process_sendcmpct_message(
+    sendcmpct: &SendCmpctMessage,
+    peer_state: &mut PeerState,
+) -> Result<NetworkResponse> {
+    // Validate version (must be 1 or 2)
+    if sendcmpct.version != 1 && sendcmpct.version != 2 {
+        return Ok(NetworkResponse::Reject("Invalid compact block version".to_string()));
+    }
+
+    // Store compact block preference in peer state
+    // (actual implementation would store this)
+    let _ = (sendcmpct.version, sendcmpct.prefer_cmpct);
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process cmpctblock message (BIP152)
+fn process_cmpctblock_message(_cmpctblock: &CmpctBlockMessage) -> Result<NetworkResponse> {
+    // Validate compact block and reconstruct full block
+    // For now, just acknowledge (actual implementation would validate and reconstruct)
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process getblocktxn message (BIP152)
+fn process_getblocktxn_message(
+    getblocktxn: &GetBlockTxnMessage,
+    chain_access: Option<&dyn ChainStateAccess>,
+) -> Result<NetworkResponse> {
+    // Validate indices count (protocol limit)
+    if getblocktxn.indices.len() > 10000 {
+        return Ok(NetworkResponse::Reject("Too many transaction indices".to_string()));
+    }
+
+    // Use chain access to get requested transactions
+    if let Some(chain) = chain_access {
+        let mut transactions = Vec::new();
+        for &index in &getblocktxn.indices {
+            // Get block and extract transaction at index
+            // (simplified - actual implementation would get block first)
+            if let Some(obj) = chain.get_object(&getblocktxn.block_hash) {
+                if let Some(block) = obj.as_block() {
+                    if (index as usize) < block.transactions.len() {
+                        transactions.push(block.transactions[index as usize].clone());
+                    }
+                }
+            }
+        }
+
+        if !transactions.is_empty() {
+            return Ok(NetworkResponse::SendMessage(Box::new(
+                NetworkMessage::BlockTxn(BlockTxnMessage {
+                    block_hash: getblocktxn.block_hash,
+                    transactions,
+                }),
+            )));
+        }
+    }
+
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process blocktxn message (BIP152)
+fn process_blocktxn_message(_blocktxn: &BlockTxnMessage) -> Result<NetworkResponse> {
+    // Validate transactions and use to reconstruct block
+    // For now, just acknowledge (actual implementation would validate and reconstruct)
+    Ok(NetworkResponse::Ok)
+}
+
+#[cfg(feature = "utxo-commitments")]
+/// Process getutxoset message
+fn process_getutxoset_message(_getutxoset: &commons::GetUTXOSetMessage) -> Result<NetworkResponse> {
+    // Request UTXO set at specific height
+    // For now, just acknowledge (actual implementation would fetch and return UTXO set)
+    Ok(NetworkResponse::Ok)
+}
+
+#[cfg(feature = "utxo-commitments")]
+/// Process utxoset message
+fn process_utxoset_message(_utxoset: &commons::UTXOSetMessage) -> Result<NetworkResponse> {
+    // Receive UTXO set commitment
+    // For now, just acknowledge (actual implementation would validate and store)
+    Ok(NetworkResponse::Ok)
+}
+
+#[cfg(feature = "utxo-commitments")]
+/// Process getfilteredblock message
+fn process_getfilteredblock_message(
+    _getfiltered: &commons::GetFilteredBlockMessage,
+) -> Result<NetworkResponse> {
+    // Request filtered block (spam-filtered)
+    // For now, just acknowledge (actual implementation would filter and return)
+    Ok(NetworkResponse::Ok)
+}
+
+#[cfg(feature = "utxo-commitments")]
+/// Process filteredblock message
+fn process_filteredblock_message(
+    _filtered: &commons::FilteredBlockMessage,
+) -> Result<NetworkResponse> {
+    // Receive filtered block
+    // For now, just acknowledge (actual implementation would validate and process)
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process getbanlist message
+fn process_getbanlist_message(_getbanlist: &commons::GetBanListMessage) -> Result<NetworkResponse> {
+    // Request ban list from peer
+    // For now, just acknowledge (actual implementation would return ban list)
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process banlist message
+fn process_banlist_message(_banlist: &commons::BanListMessage) -> Result<NetworkResponse> {
+    // Receive ban list from peer
+    // For now, just acknowledge (actual implementation would validate and merge)
     Ok(NetworkResponse::Ok)
 }
