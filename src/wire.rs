@@ -11,6 +11,7 @@
 
 use crate::{Hash, Result};
 use bllvm_consensus::ConsensusError;
+use std::borrow::Cow;
 use crate::network::NetworkMessage;
 use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
@@ -75,7 +76,7 @@ pub fn serialize_message(
 
     // Validate payload size
     if payload.len() > MAX_MESSAGE_PAYLOAD {
-        return Err(crate::ConsensusError::Serialization(format!(
+        return Err(crate::ConsensusError::Serialization(Cow::Owned(format!(
             "Message payload too large: {} bytes",
             payload.len()
         )));
@@ -117,12 +118,12 @@ pub fn deserialize_message<R: Read>(
 
     // Read header
     let mut header = [0u8; MESSAGE_HEADER_SIZE];
-    reader.read_exact(&mut header).map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e)))?;
+    reader.read_exact(&mut header).map_err(|e| ConsensusError::Serialization(Cow::Owned(format!("IO error: {}", e))))?;
 
     // Check magic bytes
     let magic = [header[0], header[1], header[2], header[3]];
     if magic != expected_magic {
-        return Err(crate::ConsensusError::Serialization(format!(
+        return Err(crate::ConsensusError::Serialization(Cow::Owned(format!(
             "Invalid magic bytes: {:?}, expected {:?}",
             magic, expected_magic
         )));
@@ -132,14 +133,14 @@ pub fn deserialize_message<R: Read>(
     let command_bytes = &header[4..16];
     let command_len = command_bytes.iter().position(|&b| b == 0).unwrap_or(12);
     let command = std::str::from_utf8(&command_bytes[..command_len])
-        .map_err(|e| crate::ConsensusError::Serialization(format!("Invalid command: {}", e)))?;
+        .map_err(|e| crate::ConsensusError::Serialization(Cow::Owned(format!("Invalid command: {}", e)))?;
 
     // Read payload length
     let length_bytes = [header[16], header[17], header[18], header[19]];
     let payload_length = u32::from_le_bytes(length_bytes) as usize;
 
     if payload_length > MAX_MESSAGE_PAYLOAD {
-        return Err(crate::ConsensusError::Serialization(format!(
+        return Err(crate::ConsensusError::Serialization(Cow::Owned(format!(
             "Payload length too large: {} bytes",
             payload_length
         )));
@@ -151,7 +152,7 @@ pub fn deserialize_message<R: Read>(
     // Read payload
     let mut payload = vec![0u8; payload_length];
     if payload_length > 0 {
-        reader.read_exact(&mut payload).map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e)))?;
+        reader.read_exact(&mut payload).map_err(|e| ConsensusError::Serialization(Cow::Owned(format!("IO error: {}", e))))?;
     }
 
     // Verify checksum
@@ -197,7 +198,7 @@ pub fn deserialize_message<R: Read>(
         "getbanlist" => NetworkMessage::GetBanList(deserialize_getbanlist(&payload)?),
         "banlist" => NetworkMessage::BanList(deserialize_banlist(&payload)?),
         _ => {
-            return Err(crate::ConsensusError::Serialization(format!(
+            return Err(crate::ConsensusError::Serialization(Cow::Owned(format!(
                 "Unknown command: {}",
                 command
             )));
@@ -212,12 +213,12 @@ pub fn deserialize_message<R: Read>(
 
 fn serialize_version(v: &crate::network::VersionMessage) -> Result<Vec<u8>> {
     use bincode;
-    bincode::serialize(v).map_err(|e| crate::ConsensusError::Serialization(format!("Serialization error: {}", e)))
+    bincode::serialize(v).map_err(|e| crate::ConsensusError::Serialization(Cow::Owned(format!("Serialization error: {}", e)))
 }
 
 fn deserialize_version(data: &[u8]) -> Result<crate::network::VersionMessage> {
     use bincode;
-    bincode::deserialize(data).map_err(|e| crate::ConsensusError::Serialization(format!("Deserialization error: {}", e)))
+    bincode::deserialize(data).map_err(|e| crate::ConsensusError::Serialization(Cow::Owned(format!("Deserialization error: {}", e)))
 }
 
 // Stub implementations for other message types (would need full wire format encoding)
