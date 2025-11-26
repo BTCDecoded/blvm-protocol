@@ -6,9 +6,9 @@
 
 This crate provides a Bitcoin protocol abstraction layer that enables:
 - Multiple Bitcoin variants (mainnet, testnet, regtest)
-- Protocol evolution support (Bitcoin V1, V2, etc.)
-- Economic model abstraction (PoW, future variants)
-- **Commons-specific protocol extensions** (UTXO commitments, ban list sharing)
+- Protocol evolution support
+- Economic model abstraction
+- Commons-specific protocol extensions (UTXO commitments, ban list sharing)
 - Research-friendly interfaces
 
 ## Architecture Position
@@ -34,7 +34,7 @@ The bllvm-protocol sits between the pure mathematical consensus rules (bllvm-con
 - **Validation Rules**: Protocol-specific size limits and validation logic
 
 ### Protocol Evolution
-- **Version Support**: Bitcoin V1 (current), V2 (future), and experimental variants
+- **Version Support**: Current and future protocol versions
 - **Feature Management**: Enable/disable features based on protocol version
 - **Breaking Changes**: Track and manage protocol evolution
 
@@ -65,7 +65,7 @@ The bllvm-protocol sits between the pure mathematical consensus rules (bllvm-con
 - **Commons Extensions**: GetUTXOSet, UTXOSet, GetFilteredBlock, FilteredBlock, GetBanList, BanList
 
 ### Service Flags
-- **Standard Flags**: NODE_NETWORK, NODE_WITNESS, NODE_COMPACT_FILTERS, etc.
+- **Standard Flags**: NODE_NETWORK, NODE_WITNESS, NODE_COMPACT_FILTERS, NODE_NETWORK_LIMITED
 - **Commons Flags**: NODE_UTXO_COMMITMENTS, NODE_BAN_LIST_SHARING, NODE_FIBRE, NODE_DANDELION, NODE_PACKAGE_RELAY
 
 ### Validation Rules
@@ -193,7 +193,7 @@ assert!(engine.supports_feature("segwit"));
 
 ## Protocol Evolution
 
-### Bitcoin V1 (Current)
+### Current Protocol
 - Basic transactions and proof-of-work
 - Economic model and P2P networking
 - SegWit and Taproot support
@@ -208,7 +208,7 @@ assert!(engine.supports_feature("segwit"));
 - FIBRE support
 - Dandelion++ privacy relay
 
-### Bitcoin V2 (Future)
+### Future Protocol Versions
 - Enhanced scripting capabilities
 - Privacy features
 - Advanced economic models
@@ -253,12 +253,16 @@ cargo test --features utxo-commitments
 
 ## Test Coverage
 
-- **125 passing tests** (up from 118)
-- Network message processing tests (22 tests)
-- Protocol limits tests (10 tests)
+The test suite includes:
+- Network message processing tests
+- Protocol limits tests (DoS protection)
 - Service flags tests
 - Varint encoding tests
 - Protocol integration tests
+- Validation rules tests
+- Network parameters tests
+- Feature registry tests
+- BIP implementation tests
 
 ## Security Considerations
 
@@ -274,33 +278,14 @@ cargo test --features utxo-commitments
 
 ### DoS Protection
 - Protocol-level message size limits
-- Address count limits (1000)
-- Inventory item limits (50000)
-- Header count limits (2000)
-- Transaction count limits (10000 per block)
+- Address count limits
+- Inventory item limits
+- Header count limits
+- Transaction count limits
 
 ## Dependencies
 
-All dependencies are pinned to exact versions for security:
-
-```toml
-# Consensus layer
-bllvm-consensus = { path = "../bllvm-consensus" }
-
-# Serialization - EXACT VERSIONS
-serde = "=1.0.228"
-serde_json = "=1.0.108"
-bincode = "=1.3.3"
-
-# Error handling - EXACT VERSIONS
-anyhow = "=1.0.93"
-thiserror = "=1.0.69"
-
-# Cryptography - EXACT VERSIONS
-sha2 = "=0.10.9"
-ripemd = "=0.1.3"
-secp256k1 = "=0.28.2"
-```
+All dependencies are pinned to exact versions for security. See `Cargo.toml` for the complete list.
 
 ## License
 
