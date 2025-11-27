@@ -19,9 +19,8 @@ use serde::{Deserialize, Serialize};
 // Re-export commonly used types from consensus-proof for convenience
 // This allows upper layers (like reference-node) to depend only on protocol-engine
 pub use bllvm_consensus::{
-    Block, BlockHeader, ByteString, ConsensusProof, Hash, Integer, Natural,
-    OutPoint, Transaction, TransactionInput, TransactionOutput, UtxoSet, ValidationResult,
-    UTXO,
+    Block, BlockHeader, ByteString, ConsensusProof, Hash, Integer, Natural, NetworkMessageLimits,
+    OutPoint, Transaction, TransactionInput, TransactionOutput, UtxoSet, ValidationResult, UTXO,
 };
 
 // Re-export consensus Result as ConsensusResult for backward compatibility
@@ -238,12 +237,25 @@ impl BitcoinProtocolEngine {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion, ProtocolValidationContext};
+    /// use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+    /// use bllvm_protocol::validation::ProtocolValidationContext;
     /// use bllvm_protocol::{Block, UtxoSet};
     ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1)?;
     /// let context = ProtocolValidationContext::new(ProtocolVersion::BitcoinV1, 0)?;
-    /// let block = /* ... */;
+    /// // Create a test block
+    /// let block = Block {
+    ///     header: bllvm_consensus::BlockHeader {
+    ///         version: 1,
+    ///         prev_block_hash: [0u8; 32],
+    ///         merkle_root: [0u8; 32],
+    ///         timestamp: 1231006505,
+    ///         bits: 0x1d00ffff,
+    ///         nonce: 0,
+    ///     },
+    ///     transactions: vec![].into_boxed_slice(),
+    /// };
     /// let witnesses = vec![];
     /// let utxos = UtxoSet::new();
     ///
@@ -255,6 +267,8 @@ impl BitcoinProtocolEngine {
     ///     None,
     ///     &context,
     /// )?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn validate_and_connect_block(
         &self,

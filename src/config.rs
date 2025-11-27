@@ -271,7 +271,7 @@ impl Default for CompactBlockConfig {
 }
 
 /// Commons-specific protocol extensions configuration
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct CommonsExtensionsConfig {
     /// Enable UTXO commitments protocol
     /// Default: false (requires utxo-commitments feature)
@@ -294,7 +294,7 @@ pub struct CommonsExtensionsConfig {
 }
 
 /// Filter preferences configuration for spam filtering
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct FilterPreferencesConfig {
     /// Filter Ordinals/Inscriptions
     /// Default: false
@@ -315,28 +315,6 @@ pub struct FilterPreferencesConfig {
     /// Default: 0 (no minimum)
     #[serde(default)]
     pub min_output_value: u64,
-}
-
-impl Default for FilterPreferencesConfig {
-    fn default() -> Self {
-        Self {
-            filter_ordinals: false,
-            filter_dust: false,
-            filter_brc20: false,
-            min_output_value: 0,
-        }
-    }
-}
-
-impl Default for CommonsExtensionsConfig {
-    fn default() -> Self {
-        Self {
-            utxo_commitments: false,
-            filtered_blocks: false,
-            ban_list_sharing: false,
-            default_filter_preferences: FilterPreferencesConfig::default(),
-        }
-    }
 }
 
 /// Complete protocol configuration
