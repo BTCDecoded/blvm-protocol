@@ -1,10 +1,10 @@
 # Bitcoin Protocol Engine
 
-**Bitcoin protocol abstraction layer for multiple variants and evolution.**
+Bitcoin protocol abstraction layer supporting multiple variants and protocol evolution.
 
 > **For verified system status**: See [SYSTEM_STATUS.md](https://github.com/BTCDecoded/.github/blob/main/SYSTEM_STATUS.md) in the BTCDecoded organization repository.
 
-This crate provides a Bitcoin protocol abstraction layer that enables:
+Provides a Bitcoin protocol abstraction layer enabling:
 - Multiple Bitcoin variants (mainnet, testnet, regtest)
 - Protocol evolution support
 - Economic model abstraction
@@ -13,35 +13,30 @@ This crate provides a Bitcoin protocol abstraction layer that enables:
 
 ## Architecture Position
 
-This is **Tier 3** of the 6-tier Bitcoin Commons architecture (BLLVM technology stack):
+Tier 3 of the 6-tier Bitcoin Commons architecture (BLLVM technology stack):
 
 ```
 1. bllvm-spec (Orange Paper - mathematical foundation)
 2. bllvm-consensus (pure math implementation)
-3. bllvm-protocol (Bitcoin abstraction) ← THIS CRATE
+3. bllvm-protocol (Bitcoin abstraction)
 4. bllvm-node (full node implementation)
 5. bllvm-sdk (developer toolkit)
 6. bllvm-commons (governance enforcement)
 ```
 
-## Current Implementation Status
+## Features
 
-### Core Features
-- ✅ **Protocol Variants** - Mainnet, testnet, regtest support
-- ✅ **Network Messages** - Core P2P messages and BIP152 compact blocks
-- ✅ **Commons Extensions** - UTXO commitments, filtered blocks, ban list sharing
-- ✅ **Service Flags** - Standard and Commons-specific capability flags
-- ✅ **Validation Rules** - Protocol-specific size limits and validation
-- ✅ **BIP Support** - BIP152, BIP157, BIP158, BIP173/350/351
-
-### Production Readiness
-- ✅ **Core Functionality** - All major protocol features implemented
-- ✅ **Testing** - Comprehensive test coverage including edge cases
-- ✅ **DoS Protection** - Protocol-level message size limits
+- **Protocol Variants**: Mainnet, testnet, regtest support
+- **Network Messages**: Core P2P messages and BIP152 compact blocks
+- **Commons Extensions**: UTXO commitments, filtered blocks, ban list sharing
+- **Service Flags**: Standard and Commons-specific capability flags
+- **Validation Rules**: Protocol-specific size limits and validation
+- **BIP Support**: BIP152, BIP157, BIP158, BIP173/350/351
+- **DoS Protection**: Protocol-level message size limits
 
 ## Purpose
 
-The bllvm-protocol sits between the pure mathematical consensus rules (bllvm-consensus) and the full Bitcoin implementation (bllvm-node). It provides:
+Sits between pure mathematical consensus rules (bllvm-consensus) and full Bitcoin implementation (bllvm-node). Provides:
 
 ### Protocol Abstraction
 - **Multiple Variants**: Support for mainnet, testnet, and regtest
@@ -303,9 +298,9 @@ cargo test --features testnet
 cargo test --features utxo-commitments
 ```
 
-## Test Coverage
+## Testing
 
-The test suite includes:
+Test suite includes:
 - Network message processing tests
 - Protocol limits tests (DoS protection)
 - BIP152 compact block relay tests
@@ -342,14 +337,6 @@ The test suite includes:
 ## Dependencies
 
 All dependencies are pinned to exact versions for security. See `Cargo.toml` for the complete list.
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for security policies and [BTCDecoded Security Policy](https://github.com/BTCDecoded/.github/blob/main/SECURITY.md) for organization-wide guidelines.
 
 ## Contributing
 

@@ -1,6 +1,6 @@
 # Type Usage Guidelines
 
-This document clarifies which types should be imported from which layer in the BLLVM architecture.
+Clarifies which types should be imported from which layer in the BLLVM architecture.
 
 ## Architecture Layers
 
