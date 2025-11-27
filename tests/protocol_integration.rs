@@ -121,6 +121,7 @@ fn test_multi_block_chain_validation() {
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             ],
             height: 0,
+            is_coinbase: false,
         },
     );
 
@@ -211,6 +212,7 @@ fn test_utxo_tracking_across_transactions() {
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             ],
             height: 0,
+            is_coinbase: false,
         },
     );
 

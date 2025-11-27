@@ -3,8 +3,7 @@
 //! Additional edge cases and error scenarios for BIP70 payment protocol.
 
 use bllvm_protocol::payment::{
-    Bip70Error, Payment, PaymentACK, PaymentDetails, PaymentOutput, PaymentRequest,
-    SignedRefundAddress,
+    Bip70Error, Payment, PaymentACK, PaymentOutput, PaymentRequest, SignedRefundAddress,
 };
 use secp256k1::{Message, Secp256k1, SecretKey};
 
@@ -190,16 +189,13 @@ fn test_signed_refund_address_invalid_signature() {
         signature: invalid_signature,
     };
 
-    // Verification should fail
+    // Verification should fail - from_compact will fail for invalid signature
     use sha2::{Digest, Sha256};
     let hash = Sha256::digest(&[0x42; 32]);
     let message = Message::from_digest_slice(&hash).unwrap();
-    let result = secp.verify_ecdsa(
-        &message,
-        &secp256k1::ecdsa::Signature::from_compact(&signed_refund.signature).unwrap(),
-        &pubkey,
-    );
-    assert!(result.is_err());
+    let sig_result = secp256k1::ecdsa::Signature::from_compact(&signed_refund.signature);
+    // Invalid signature should fail to parse
+    assert!(sig_result.is_err());
 }
 
 #[test]
