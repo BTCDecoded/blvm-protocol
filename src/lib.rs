@@ -71,8 +71,8 @@ pub use config::{
     ProtocolConfig, ProtocolFeaturesConfig, ProtocolValidationConfig, ServiceFlagsConfig,
 };
 pub use service_flags::{commons as service_flags_commons, standard as service_flags_standard};
-// Wire format module - framework in place, full implementation pending
-// pub mod wire;
+// Wire format module - Bitcoin P2P wire protocol serialization
+pub mod wire;
 pub mod types {
     pub use bllvm_consensus::types::*;
 }
