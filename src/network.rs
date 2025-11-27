@@ -331,9 +331,9 @@ pub fn process_network_message(
         }
         NetworkMessage::Headers(headers) => process_headers_message(headers, config),
         NetworkMessage::Block(block) => {
-            process_block_message(engine, &block, utxo_set, height, config)
+            process_block_message(engine, block, utxo_set, height, config)
         }
-        NetworkMessage::Tx(tx) => process_tx_message(engine, &tx, height),
+        NetworkMessage::Tx(tx) => process_tx_message(engine, tx, height),
         NetworkMessage::Ping(ping) => process_ping_message(ping, peer_state),
         NetworkMessage::Pong(pong) => process_pong_message(pong, peer_state),
         NetworkMessage::MemPool => process_mempool_message(chain_access),
@@ -381,13 +381,10 @@ fn process_version_message(
 
     // Validate user agent length (from config)
     if version.user_agent.len() > config.network_limits.max_user_agent_length {
-        return Ok(NetworkResponse::Reject(
-            format!(
-                "User agent too long (max {} bytes)",
-                config.network_limits.max_user_agent_length
-            )
-            .into(),
-        ));
+        return Ok(NetworkResponse::Reject(format!(
+            "User agent too long (max {} bytes)",
+            config.network_limits.max_user_agent_length
+        )));
     }
 
     // Update peer state
@@ -416,13 +413,10 @@ fn process_addr_message(
 ) -> Result<NetworkResponse> {
     // Validate address count (from config)
     if addr.addresses.len() > config.network_limits.max_addr_addresses {
-        return Ok(NetworkResponse::Reject(
-            format!(
-                "Too many addresses (max {})",
-                config.network_limits.max_addr_addresses
-            )
-            .into(),
-        ));
+        return Ok(NetworkResponse::Reject(format!(
+            "Too many addresses (max {})",
+            config.network_limits.max_addr_addresses
+        )));
     }
 
     // Store addresses for future use
@@ -439,13 +433,10 @@ fn process_inv_message(
 ) -> Result<NetworkResponse> {
     // Validate inventory count (from config)
     if inv.inventory.len() > config.network_limits.max_inv_items {
-        return Ok(NetworkResponse::Reject(
-            format!(
-                "Too many inventory items (max {})",
-                config.network_limits.max_inv_items
-            )
-            .into(),
-        ));
+        return Ok(NetworkResponse::Reject(format!(
+            "Too many inventory items (max {})",
+            config.network_limits.max_inv_items
+        )));
     }
 
     // Check which items we need (if chain access provided)
@@ -477,13 +468,10 @@ fn process_getdata_message(
 ) -> Result<NetworkResponse> {
     // Validate request count (from config)
     if getdata.inventory.len() > config.network_limits.max_inv_items {
-        return Ok(NetworkResponse::Reject(
-            format!(
-                "Too many getdata items (max {})",
-                config.network_limits.max_inv_items
-            )
-            .into(),
-        ));
+        return Ok(NetworkResponse::Reject(format!(
+            "Too many getdata items (max {})",
+            config.network_limits.max_inv_items
+        )));
     }
 
     // Send requested objects (if chain access provided)
@@ -527,13 +515,10 @@ fn process_getheaders_message(
 ) -> Result<NetworkResponse> {
     // Validate block locator size (from config)
     if getheaders.block_locator_hashes.len() > config.validation.max_locator_hashes {
-        return Ok(NetworkResponse::Reject(
-            format!(
-                "Too many locator hashes (max {})",
-                config.validation.max_locator_hashes
-            )
-            .into(),
-        ));
+        return Ok(NetworkResponse::Reject(format!(
+            "Too many locator hashes (max {})",
+            config.validation.max_locator_hashes
+        )));
     }
 
     // Use chain access to find headers (if provided)
@@ -555,13 +540,10 @@ fn process_headers_message(
 ) -> Result<NetworkResponse> {
     // Validate header count (from config)
     if headers.headers.len() > config.network_limits.max_headers {
-        return Ok(NetworkResponse::Reject(
-            format!(
-                "Too many headers (max {})",
-                config.network_limits.max_headers
-            )
-            .into(),
-        ));
+        return Ok(NetworkResponse::Reject(format!(
+            "Too many headers (max {})",
+            config.network_limits.max_headers
+        )));
     }
 
     // Header validation is consensus logic, not protocol
@@ -581,7 +563,7 @@ fn process_block_message(
     if block.transactions.len() > config.validation.max_txs_per_block {
         return Err(crate::error::ProtocolError::MessageTooLarge {
             size: block.transactions.len(),
-            max: config.validation.max_txs_per_block as usize,
+            max: config.validation.max_txs_per_block,
         });
     }
 
@@ -592,13 +574,13 @@ fn process_block_message(
 
         match result {
             ValidationResult::Valid => Ok(NetworkResponse::Ok),
-            ValidationResult::Invalid(reason) => Ok(NetworkResponse::Reject(
-                format!("Invalid block: {reason}").into(),
-            )),
+            ValidationResult::Invalid(reason) => {
+                Ok(NetworkResponse::Reject(format!("Invalid block: {reason}")))
+            }
         }
     } else {
         Err(crate::error::ProtocolError::Configuration(
-            "Missing validation context (utxo_set and height required)".into()
+            "Missing validation context (utxo_set and height required)".into(),
         ))
     }
 }
@@ -616,9 +598,9 @@ fn process_tx_message(
 
     match result {
         ValidationResult::Valid => Ok(NetworkResponse::Ok),
-        ValidationResult::Invalid(reason) => Ok(NetworkResponse::Reject(
-            format!("Invalid transaction: {reason}").into(),
-        )),
+        ValidationResult::Invalid(reason) => Ok(NetworkResponse::Reject(format!(
+            "Invalid transaction: {reason}"
+        ))),
     }
 }
 
@@ -739,13 +721,10 @@ fn process_notfound_message(
 ) -> Result<NetworkResponse> {
     // Validate inventory count (from config)
     if notfound.inventory.len() > config.network_limits.max_inv_items {
-        return Ok(NetworkResponse::Reject(
-            format!(
-                "Too many notfound items (max {})",
-                config.network_limits.max_inv_items
-            )
-            .into(),
-        ));
+        return Ok(NetworkResponse::Reject(format!(
+            "Too many notfound items (max {})",
+            config.network_limits.max_inv_items
+        )));
     }
 
     // NotFound is informational - just acknowledge
@@ -824,13 +803,10 @@ fn process_getblocktxn_message(
 ) -> Result<NetworkResponse> {
     // Validate indices count (from config)
     if getblocktxn.indices.len() > config.compact_blocks.max_blocktxn_indices {
-        return Ok(NetworkResponse::Reject(
-            format!(
-                "Too many transaction indices (max {})",
-                config.compact_blocks.max_blocktxn_indices
-            )
-            .into(),
-        ));
+        return Ok(NetworkResponse::Reject(format!(
+            "Too many transaction indices (max {})",
+            config.compact_blocks.max_blocktxn_indices
+        )));
     }
 
     // Use chain access to get requested transactions

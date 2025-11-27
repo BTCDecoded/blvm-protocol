@@ -18,7 +18,7 @@ pub fn read_varint<R: Read>(reader: &mut R) -> Result<u64> {
     let mut buf = [0u8; 1];
     reader
         .read_exact(&mut buf)
-        .map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e).into()))?;
+        .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
     let first_byte = buf[0];
 
     match first_byte {
@@ -26,21 +26,21 @@ pub fn read_varint<R: Read>(reader: &mut R) -> Result<u64> {
             let mut buf = [0u8; 2];
             reader
                 .read_exact(&mut buf)
-                .map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e).into()))?;
+                .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
             Ok(u16::from_le_bytes(buf) as u64)
         }
         0xfe => {
             let mut buf = [0u8; 4];
             reader
                 .read_exact(&mut buf)
-                .map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e).into()))?;
+                .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
             Ok(u32::from_le_bytes(buf) as u64)
         }
         0xff => {
             let mut buf = [0u8; 8];
             reader
                 .read_exact(&mut buf)
-                .map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e).into()))?;
+                .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
             Ok(u64::from_le_bytes(buf))
         }
         _ => Ok(first_byte as u64),
@@ -53,34 +53,34 @@ pub fn write_varint<W: Write>(writer: &mut W, value: u64) -> Result<usize> {
         0..=0xfc => {
             writer
                 .write_all(&[value as u8])
-                .map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e).into()))?;
+                .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
             Ok(1)
         }
         0xfd..=0xffff => {
             writer
                 .write_all(&[0xfd])
-                .map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e).into()))?;
+                .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
             writer
                 .write_all(&(value as u16).to_le_bytes())
-                .map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e).into()))?;
+                .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
             Ok(3)
         }
         0x10000..=0xffff_ffff => {
             writer
                 .write_all(&[0xfe])
-                .map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e).into()))?;
+                .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
             writer
                 .write_all(&(value as u32).to_le_bytes())
-                .map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e).into()))?;
+                .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
             Ok(5)
         }
         _ => {
             writer
                 .write_all(&[0xff])
-                .map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e).into()))?;
+                .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
             writer
                 .write_all(&value.to_le_bytes())
-                .map_err(|e| ConsensusError::Serialization(format!("IO error: {}", e).into()))?;
+                .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
             Ok(9)
         }
     }
