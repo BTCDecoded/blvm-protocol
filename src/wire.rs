@@ -223,23 +223,202 @@ pub fn deserialize_message<R: Read>(
     Ok((message, MESSAGE_HEADER_SIZE + payload_length))
 }
 
-// Serialization helpers (simplified - using bincode for now)
-// In a full implementation, these would use proper Bitcoin wire format encoding
+// Serialization helpers - Bitcoin P2P wire format encoding
 
-fn serialize_version(_v: &crate::network::VersionMessage) -> Result<Vec<u8>> {
-    // VersionMessage doesn't implement Serialize, so we manually serialize
-    // This is a stub implementation - full wire format would need proper encoding
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Version message serialization not fully implemented".to_string()),
-    )))
+/// Serialize NetworkAddress to Bitcoin wire format (26 bytes)
+/// Format: services (8 bytes LE) + ip (16 bytes) + port (2 bytes BE)
+fn serialize_network_address(addr: &crate::network::NetworkAddress) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(26);
+    // services: u64 little-endian
+    buf.extend_from_slice(&addr.services.to_le_bytes());
+    // ip: [u8; 16] (IPv6 format, IPv4 is 0x0000...0000FFFF + IPv4 bytes)
+    buf.extend_from_slice(&addr.ip);
+    // port: u16 big-endian (network byte order)
+    buf.extend_from_slice(&addr.port.to_be_bytes());
+    buf
 }
 
-fn deserialize_version(_data: &[u8]) -> Result<crate::network::VersionMessage> {
-    // VersionMessage doesn't implement Deserialize, so we manually deserialize
-    // This is a stub implementation - full wire format would need proper decoding
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Version message deserialization not fully implemented".to_string()),
-    )))
+/// Deserialize NetworkAddress from Bitcoin wire format (26 bytes)
+fn deserialize_network_address(data: &[u8]) -> Result<crate::network::NetworkAddress> {
+    if data.len() < 26 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("NetworkAddress too short".to_string()),
+        )));
+    }
+
+    // services: u64 little-endian (bytes 0-7)
+    let services = u64::from_le_bytes([
+        data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7],
+    ]);
+
+    // ip: [u8; 16] (bytes 8-23)
+    let mut ip = [0u8; 16];
+    ip.copy_from_slice(&data[8..24]);
+
+    // port: u16 big-endian (bytes 24-25)
+    let port = u16::from_be_bytes([data[24], data[25]]);
+
+    Ok(crate::network::NetworkAddress { services, ip, port })
+}
+
+/// Serialize VersionMessage to Bitcoin wire format
+/// Format per Bitcoin protocol specification:
+/// - version: i32 (4 bytes LE)
+/// - services: u64 (8 bytes LE)
+/// - timestamp: i64 (8 bytes LE)
+/// - addr_recv: NetworkAddress (26 bytes)
+/// - addr_from: NetworkAddress (26 bytes)
+/// - nonce: u64 (8 bytes LE)
+/// - user_agent: CompactSize + string bytes
+/// - start_height: i32 (4 bytes LE)
+/// - relay: u8 (1 byte, 0 or 1)
+pub fn serialize_version(v: &crate::network::VersionMessage) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+
+    let mut buf = Vec::new();
+
+    // version: i32 (4 bytes, little-endian)
+    // Note: VersionMessage uses u32, but protocol expects i32
+    buf.extend_from_slice(&(v.version as i32).to_le_bytes());
+
+    // services: u64 (8 bytes, little-endian)
+    buf.extend_from_slice(&v.services.to_le_bytes());
+
+    // timestamp: i64 (8 bytes, little-endian)
+    buf.extend_from_slice(&v.timestamp.to_le_bytes());
+
+    // addr_recv: NetworkAddress (26 bytes)
+    buf.extend_from_slice(&serialize_network_address(&v.addr_recv));
+
+    // addr_from: NetworkAddress (26 bytes)
+    buf.extend_from_slice(&serialize_network_address(&v.addr_from));
+
+    // nonce: u64 (8 bytes, little-endian)
+    buf.extend_from_slice(&v.nonce.to_le_bytes());
+
+    // user_agent: CompactSize (varint) + string bytes
+    let user_agent_bytes = v.user_agent.as_bytes();
+    write_varint(&mut buf, user_agent_bytes.len() as u64)?;
+    buf.extend_from_slice(user_agent_bytes);
+
+    // start_height: i32 (4 bytes, little-endian)
+    buf.extend_from_slice(&v.start_height.to_le_bytes());
+
+    // relay: u8 (1 byte, 0 or 1)
+    buf.push(if v.relay { 1 } else { 0 });
+
+    Ok(buf)
+}
+
+/// Deserialize VersionMessage from Bitcoin wire format
+pub fn deserialize_version(data: &[u8]) -> Result<crate::network::VersionMessage> {
+    use crate::varint::read_varint;
+    use std::io::Cursor;
+
+    let mut cursor = Cursor::new(data);
+
+    // version: i32 (4 bytes, little-endian)
+    let mut version_bytes = [0u8; 4];
+    cursor.read_exact(&mut version_bytes).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+            "Failed to read version: {e}"
+        ))))
+    })?;
+    let version = i32::from_le_bytes(version_bytes) as u32;
+
+    // services: u64 (8 bytes, little-endian)
+    let mut services_bytes = [0u8; 8];
+    cursor.read_exact(&mut services_bytes).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+            "Failed to read services: {e}"
+        ))))
+    })?;
+    let services = u64::from_le_bytes(services_bytes);
+
+    // timestamp: i64 (8 bytes, little-endian)
+    let mut timestamp_bytes = [0u8; 8];
+    cursor.read_exact(&mut timestamp_bytes).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+            "Failed to read timestamp: {e}"
+        ))))
+    })?;
+    let timestamp = i64::from_le_bytes(timestamp_bytes);
+
+    // addr_recv: NetworkAddress (26 bytes)
+    let mut addr_recv_bytes = [0u8; 26];
+    cursor.read_exact(&mut addr_recv_bytes).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+            "Failed to read addr_recv: {e}"
+        ))))
+    })?;
+    let addr_recv = deserialize_network_address(&addr_recv_bytes)?;
+
+    // addr_from: NetworkAddress (26 bytes)
+    let mut addr_from_bytes = [0u8; 26];
+    cursor.read_exact(&mut addr_from_bytes).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+            "Failed to read addr_from: {e}"
+        ))))
+    })?;
+    let addr_from = deserialize_network_address(&addr_from_bytes)?;
+
+    // nonce: u64 (8 bytes, little-endian)
+    let mut nonce_bytes = [0u8; 8];
+    cursor.read_exact(&mut nonce_bytes).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+            "Failed to read nonce: {e}"
+        ))))
+    })?;
+    let nonce = u64::from_le_bytes(nonce_bytes);
+
+    // user_agent: CompactSize (varint) + string bytes
+    let user_agent_len = read_varint(&mut cursor)?;
+    if user_agent_len > 10000 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("User agent too long".to_string()),
+        )));
+    }
+    let mut user_agent_bytes = vec![0u8; user_agent_len as usize];
+    cursor.read_exact(&mut user_agent_bytes).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+            "Failed to read user_agent: {e}"
+        ))))
+    })?;
+    let user_agent = String::from_utf8(user_agent_bytes).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+            "Invalid user_agent UTF-8: {e}"
+        ))))
+    })?;
+
+    // start_height: i32 (4 bytes, little-endian)
+    let mut start_height_bytes = [0u8; 4];
+    cursor.read_exact(&mut start_height_bytes).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+            "Failed to read start_height: {e}"
+        ))))
+    })?;
+    let start_height = i32::from_le_bytes(start_height_bytes);
+
+    // relay: u8 (1 byte, 0 or 1)
+    let mut relay_byte = [0u8; 1];
+    cursor.read_exact(&mut relay_byte).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+            "Failed to read relay: {e}"
+        ))))
+    })?;
+    let relay = relay_byte[0] != 0;
+
+    Ok(crate::network::VersionMessage {
+        version,
+        services,
+        timestamp,
+        addr_recv,
+        addr_from,
+        nonce,
+        user_agent,
+        start_height,
+        relay,
+    })
 }
 
 // Stub implementations for other message types (would need full wire format encoding)
