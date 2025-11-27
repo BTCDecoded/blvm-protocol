@@ -195,3 +195,231 @@ fn test_message_header_structure() {
         header_size
     );
 }
+
+#[test]
+fn test_version_message_serialization_roundtrip() {
+    // Test that version messages can be serialized and deserialized correctly
+    // This ensures compatibility with Bitcoin Core wire format
+
+    use bllvm_protocol::wire::{deserialize_version, serialize_version};
+
+    let original = VersionMessage {
+        version: 70015,
+        services: 0x0000000000000001, // NODE_NETWORK
+        timestamp: 1234567890,
+        addr_recv: NetworkAddress {
+            services: 0x0000000000000001,
+            ip: [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x7f, 0x00,
+                0x00, 0x01,
+            ], // IPv4: 127.0.0.1
+            port: 8333,
+        },
+        addr_from: NetworkAddress {
+            services: 0x0000000000000001,
+            ip: [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x7f, 0x00,
+                0x00, 0x01,
+            ], // IPv4: 127.0.0.1
+            port: 8333,
+        },
+        nonce: 0x1234567890abcdef,
+        user_agent: "/BitcoinCommons:0.1.0/".to_string(),
+        start_height: 100000,
+        relay: true,
+    };
+
+    // Serialize
+    let serialized = serialize_version(&original).expect("Serialization should succeed");
+
+    // Deserialize
+    let deserialized = deserialize_version(&serialized).expect("Deserialization should succeed");
+
+    // Verify all fields match
+    assert_eq!(original.version, deserialized.version);
+    assert_eq!(original.services, deserialized.services);
+    assert_eq!(original.timestamp, deserialized.timestamp);
+    assert_eq!(original.addr_recv.services, deserialized.addr_recv.services);
+    assert_eq!(original.addr_recv.ip, deserialized.addr_recv.ip);
+    assert_eq!(original.addr_recv.port, deserialized.addr_recv.port);
+    assert_eq!(original.addr_from.services, deserialized.addr_from.services);
+    assert_eq!(original.addr_from.ip, deserialized.addr_from.ip);
+    assert_eq!(original.addr_from.port, deserialized.addr_from.port);
+    assert_eq!(original.nonce, deserialized.nonce);
+    assert_eq!(original.user_agent, deserialized.user_agent);
+    assert_eq!(original.start_height, deserialized.start_height);
+    assert_eq!(original.relay, deserialized.relay);
+}
+
+#[test]
+fn test_version_message_wire_format_compatibility() {
+    // Test that version message wire format matches Bitcoin Core expectations
+    // This ensures compatibility with other Bitcoin nodes
+
+    use bllvm_protocol::wire::serialize_version;
+
+    let version = VersionMessage {
+        version: 70015,
+        services: 0x0000000000000001, // NODE_NETWORK
+        timestamp: 1234567890,
+        addr_recv: NetworkAddress {
+            services: 0x0000000000000001,
+            ip: [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x7f, 0x00,
+                0x00, 0x01,
+            ], // IPv4: 127.0.0.1
+            port: 8333,
+        },
+        addr_from: NetworkAddress {
+            services: 0x0000000000000001,
+            ip: [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x7f, 0x00,
+                0x00, 0x01,
+            ], // IPv4: 127.0.0.1
+            port: 8333,
+        },
+        nonce: 0x1234567890abcdef,
+        user_agent: "/BitcoinCommons:0.1.0/".to_string(),
+        start_height: 0,
+        relay: true,
+    };
+
+    let serialized = serialize_version(&version).expect("Serialization should succeed");
+
+    // Verify minimum expected size
+    // version (4) + services (8) + timestamp (8) + addr_recv (26) + addr_from (26)
+    // + nonce (8) + user_agent varint + user_agent bytes + start_height (4) + relay (1)
+    let min_size = 4 + 8 + 8 + 26 + 26 + 8 + 1 + 22 + 4 + 1; // Minimum with short user_agent
+    assert!(
+        serialized.len() >= min_size,
+        "Serialized version message too short"
+    );
+
+    // Verify structure: version should be first 4 bytes (little-endian i32)
+    let version_bytes = [serialized[0], serialized[1], serialized[2], serialized[3]];
+    let decoded_version = i32::from_le_bytes(version_bytes) as u32;
+    assert_eq!(decoded_version, 70015);
+
+    // Verify services (next 8 bytes, little-endian u64)
+    let services_bytes = [
+        serialized[4],
+        serialized[5],
+        serialized[6],
+        serialized[7],
+        serialized[8],
+        serialized[9],
+        serialized[10],
+        serialized[11],
+    ];
+    let decoded_services = u64::from_le_bytes(services_bytes);
+    assert_eq!(decoded_services, 0x0000000000000001);
+
+    // Verify NetworkAddress format: services (8) + ip (16) + port (2, big-endian)
+    // addr_recv starts at byte 20 (after version(4) + services(8) + timestamp(8))
+    let addr_recv_port_start = 20 + 8 + 16; // services + ip
+    let port_bytes = [
+        serialized[addr_recv_port_start],
+        serialized[addr_recv_port_start + 1],
+    ];
+    let decoded_port = u16::from_be_bytes(port_bytes);
+    assert_eq!(decoded_port, 8333, "Port should be big-endian");
+}
+
+#[test]
+fn test_version_message_user_agent_variants() {
+    // Test version messages with different user agent lengths
+    // User agent uses CompactSize (varint) encoding
+
+    use bllvm_protocol::wire::{deserialize_version, serialize_version};
+
+    let test_cases = vec![
+        "".to_string(),                       // Empty
+        "/BitcoinCommons:0.1.0/".to_string(), // Short
+        "/BitcoinCommons:0.1.0/".repeat(10),  // Long
+    ];
+
+    for user_agent in test_cases {
+        let version = VersionMessage {
+            version: 70015,
+            services: 0x0000000000000001,
+            timestamp: 1234567890,
+            addr_recv: NetworkAddress {
+                services: 0,
+                ip: [0u8; 16],
+                port: 0,
+            },
+            addr_from: NetworkAddress {
+                services: 0,
+                ip: [0u8; 16],
+                port: 0,
+            },
+            nonce: 0,
+            user_agent: user_agent.clone(),
+            start_height: 0,
+            relay: false,
+        };
+
+        let serialized = serialize_version(&version).expect("Serialization should succeed");
+        let deserialized =
+            deserialize_version(&serialized).expect("Deserialization should succeed");
+
+        assert_eq!(
+            deserialized.user_agent, user_agent,
+            "User agent should match after round-trip"
+        );
+    }
+}
+
+#[test]
+fn test_version_message_network_address_encoding() {
+    // Test that NetworkAddress is encoded correctly (services LE, ip, port BE)
+
+    use bllvm_protocol::wire::serialize_version;
+
+    let version = VersionMessage {
+        version: 70015,
+        services: 0,
+        timestamp: 0,
+        addr_recv: NetworkAddress {
+            services: 0x0102030405060708,
+            ip: [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x0a, 0x00,
+                0x00, 0x01,
+            ], // IPv4: 10.0.0.1
+            port: 0x1234, // Port 4660
+        },
+        addr_from: NetworkAddress {
+            services: 0,
+            ip: [0u8; 16],
+            port: 0,
+        },
+        nonce: 0,
+        user_agent: "".to_string(),
+        start_height: 0,
+        relay: false,
+    };
+
+    let serialized = serialize_version(&version).expect("Serialization should succeed");
+
+    // addr_recv starts at byte 20 (version(4) + services(8) + timestamp(8))
+    // Verify services (little-endian)
+    let services_start = 20;
+    let services_bytes = [
+        serialized[services_start],
+        serialized[services_start + 1],
+        serialized[services_start + 2],
+        serialized[services_start + 3],
+        serialized[services_start + 4],
+        serialized[services_start + 5],
+        serialized[services_start + 6],
+        serialized[services_start + 7],
+    ];
+    let decoded_services = u64::from_le_bytes(services_bytes);
+    assert_eq!(decoded_services, 0x0102030405060708);
+
+    // Verify port (big-endian, at offset 20 + 8 + 16 = 44)
+    let port_start = 20 + 8 + 16;
+    let port_bytes = [serialized[port_start], serialized[port_start + 1]];
+    let decoded_port = u16::from_be_bytes(port_bytes);
+    assert_eq!(decoded_port, 0x1234);
+}
