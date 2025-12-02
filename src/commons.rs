@@ -128,3 +128,77 @@ pub struct BanListMessage {
     /// Optional signature over entire ban list
     pub list_signature: Option<Vec<u8>>,
 }
+
+// Governance/Commons Economic Node messages
+
+/// EconomicNodeRegistration message - Register economic node via P2P
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EconomicNodeRegistrationMessage {
+    /// Node type: "mining_pool", "exchange", "custodian", "commons_contributor"
+    pub node_type: String,
+    /// Entity name
+    pub entity_name: String,
+    /// Public key for veto signals
+    pub public_key: String,
+    /// Qualification data (JSON with cryptographic proofs)
+    pub qualification_data: serde_json::Value,
+    /// Unix timestamp
+    pub timestamp: i64,
+    /// Cryptographic signature of message by entity's private key
+    /// Signs: node_type || entity_name || public_key || qualification_data_hash || timestamp
+    pub signature: String,
+    /// Unique message ID for deduplication (hex-encoded hash)
+    pub message_id: String,
+}
+
+/// EconomicNodeVeto message - Veto signal via P2P
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EconomicNodeVetoMessage {
+    /// Economic node ID (if already registered)
+    pub node_id: Option<i32>,
+    /// Public key (if not registered yet, used to identify node)
+    pub public_key: String,
+    /// Pull request ID being vetoed
+    pub pr_id: i32,
+    /// Signal type: "veto", "support", "abstain"
+    pub signal_type: String,
+    /// Unix timestamp
+    pub timestamp: i64,
+    /// Cryptographic signature by node's private key
+    /// Signs: node_id || public_key || pr_id || signal_type || timestamp
+    pub signature: String,
+    /// Unique message ID for deduplication
+    pub message_id: String,
+}
+
+/// EconomicNodeStatus message - Query/response for node status
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EconomicNodeStatusMessage {
+    /// Request ID (for async request-response matching)
+    pub request_id: u64,
+    /// Node ID or public key to query
+    pub node_identifier: String,
+    /// Query type: "by_id", "by_public_key"
+    pub query_type: String,
+    /// Response data (if this is a response)
+    pub status: Option<NodeStatusResponse>,
+}
+
+/// NodeStatusResponse - Status information for economic node
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NodeStatusResponse {
+    /// Node ID
+    pub node_id: i32,
+    /// Node type
+    pub node_type: String,
+    /// Entity name
+    pub entity_name: String,
+    /// Current status: "active", "pending", "revoked"
+    pub status: String,
+    /// Current weight
+    pub weight: f64,
+    /// Registered timestamp
+    pub registered_at: i64,
+    /// Last verified timestamp
+    pub last_verified_at: Option<i64>,
+}
