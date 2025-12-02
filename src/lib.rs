@@ -54,6 +54,11 @@ pub mod sigop {
 pub mod utxo_commitments {
     pub use bllvm_consensus::utxo_commitments::*;
 }
+
+// Spam filter is always available (not behind utxo-commitments feature)
+pub mod spam_filter {
+    pub use bllvm_consensus::spam_filter::*;
+}
 pub mod serialization {
     pub use bllvm_consensus::serialization::*;
 }
