@@ -55,6 +55,10 @@ pub enum NetworkMessage {
     FilteredBlock(commons::FilteredBlockMessage),
     GetBanList(commons::GetBanListMessage),
     BanList(commons::BanListMessage),
+    // Governance/Commons Economic Node messages
+    EconomicNodeRegistration(commons::EconomicNodeRegistrationMessage),
+    EconomicNodeVeto(commons::EconomicNodeVetoMessage),
+    EconomicNodeStatus(commons::EconomicNodeStatusMessage),
 }
 
 /// Version message for initial handshake

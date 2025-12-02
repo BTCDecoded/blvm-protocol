@@ -125,6 +125,11 @@ pub struct ServiceFlagsConfig {
     /// Default: false
     #[serde(default = "default_false")]
     pub node_ban_list_sharing: bool,
+
+    /// Advertise Commons NODE_GOVERNANCE capability (governance message relay)
+    /// Default: false
+    #[serde(default = "default_false")]
+    pub node_governance: bool,
 }
 
 fn default_true() -> bool {
@@ -147,6 +152,7 @@ impl Default for ServiceFlagsConfig {
             node_package_relay: false,
             node_utxo_commitments: false,
             node_ban_list_sharing: false,
+            node_governance: false,
         }
     }
 }
@@ -510,6 +516,9 @@ impl ProtocolConfig {
         }
         if self.service_flags.node_ban_list_sharing {
             set_flag(&mut flags, commons::NODE_BAN_LIST_SHARING);
+        }
+        if self.service_flags.node_governance {
+            set_flag(&mut flags, commons::NODE_GOVERNANCE);
         }
 
         flags
