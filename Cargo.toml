@@ -21,7 +21,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 # To use local path for development, create .cargo/config.toml with:
 # [build]
 # [replace]
-# "bllvm-consensus:0.1.6" = { path = "../bllvm-consensus" }
+# "bllvm-consensus:0.1.6" = { path = "../blvm-consensus" }
 bllvm-consensus = "0.1.6"
 
 # Serialization - EXACT VERSIONS for security
