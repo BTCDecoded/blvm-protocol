@@ -3,7 +3,7 @@
 //! Tests for BIP70 payment protocol implementation.
 //! Specification: https://github.com/bitcoin/bips/blob/master/bip-0070.mediawiki
 
-use bllvm_protocol::payment::{
+use blvm_protocol::payment::{
     Bip70Error, Payment, PaymentACK, PaymentDetails, PaymentOutput, PaymentProtocolServer,
     PaymentRequest, SignedRefundAddress,
 };

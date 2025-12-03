@@ -2,9 +2,9 @@
 //!
 //! Tests for service flag combinations, edge cases, and Commons-specific flags.
 
-use bllvm_protocol::service_flags::commons::*;
-use bllvm_protocol::service_flags::standard::*;
-use bllvm_protocol::service_flags::{
+use blvm_protocol::service_flags::commons::*;
+use blvm_protocol::service_flags::standard::*;
+use blvm_protocol::service_flags::{
     clear_flag, get_commons_flags, has_flag, set_flag, supports_commons,
 };
 

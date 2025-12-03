@@ -3,13 +3,13 @@
 //! Tests for `process_network_message` and individual message handlers.
 //! These tests verify protocol-level message handling, limits, and responses.
 
-use bllvm_consensus::{Block, BlockHeader, Hash, Transaction};
-use bllvm_protocol::network::{
+use blvm_consensus::{Block, BlockHeader, Hash, Transaction};
+use blvm_protocol::network::{
     process_network_message, AddrMessage, ChainStateAccess, FeeFilterMessage, GetBlocksMessage,
     GetDataMessage, HeadersMessage, InvMessage, NetworkAddress, NetworkMessage, NetworkResponse,
     NotFoundMessage, PeerState, PingMessage, PongMessage, RejectMessage, VersionMessage,
 };
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -51,13 +51,13 @@ impl ChainStateAccess for MockChainStateAccess {
         self.blocks.contains_key(hash) || self.transactions.contains_key(hash)
     }
 
-    fn get_object(&self, hash: &Hash) -> Option<bllvm_protocol::network::ChainObject> {
+    fn get_object(&self, hash: &Hash) -> Option<blvm_protocol::network::ChainObject> {
         if let Some(block) = self.blocks.get(hash) {
-            Some(bllvm_protocol::network::ChainObject::Block(Arc::new(
+            Some(blvm_protocol::network::ChainObject::Block(Arc::new(
                 block.clone(),
             )))
         } else if let Some(tx) = self.transactions.get(hash) {
-            Some(bllvm_protocol::network::ChainObject::Transaction(Arc::new(
+            Some(blvm_protocol::network::ChainObject::Transaction(Arc::new(
                 tx.clone(),
             )))
         } else {
@@ -267,7 +267,7 @@ fn test_process_inv_message() {
     chain_access.add_block(hash, block);
 
     let inv = InvMessage {
-        inventory: vec![bllvm_protocol::network::InventoryVector {
+        inventory: vec![blvm_protocol::network::InventoryVector {
             inv_type: 2, // MSG_BLOCK
             hash,
         }],
@@ -291,8 +291,8 @@ fn test_process_inv_message() {
 fn test_process_inv_message_too_many() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50001)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 2,
             hash: [i as u8; 32],
         })
@@ -507,7 +507,7 @@ fn test_process_notfound_message() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
     let notfound = NotFoundMessage {
-        inventory: vec![bllvm_protocol::network::InventoryVector {
+        inventory: vec![blvm_protocol::network::InventoryVector {
             inv_type: 2,
             hash: [1u8; 32],
         }],
@@ -530,8 +530,8 @@ fn test_process_notfound_message() {
 fn test_process_notfound_message_too_many() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50001)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 2,
             hash: [i as u8; 32],
         })
@@ -698,7 +698,7 @@ fn test_process_getdata_message() {
     let hash = [1u8; 32];
 
     // Add a transaction to chain
-    use bllvm_consensus::{tx_inputs, tx_outputs};
+    use blvm_consensus::{tx_inputs, tx_outputs};
     let tx = Transaction {
         version: 1,
         inputs: tx_inputs![],
@@ -708,7 +708,7 @@ fn test_process_getdata_message() {
     chain_access.add_transaction(hash, tx);
 
     let getdata = GetDataMessage {
-        inventory: vec![bllvm_protocol::network::InventoryVector {
+        inventory: vec![blvm_protocol::network::InventoryVector {
             inv_type: 1, // MSG_TX
             hash,
         }],
@@ -738,8 +738,8 @@ fn test_process_getdata_message() {
 fn test_process_getdata_message_too_many() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50001)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 1,
             hash: [i as u8; 32],
         })
@@ -771,7 +771,7 @@ fn test_process_mempool_message() {
     let mut chain_access = MockChainStateAccess::new();
 
     // Add transactions to mempool
-    use bllvm_consensus::{tx_inputs, tx_outputs};
+    use blvm_consensus::{tx_inputs, tx_outputs};
     let tx1 = Transaction {
         version: 1,
         inputs: tx_inputs![],

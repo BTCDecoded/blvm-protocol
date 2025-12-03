@@ -18,49 +18,49 @@ use serde::{Deserialize, Serialize};
 
 // Re-export commonly used types from consensus-proof for convenience
 // This allows upper layers (like reference-node) to depend only on protocol-engine
-pub use bllvm_consensus::{
+pub use blvm_consensus::{
     Block, BlockHeader, ByteString, ConsensusProof, Hash, Integer, Natural, NetworkMessageLimits,
     OutPoint, Transaction, TransactionInput, TransactionOutput, UtxoSet, ValidationResult, UTXO,
 };
 
 // Re-export consensus Result as ConsensusResult for backward compatibility
-pub use bllvm_consensus::error::Result as ConsensusResult;
+pub use blvm_consensus::error::Result as ConsensusResult;
 
 // Protocol-specific Result type
 pub use error::{ProtocolError, Result};
 
 // Re-export commonly used modules
 pub mod mempool {
-    pub use bllvm_consensus::mempool::*;
+    pub use blvm_consensus::mempool::*;
 }
 pub mod segwit {
-    pub use bllvm_consensus::segwit::*;
+    pub use blvm_consensus::segwit::*;
 }
 pub mod block {
-    pub use bllvm_consensus::block::*;
+    pub use blvm_consensus::block::*;
 }
 pub mod mining {
-    pub use bllvm_consensus::mining::*;
+    pub use blvm_consensus::mining::*;
 }
 pub mod pow {
-    pub use bllvm_consensus::pow::*;
+    pub use blvm_consensus::pow::*;
 }
 
 pub mod sigop {
-    pub use bllvm_consensus::sigop::*;
+    pub use blvm_consensus::sigop::*;
 }
 
 #[cfg(feature = "utxo-commitments")]
 pub mod utxo_commitments {
-    pub use bllvm_consensus::utxo_commitments::*;
+    pub use blvm_consensus::utxo_commitments::*;
 }
 
 // Spam filter is always available (not behind utxo-commitments feature)
 pub mod spam_filter {
-    pub use bllvm_consensus::spam_filter::*;
+    pub use blvm_consensus::spam_filter::*;
 }
 pub mod serialization {
-    pub use bllvm_consensus::serialization::*;
+    pub use blvm_consensus::serialization::*;
 }
 pub mod commons;
 pub mod network;
@@ -79,21 +79,21 @@ pub use service_flags::{commons as service_flags_commons, standard as service_fl
 // Wire format module - Bitcoin P2P wire protocol serialization
 pub mod wire;
 pub mod types {
-    pub use bllvm_consensus::types::*;
+    pub use blvm_consensus::types::*;
 }
 // Re-export macros from bllvm-consensus for convenience
 #[cfg(feature = "production")]
-pub use bllvm_consensus::tx_inputs;
+pub use blvm_consensus::tx_inputs;
 #[cfg(not(feature = "production"))]
-pub use bllvm_consensus::tx_inputs;
+pub use blvm_consensus::tx_inputs;
 #[cfg(feature = "production")]
-pub use bllvm_consensus::tx_outputs;
+pub use blvm_consensus::tx_outputs;
 #[cfg(not(feature = "production"))]
-pub use bllvm_consensus::tx_outputs;
+pub use blvm_consensus::tx_outputs;
 pub mod error;
 
 // Re-export consensus error types for backward compatibility
-pub use bllvm_consensus::error::ConsensusError;
+pub use blvm_consensus::error::ConsensusError;
 
 // Re-export feature and economic modules for convenience
 pub use economic::EconomicParameters;
@@ -199,8 +199,8 @@ impl BitcoinProtocolEngine {
         &self,
         block: &Block,
         utxos: &std::collections::HashMap<
-            bllvm_consensus::types::OutPoint,
-            bllvm_consensus::types::UTXO,
+            blvm_consensus::types::OutPoint,
+            blvm_consensus::types::UTXO,
         >,
         height: u64,
     ) -> Result<ValidationResult> {
@@ -251,7 +251,7 @@ impl BitcoinProtocolEngine {
     /// let context = ProtocolValidationContext::new(ProtocolVersion::BitcoinV1, 0)?;
     /// // Create a test block
     /// let block = Block {
-    ///     header: bllvm_consensus::BlockHeader {
+    ///     header: blvm_consensus::BlockHeader {
     ///         version: 1,
     ///         prev_block_hash: [0u8; 32],
     ///         merkle_root: [0u8; 32],
@@ -297,7 +297,7 @@ impl BitcoinProtocolEngine {
             ProtocolVersion::Testnet3 => types::Network::Testnet,
             ProtocolVersion::Regtest => types::Network::Regtest,
         };
-        let (result, new_utxo_set, _undo_log) = bllvm_consensus::block::connect_block(
+        let (result, new_utxo_set, _undo_log) = blvm_consensus::block::connect_block(
             block,
             witnesses,
             utxos.clone(),
@@ -404,7 +404,7 @@ impl NetworkParameters {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bllvm_consensus::types::{BlockHeader, OutPoint, TransactionInput, TransactionOutput};
+    use blvm_consensus::types::{BlockHeader, OutPoint, TransactionInput, TransactionOutput};
     use std::collections::HashMap;
 
     #[test]
@@ -499,35 +499,40 @@ mod tests {
         let utxos = HashMap::new();
 
         // Create a simple block with just a coinbase transaction
+        let coinbase_tx = Transaction {
+            version: 1,
+            inputs: blvm_consensus::tx_inputs![TransactionInput {
+                prevout: OutPoint {
+                    hash: [0u8; 32],
+                    index: 0xffffffff,
+                },
+                script_sig: vec![0x01, 0x00], // Height 0
+                sequence: 0xffffffff,
+            }],
+            outputs: blvm_consensus::tx_outputs![TransactionOutput {
+                value: 50_0000_0000,
+                script_pubkey: vec![
+                    0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                ], // P2PKH
+            }],
+            lock_time: 0,
+        };
+
+        // Calculate proper merkle root
+        let merkle_root = blvm_consensus::mining::calculate_merkle_root(&[coinbase_tx.clone()])
+            .expect("Should calculate merkle root");
+
         let block = Block {
             header: BlockHeader {
                 version: 1,
                 prev_block_hash: [0u8; 32],
-                merkle_root: [0u8; 32],
+                merkle_root,
                 timestamp: 1231006505,
                 bits: 0x1d00ffff,
                 nonce: 0,
             },
-            transactions: vec![Transaction {
-                version: 1,
-                inputs: bllvm_consensus::tx_inputs![TransactionInput {
-                    prevout: OutPoint {
-                        hash: [0u8; 32],
-                        index: 0xffffffff,
-                    },
-                    script_sig: vec![0x01, 0x00], // Height 0
-                    sequence: 0xffffffff,
-                }],
-                outputs: bllvm_consensus::tx_outputs![TransactionOutput {
-                    value: 50_0000_0000,
-                    script_pubkey: vec![
-                        0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    ], // P2PKH
-                }],
-                lock_time: 0,
-            }]
-            .into_boxed_slice(),
+            transactions: vec![coinbase_tx].into_boxed_slice(),
         };
 
         // This should pass validation for a genesis block

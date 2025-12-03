@@ -2,7 +2,7 @@
 //!
 //! Additional edge cases for variable-length integer encoding.
 
-use bllvm_protocol::varint::{read_varint, varint_size, write_varint, MAX_VARINT};
+use blvm_protocol::varint::{read_varint, varint_size, write_varint, MAX_VARINT};
 use std::io::Cursor;
 
 #[test]

@@ -3,7 +3,7 @@
 //! Tests for Bitcoin P2P wire format serialization and deserialization.
 //! Tests wire format module functions: calculate_checksum, serialize_message, deserialize_message.
 
-use bllvm_protocol::network::{NetworkAddress, NetworkMessage, VersionMessage};
+use blvm_protocol::network::{NetworkAddress, NetworkMessage, VersionMessage};
 
 // Note: wire module is not currently exported, but we can test via network module
 // These tests verify wire format functionality when the module is enabled
@@ -201,7 +201,7 @@ fn test_version_message_serialization_roundtrip() {
     // Test that version messages can be serialized and deserialized correctly
     // This ensures compatibility with Bitcoin Core wire format
 
-    use bllvm_protocol::wire::{deserialize_version, serialize_version};
+    use blvm_protocol::wire::{deserialize_version, serialize_version};
 
     let original = VersionMessage {
         version: 70015,
@@ -256,7 +256,7 @@ fn test_version_message_wire_format_compatibility() {
     // Test that version message wire format matches Bitcoin Core expectations
     // This ensures compatibility with other Bitcoin nodes
 
-    use bllvm_protocol::wire::serialize_version;
+    use blvm_protocol::wire::serialize_version;
 
     let version = VersionMessage {
         version: 70015,
@@ -330,7 +330,7 @@ fn test_version_message_user_agent_variants() {
     // Test version messages with different user agent lengths
     // User agent uses CompactSize (varint) encoding
 
-    use bllvm_protocol::wire::{deserialize_version, serialize_version};
+    use blvm_protocol::wire::{deserialize_version, serialize_version};
 
     let test_cases = vec![
         "".to_string(),                       // Empty
@@ -374,7 +374,7 @@ fn test_version_message_user_agent_variants() {
 fn test_version_message_network_address_encoding() {
     // Test that NetworkAddress is encoded correctly (services LE, ip, port BE)
 
-    use bllvm_protocol::wire::serialize_version;
+    use blvm_protocol::wire::serialize_version;
 
     let version = VersionMessage {
         version: 70015,

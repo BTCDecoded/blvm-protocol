@@ -5,17 +5,15 @@
 //! - Filtered Blocks (GetFilteredBlock, FilteredBlock)
 //! - Ban List Sharing (GetBanList, BanList)
 
-use bllvm_consensus::{BlockHeader, Hash, Transaction};
-use bllvm_protocol::commons::{BanEntry, BanListMessage, GetBanListMessage};
+use blvm_consensus::{BlockHeader, Hash, Transaction};
+use blvm_protocol::commons::{BanEntry, BanListMessage, GetBanListMessage};
 #[cfg(feature = "utxo-commitments")]
-use bllvm_protocol::commons::{
+use blvm_protocol::commons::{
     FilterPreferences, FilteredBlockMessage, GetFilteredBlockMessage, GetUTXOSetMessage,
     SpamSummary, UTXOCommitment, UTXOSetMessage,
 };
-use bllvm_protocol::network::{
-    process_network_message, NetworkMessage, NetworkResponse, PeerState,
-};
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+use blvm_protocol::network::{process_network_message, NetworkMessage, NetworkResponse, PeerState};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 
 fn create_test_engine() -> BitcoinProtocolEngine {
     BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap()
@@ -243,15 +241,15 @@ fn test_filteredblock_message_processing() {
 
     let filtered_tx = Transaction {
         version: 1,
-        inputs: bllvm_consensus::tx_inputs![TransactionInput {
-            prevout: bllvm_consensus::types::OutPoint {
+        inputs: blvm_consensus::tx_inputs![TransactionInput {
+            prevout: blvm_consensus::types::OutPoint {
                 hash: [0u8; 32],
                 index: 0,
             },
             script_sig: vec![0x41, 0x04],
             sequence: 0xffffffff,
         }],
-        outputs: bllvm_consensus::tx_outputs![TransactionOutput {
+        outputs: blvm_consensus::tx_outputs![TransactionOutput {
             value: 10000, // Above dust threshold
             script_pubkey: vec![0x51],
         }],

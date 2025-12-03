@@ -3,12 +3,12 @@
 //! These tests verify that protocol limits are enforced correctly to prevent
 //! denial-of-service attacks through oversized messages.
 
-use bllvm_protocol::network::{
+use blvm_protocol::network::{
     process_network_message, AddrMessage, FeeFilterMessage, GetBlocksMessage, GetDataMessage,
     HeadersMessage, InvMessage, NetworkAddress, NetworkMessage, NotFoundMessage, PeerState,
     RejectMessage, VersionMessage,
 };
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 use std::sync::Arc;
 
 fn create_test_engine() -> BitcoinProtocolEngine {
@@ -47,7 +47,7 @@ fn test_addr_message_limit() {
 
     assert!(matches!(
         response,
-        bllvm_protocol::network::NetworkResponse::Ok
+        blvm_protocol::network::NetworkResponse::Ok
     ));
 
     // Test over limit (1001 addresses) - should reject
@@ -70,7 +70,7 @@ fn test_addr_message_limit() {
     .unwrap();
 
     match response {
-        bllvm_protocol::network::NetworkResponse::Reject(reason) => {
+        blvm_protocol::network::NetworkResponse::Reject(reason) => {
             assert!(reason.contains("Too many addresses"));
         }
         _ => panic!("Expected Reject for addresses over limit"),
@@ -83,8 +83,8 @@ fn test_inv_message_limit() {
     let mut peer_state = create_test_peer_state();
 
     // Test at limit (50000 items) - should pass
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50000)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50000)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 2,
             hash: [i as u8; 32],
         })
@@ -104,12 +104,12 @@ fn test_inv_message_limit() {
 
     assert!(matches!(
         response,
-        bllvm_protocol::network::NetworkResponse::Ok
+        blvm_protocol::network::NetworkResponse::Ok
     ));
 
     // Test over limit (50001 items) - should reject
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50001)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 2,
             hash: [i as u8; 32],
         })
@@ -126,7 +126,7 @@ fn test_inv_message_limit() {
     .unwrap();
 
     match response {
-        bllvm_protocol::network::NetworkResponse::Reject(reason) => {
+        blvm_protocol::network::NetworkResponse::Reject(reason) => {
             assert!(reason.contains("Too many inventory items"));
         }
         _ => panic!("Expected Reject for inventory over limit"),
@@ -139,8 +139,8 @@ fn test_getdata_message_limit() {
     let mut peer_state = create_test_peer_state();
 
     // Test at limit (50000 items) - should pass
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50000)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50000)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 1,
             hash: [i as u8; 32],
         })
@@ -160,12 +160,12 @@ fn test_getdata_message_limit() {
 
     assert!(matches!(
         response,
-        bllvm_protocol::network::NetworkResponse::Ok
+        blvm_protocol::network::NetworkResponse::Ok
     ));
 
     // Test over limit (50001 items) - should reject
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50001)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 1,
             hash: [i as u8; 32],
         })
@@ -182,7 +182,7 @@ fn test_getdata_message_limit() {
     .unwrap();
 
     match response {
-        bllvm_protocol::network::NetworkResponse::Reject(reason) => {
+        blvm_protocol::network::NetworkResponse::Reject(reason) => {
             assert!(reason.contains("Too many getdata items"));
         }
         _ => panic!("Expected Reject for getdata over limit"),
@@ -195,8 +195,8 @@ fn test_headers_message_limit() {
     let mut peer_state = create_test_peer_state();
 
     // Test at limit (2000 headers) - should pass
-    let headers: Vec<bllvm_consensus::BlockHeader> = (0..2000)
-        .map(|i| bllvm_consensus::BlockHeader {
+    let headers: Vec<blvm_consensus::BlockHeader> = (0..2000)
+        .map(|i| blvm_consensus::BlockHeader {
             version: 1,
             prev_block_hash: [i as u8; 32],
             merkle_root: [0u8; 32],
@@ -220,12 +220,12 @@ fn test_headers_message_limit() {
 
     assert!(matches!(
         response,
-        bllvm_protocol::network::NetworkResponse::Ok
+        blvm_protocol::network::NetworkResponse::Ok
     ));
 
     // Test over limit (2001 headers) - should reject
-    let headers: Vec<bllvm_consensus::BlockHeader> = (0..2001)
-        .map(|i| bllvm_consensus::BlockHeader {
+    let headers: Vec<blvm_consensus::BlockHeader> = (0..2001)
+        .map(|i| blvm_consensus::BlockHeader {
             version: 1,
             prev_block_hash: [i as u8; 32],
             merkle_root: [0u8; 32],
@@ -246,7 +246,7 @@ fn test_headers_message_limit() {
     .unwrap();
 
     match response {
-        bllvm_protocol::network::NetworkResponse::Reject(reason) => {
+        blvm_protocol::network::NetworkResponse::Reject(reason) => {
             assert!(reason.contains("Too many headers"));
         }
         _ => panic!("Expected Reject for headers over limit"),
@@ -259,7 +259,7 @@ fn test_getblocks_locator_limit() {
     let mut peer_state = create_test_peer_state();
 
     // Test at limit (100 locators) - should pass
-    let locator_hashes: Vec<bllvm_consensus::Hash> = (0..100).map(|i| [i as u8; 32]).collect();
+    let locator_hashes: Vec<blvm_consensus::Hash> = (0..100).map(|i| [i as u8; 32]).collect();
 
     let response = process_network_message(
         &engine,
@@ -277,11 +277,11 @@ fn test_getblocks_locator_limit() {
 
     assert!(matches!(
         response,
-        bllvm_protocol::network::NetworkResponse::Ok
+        blvm_protocol::network::NetworkResponse::Ok
     ));
 
     // Test over limit (101 locators) - should reject
-    let locator_hashes: Vec<bllvm_consensus::Hash> = (0..101).map(|i| [i as u8; 32]).collect();
+    let locator_hashes: Vec<blvm_consensus::Hash> = (0..101).map(|i| [i as u8; 32]).collect();
 
     let response = process_network_message(
         &engine,
@@ -298,7 +298,7 @@ fn test_getblocks_locator_limit() {
     .unwrap();
 
     match response {
-        bllvm_protocol::network::NetworkResponse::Reject(reason) => {
+        blvm_protocol::network::NetworkResponse::Reject(reason) => {
             assert!(reason.contains("Too many locator hashes"));
         }
         _ => panic!("Expected Reject for locators over limit"),
@@ -311,8 +311,8 @@ fn test_notfound_message_limit() {
     let mut peer_state = create_test_peer_state();
 
     // Test at limit (50000 items) - should pass
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50000)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50000)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 2,
             hash: [i as u8; 32],
         })
@@ -332,12 +332,12 @@ fn test_notfound_message_limit() {
 
     assert!(matches!(
         response,
-        bllvm_protocol::network::NetworkResponse::Ok
+        blvm_protocol::network::NetworkResponse::Ok
     ));
 
     // Test over limit (50001 items) - should reject
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50001)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 2,
             hash: [i as u8; 32],
         })
@@ -354,7 +354,7 @@ fn test_notfound_message_limit() {
     .unwrap();
 
     match response {
-        bllvm_protocol::network::NetworkResponse::Reject(reason) => {
+        blvm_protocol::network::NetworkResponse::Reject(reason) => {
             assert!(reason.contains("Too many notfound items"));
         }
         _ => panic!("Expected Reject for notfound over limit"),
@@ -384,7 +384,7 @@ fn test_reject_message_name_limit() {
 
     assert!(matches!(
         response,
-        bllvm_protocol::network::NetworkResponse::Ok
+        blvm_protocol::network::NetworkResponse::Ok
     ));
 
     // Test over limit (13 chars) - should reject
@@ -404,7 +404,7 @@ fn test_reject_message_name_limit() {
     .unwrap();
 
     match response {
-        bllvm_protocol::network::NetworkResponse::Reject(reason) => {
+        blvm_protocol::network::NetworkResponse::Reject(reason) => {
             assert!(reason.contains("Invalid reject message name"));
         }
         _ => panic!("Expected Reject for message name over limit"),
@@ -435,7 +435,7 @@ fn test_reject_message_reason_limit() {
 
     assert!(matches!(
         response,
-        bllvm_protocol::network::NetworkResponse::Ok
+        blvm_protocol::network::NetworkResponse::Ok
     ));
 
     // Test over limit (112 chars) - should reject
@@ -456,7 +456,7 @@ fn test_reject_message_reason_limit() {
     .unwrap();
 
     match response {
-        bllvm_protocol::network::NetworkResponse::Reject(reason) => {
+        blvm_protocol::network::NetworkResponse::Reject(reason) => {
             assert!(reason.contains("Reject reason too long"));
         }
         _ => panic!("Expected Reject for reason over limit"),
@@ -502,15 +502,15 @@ fn test_version_message_user_agent_limit() {
 
     assert!(matches!(
         response,
-        bllvm_protocol::network::NetworkResponse::SendMessage(_)
+        blvm_protocol::network::NetworkResponse::SendMessage(_)
     ));
 }
 
 #[test]
 fn test_block_transaction_count_limit() {
-    use bllvm_consensus::types::UtxoSet;
-    use bllvm_consensus::{tx_inputs, tx_outputs};
-    use bllvm_consensus::{Block, BlockHeader};
+    use blvm_consensus::types::UtxoSet;
+    use blvm_consensus::{tx_inputs, tx_outputs};
+    use blvm_consensus::{Block, BlockHeader};
 
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
@@ -519,8 +519,8 @@ fn test_block_transaction_count_limit() {
     let utxo_set = UtxoSet::new();
 
     // Test at limit (10000 transactions) - should pass protocol limit check
-    let transactions: Vec<bllvm_consensus::Transaction> = (0..10000)
-        .map(|_| bllvm_consensus::Transaction {
+    let transactions: Vec<blvm_consensus::Transaction> = (0..10000)
+        .map(|_| blvm_consensus::Transaction {
             version: 1,
             inputs: tx_inputs![],
             outputs: tx_outputs![],
@@ -570,12 +570,12 @@ fn test_block_transaction_count_limit() {
     // but should not fail due to transaction count limit
     assert!(!matches!(
         response,
-        bllvm_protocol::network::NetworkResponse::Reject(ref r) if r.contains("Too many transactions")
+        blvm_protocol::network::NetworkResponse::Reject(ref r) if r.contains("Too many transactions")
     ));
 
     // Test over limit (10001 transactions) - should reject due to protocol limit
-    let transactions: Vec<bllvm_consensus::Transaction> = (0..10001)
-        .map(|_| bllvm_consensus::Transaction {
+    let transactions: Vec<blvm_consensus::Transaction> = (0..10001)
+        .map(|_| blvm_consensus::Transaction {
             version: 1,
             inputs: tx_inputs![],
             outputs: tx_outputs![],
@@ -608,7 +608,7 @@ fn test_block_transaction_count_limit() {
 
     // Should be rejected due to transaction count limit (protocol limit check happens first)
     match response {
-        Ok(bllvm_protocol::network::NetworkResponse::Reject(ref r)) => {
+        Ok(blvm_protocol::network::NetworkResponse::Reject(ref r)) => {
             assert!(r.contains("Too many transactions") || r.contains("Message size exceeds"));
         }
         Ok(_) => {

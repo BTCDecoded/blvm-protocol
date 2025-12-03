@@ -2,11 +2,11 @@
 //!
 //! Tests for protocol configuration system.
 
-use bllvm_protocol::config::{
+use blvm_protocol::config::{
     CommonsExtensionsConfig, CompactBlockConfig, FeeRateConfig, ProtocolConfig,
     ProtocolFeaturesConfig, ProtocolValidationConfig, ServiceFlagsConfig,
 };
-use bllvm_protocol::{service_flags, ProtocolVersion};
+use blvm_protocol::{service_flags, ProtocolVersion};
 
 #[test]
 fn test_protocol_config_default() {

@@ -2,10 +2,10 @@
 //!
 //! Tests for feature activation tracking and protocol version compatibility.
 
-use bllvm_protocol::features::{
+use blvm_protocol::features::{
     ActivationMethod, FeatureActivation, FeatureContext, FeatureRegistry,
 };
-use bllvm_protocol::ProtocolVersion;
+use blvm_protocol::ProtocolVersion;
 
 /// Test helper: Create a SegWit feature activation
 fn create_segwit_activation() -> FeatureActivation {

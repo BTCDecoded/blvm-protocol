@@ -6,8 +6,8 @@
 
 use crate::validation::ProtocolValidationContext;
 use crate::{BitcoinProtocolEngine, ProtocolConfig, Result};
-use bllvm_consensus::types::UtxoSet;
-use bllvm_consensus::{Block, BlockHeader, Hash, Transaction, ValidationResult};
+use blvm_consensus::types::UtxoSet;
+use blvm_consensus::{Block, BlockHeader, Hash, Transaction, ValidationResult};
 use std::sync::Arc;
 
 // Commons module is always available (ban list sharing doesn't require utxo-commitments)
@@ -18,7 +18,7 @@ pub mod commons {
 /// NetworkMessage: Bitcoin P2P protocol message types
 ///
 /// Network message types for Bitcoin P2P protocol
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NetworkMessage {
     Version(VersionMessage),
     VerAck,
@@ -369,6 +369,9 @@ pub fn process_network_message(
         NetworkMessage::FilteredBlock(filtered) => process_filteredblock_message(filtered),
         NetworkMessage::GetBanList(getbanlist) => process_getbanlist_message(getbanlist),
         NetworkMessage::BanList(banlist) => process_banlist_message(banlist),
+        NetworkMessage::EconomicNodeRegistration(_) => Ok(NetworkResponse::Ok),
+        NetworkMessage::EconomicNodeVeto(_) => Ok(NetworkResponse::Ok),
+        NetworkMessage::EconomicNodeStatus(_) => Ok(NetworkResponse::Ok),
     }
 }
 

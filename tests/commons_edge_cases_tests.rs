@@ -1,10 +1,10 @@
 //! Edge case tests for Commons module (ban list merging, large UTXO sets, filtered blocks)
 
-use bllvm_protocol::commons::{
+use blvm_protocol::commons::{
     BanEntry, BanListMessage, FilterPreferences, FilteredBlockMessage, GetBanListMessage,
     GetFilteredBlockMessage, GetUTXOSetMessage, SpamSummary, UTXOCommitment, UTXOSetMessage,
 };
-use bllvm_protocol::{BlockHeader, Hash, Transaction};
+use blvm_protocol::{BlockHeader, Hash, Transaction};
 
 #[test]
 fn test_ban_list_merging_large_lists() {

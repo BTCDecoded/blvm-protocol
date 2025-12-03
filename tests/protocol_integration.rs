@@ -2,13 +2,13 @@
 //!
 //! End-to-end tests for protocol engine functionality
 
-use bllvm_consensus::types::{OutPoint, TransactionInput, TransactionOutput, UTXO};
-use bllvm_consensus::{Block, BlockHeader, Transaction};
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+use blvm_consensus::types::{OutPoint, TransactionInput, TransactionOutput, UTXO};
+use blvm_consensus::{Block, BlockHeader, Transaction};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 use std::collections::HashMap;
 
 #[test]
-fn test_end_to_end_bllvm_protocol_initialization() {
+fn test_end_to_end_blvm_protocol_initialization() {
     // Test that we can create engines for all protocol versions
     let mainnet = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
     let testnet = BitcoinProtocolEngine::new(ProtocolVersion::Testnet3).unwrap();
@@ -42,7 +42,7 @@ fn test_full_block_validation_workflow() {
         },
         transactions: vec![Transaction {
             version: 1,
-            inputs: bllvm_consensus::tx_inputs![TransactionInput {
+            inputs: blvm_consensus::tx_inputs![TransactionInput {
                 prevout: OutPoint {
                     hash: [0u8; 32],
                     index: 0xffffffff,
@@ -50,7 +50,7 @@ fn test_full_block_validation_workflow() {
                 script_sig: vec![0x01, 0x00], // Height 0
                 sequence: 0xffffffff,
             }],
-            outputs: bllvm_consensus::tx_outputs![TransactionOutput {
+            outputs: blvm_consensus::tx_outputs![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
                     0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -84,7 +84,7 @@ fn test_multi_block_chain_validation() {
         },
         transactions: vec![Transaction {
             version: 1,
-            inputs: bllvm_consensus::tx_inputs![TransactionInput {
+            inputs: blvm_consensus::tx_inputs![TransactionInput {
                 prevout: OutPoint {
                     hash: [0u8; 32],
                     index: 0xffffffff,
@@ -92,7 +92,7 @@ fn test_multi_block_chain_validation() {
                 script_sig: vec![0x01, 0x00], // Height 0
                 sequence: 0xffffffff,
             }],
-            outputs: bllvm_consensus::tx_outputs![TransactionOutput {
+            outputs: blvm_consensus::tx_outputs![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
                     0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -137,7 +137,7 @@ fn test_multi_block_chain_validation() {
         },
         transactions: vec![Transaction {
             version: 1,
-            inputs: bllvm_consensus::tx_inputs![TransactionInput {
+            inputs: blvm_consensus::tx_inputs![TransactionInput {
                 prevout: OutPoint {
                     hash: [0u8; 32],
                     index: 0,
@@ -145,7 +145,7 @@ fn test_multi_block_chain_validation() {
                 script_sig: vec![0x41, 0x04], // Signature
                 sequence: 0xffffffff,
             }],
-            outputs: bllvm_consensus::tx_outputs![TransactionOutput {
+            outputs: blvm_consensus::tx_outputs![TransactionOutput {
                 value: 25_0000_0000,
                 script_pubkey: vec![
                     0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

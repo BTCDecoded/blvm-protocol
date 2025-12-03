@@ -3,8 +3,8 @@
 //! This module provides shared test utilities for building test data,
 //! creating mock objects, and setting up test scenarios.
 
-use bllvm_consensus::{Block, Transaction, BlockHeader};
-use bllvm_consensus::types::{OutPoint, UTXO, TxInput, TxOutput};
+use blvm_consensus::{Block, Transaction, BlockHeader};
+use blvm_consensus::types::{OutPoint, UTXO, TxInput, TxOutput};
 use crate::{BitcoinProtocolEngine, ProtocolVersion, NetworkParameters, NetworkConstants};
 use std::collections::HashMap;
 

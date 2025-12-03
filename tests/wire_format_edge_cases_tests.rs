@@ -1,7 +1,7 @@
 //! Edge case tests for wire format module
 
-use bllvm_protocol::network::{NetworkAddress, NetworkMessage, VersionMessage};
-use bllvm_protocol::wire::{
+use blvm_protocol::network::{NetworkAddress, NetworkMessage, VersionMessage};
+use blvm_protocol::wire::{
     calculate_checksum, deserialize_message, serialize_message, MAX_MESSAGE_PAYLOAD,
     MESSAGE_HEADER_SIZE,
 };

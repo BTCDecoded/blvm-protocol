@@ -12,7 +12,7 @@
 use crate::error::ProtocolError;
 use crate::network::NetworkMessage;
 use crate::Result;
-use bllvm_consensus::ConsensusError;
+use blvm_consensus::ConsensusError;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::io::Read;
@@ -77,9 +77,7 @@ pub fn serialize_message(message: &NetworkMessage, magic_bytes: [u8; 4]) -> Resu
         NetworkMessage::EconomicNodeRegistration(msg) => {
             ("econreg", serialize_economic_node_registration(msg)?)
         }
-        NetworkMessage::EconomicNodeVeto(msg) => {
-            ("econveto", serialize_economic_node_veto(msg)?)
-        }
+        NetworkMessage::EconomicNodeVeto(msg) => ("econveto", serialize_economic_node_veto(msg)?),
         NetworkMessage::EconomicNodeStatus(msg) => {
             ("econstatus", serialize_economic_node_status(msg)?)
         }
@@ -224,14 +222,10 @@ pub fn deserialize_message<R: Read>(
         "getbanlist" => NetworkMessage::GetBanList(deserialize_getbanlist(&payload)?),
         "banlist" => NetworkMessage::BanList(deserialize_banlist(&payload)?),
         // Governance messages
-        "econreg" => {
-            NetworkMessage::EconomicNodeRegistration(deserialize_economic_node_registration(
-                &payload,
-            )?)
-        }
-        "econveto" => {
-            NetworkMessage::EconomicNodeVeto(deserialize_economic_node_veto(&payload)?)
-        }
+        "econreg" => NetworkMessage::EconomicNodeRegistration(
+            deserialize_economic_node_registration(&payload)?,
+        ),
+        "econveto" => NetworkMessage::EconomicNodeVeto(deserialize_economic_node_veto(&payload)?),
         "econstatus" => {
             NetworkMessage::EconomicNodeStatus(deserialize_economic_node_status(&payload)?)
         }
@@ -664,33 +658,34 @@ fn deserialize_banlist(_data: &[u8]) -> Result<crate::commons::BanListMessage> {
 fn serialize_economic_node_registration(
     msg: &crate::commons::EconomicNodeRegistrationMessage,
 ) -> Result<Vec<u8>> {
-    Ok(bincode::serialize(msg)?)
+    bincode::serialize(msg).map_err(|e| crate::error::ProtocolError::Serialization(e.to_string()))
 }
 
 fn deserialize_economic_node_registration(
     data: &[u8],
 ) -> Result<crate::commons::EconomicNodeRegistrationMessage> {
-    Ok(bincode::deserialize(data)?)
+    bincode::deserialize(data)
+        .map_err(|e| crate::error::ProtocolError::Serialization(e.to_string()))
 }
 
 fn serialize_economic_node_veto(msg: &crate::commons::EconomicNodeVetoMessage) -> Result<Vec<u8>> {
-    Ok(bincode::serialize(msg)?)
+    bincode::serialize(msg).map_err(|e| crate::error::ProtocolError::Serialization(e.to_string()))
 }
 
-fn deserialize_economic_node_veto(
-    data: &[u8],
-) -> Result<crate::commons::EconomicNodeVetoMessage> {
-    Ok(bincode::deserialize(data)?)
+fn deserialize_economic_node_veto(data: &[u8]) -> Result<crate::commons::EconomicNodeVetoMessage> {
+    bincode::deserialize(data)
+        .map_err(|e| crate::error::ProtocolError::Serialization(e.to_string()))
 }
 
 fn serialize_economic_node_status(
     msg: &crate::commons::EconomicNodeStatusMessage,
 ) -> Result<Vec<u8>> {
-    Ok(bincode::serialize(msg)?)
+    bincode::serialize(msg).map_err(|e| crate::error::ProtocolError::Serialization(e.to_string()))
 }
 
 fn deserialize_economic_node_status(
     data: &[u8],
 ) -> Result<crate::commons::EconomicNodeStatusMessage> {
-    Ok(bincode::deserialize(data)?)
+    bincode::deserialize(data)
+        .map_err(|e| crate::error::ProtocolError::Serialization(e.to_string()))
 }

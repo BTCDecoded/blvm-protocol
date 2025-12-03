@@ -3,9 +3,9 @@
 //! Tests for Golomb-Rice Coded Sets (GCS) block filtering.
 //! Specification: https://github.com/bitcoin/bips/blob/master/bip-0158.mediawiki
 
-use bllvm_consensus::types::OutPoint;
-use bllvm_consensus::{Transaction, TransactionInput, TransactionOutput};
-use bllvm_protocol::bip158::{
+use blvm_consensus::types::OutPoint;
+use blvm_consensus::{Transaction, TransactionInput, TransactionOutput};
+use blvm_protocol::bip158::{
     build_block_filter, match_filter, CompactBlockFilter, BIP158_M, BIP158_P,
 };
 
@@ -13,7 +13,7 @@ use bllvm_protocol::bip158::{
 fn create_test_transaction_with_outputs(output_scripts: Vec<Vec<u8>>) -> Transaction {
     Transaction {
         version: 1,
-        inputs: bllvm_consensus::tx_inputs![TransactionInput {
+        inputs: blvm_consensus::tx_inputs![TransactionInput {
             prevout: OutPoint {
                 hash: [0u8; 32],
                 index: 0xffffffff,
@@ -37,7 +37,7 @@ fn create_test_transaction_with_outputs(output_scripts: Vec<Vec<u8>>) -> Transac
 fn create_coinbase_transaction() -> Transaction {
     Transaction {
         version: 1,
-        inputs: bllvm_consensus::tx_inputs![TransactionInput {
+        inputs: blvm_consensus::tx_inputs![TransactionInput {
             prevout: OutPoint {
                 hash: [0u8; 32],
                 index: 0xffffffff,
@@ -45,7 +45,7 @@ fn create_coinbase_transaction() -> Transaction {
             script_sig: vec![0x04, 0x00, 0x00, 0x00, 0x00], // Height encoding
             sequence: 0xffffffff,
         }],
-        outputs: bllvm_consensus::tx_outputs![TransactionOutput {
+        outputs: blvm_consensus::tx_outputs![TransactionOutput {
             value: 50_0000_0000,
             script_pubkey: vec![
                 0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

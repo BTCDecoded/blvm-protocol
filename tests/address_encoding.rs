@@ -6,7 +6,7 @@
 //! BIP350: Bech32m encoding for Taproot addresses (bc1p...)
 //! BIP351: Version 1 witness encoding for Taproot
 
-use bllvm_protocol::address::{AddressError, BitcoinAddress, Network};
+use blvm_protocol::address::{AddressError, BitcoinAddress, Network};
 
 /// Test helper: Create a valid P2WPKH witness program (20 bytes)
 fn create_p2wpkh_program() -> Vec<u8> {

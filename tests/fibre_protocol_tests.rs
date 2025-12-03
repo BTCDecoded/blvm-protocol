@@ -2,7 +2,7 @@
 //!
 //! Additional edge cases and error paths for FIBRE protocol.
 
-use bllvm_protocol::fibre::{
+use blvm_protocol::fibre::{
     FecChunk, FibreCapabilities, FibreConfig, FibreProtocolError, DEFAULT_SHARD_SIZE, FIBRE_MAGIC,
     HEADER_SIZE, MAX_DATA_SIZE,
 };

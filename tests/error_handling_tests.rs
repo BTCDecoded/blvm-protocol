@@ -3,13 +3,13 @@
 //! Tests for handling malformed messages, protocol mismatches,
 //! invalid data, and error recovery scenarios.
 
-use bllvm_consensus::{BlockHeader, Hash};
-use bllvm_protocol::network::{
+use blvm_consensus::{BlockHeader, Hash};
+use blvm_protocol::network::{
     process_network_message, AddrMessage, GetDataMessage, GetHeadersMessage, HeadersMessage,
     InvMessage, NetworkAddress, NetworkMessage, NetworkResponse, PeerState, RejectMessage,
     VersionMessage,
 };
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 
 fn create_test_engine() -> BitcoinProtocolEngine {
     BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap()
@@ -161,8 +161,8 @@ fn test_inv_message_too_many_items() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
 
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50001)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 1,
             hash: [i as u8; 32],
         })
@@ -193,7 +193,7 @@ fn test_inv_message_invalid_type() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
 
-    let inventory = vec![bllvm_protocol::network::InventoryVector {
+    let inventory = vec![blvm_protocol::network::InventoryVector {
         inv_type: 99, // Invalid type (valid: 1=tx, 2=block, 3=filtered block, 4=compact block)
         hash: [0u8; 32],
     }];
@@ -226,8 +226,8 @@ fn test_getdata_message_too_many_items() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
 
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50001)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 1,
             hash: [i as u8; 32],
         })

@@ -2,17 +2,17 @@
 //!
 //! Tests for protocol-specific validation rules.
 
-use bllvm_consensus::types::OutPoint;
-use bllvm_consensus::{Block, BlockHeader, Transaction, TransactionInput, TransactionOutput};
-use bllvm_protocol::validation::{ProtocolValidationContext, ProtocolValidationRules};
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+use blvm_consensus::types::OutPoint;
+use blvm_consensus::{Block, BlockHeader, Transaction, TransactionInput, TransactionOutput};
+use blvm_protocol::validation::{ProtocolValidationContext, ProtocolValidationRules};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 use std::collections::HashMap;
 
 /// Test helper: Create a simple transaction
 fn create_simple_transaction() -> Transaction {
     Transaction {
         version: 1,
-        inputs: bllvm_consensus::tx_inputs![TransactionInput {
+        inputs: blvm_consensus::tx_inputs![TransactionInput {
             prevout: OutPoint {
                 hash: [0u8; 32],
                 index: 0xffffffff,
@@ -20,7 +20,7 @@ fn create_simple_transaction() -> Transaction {
             script_sig: vec![0x51], // OP_1
             sequence: 0xffffffff,
         }],
-        outputs: bllvm_consensus::tx_outputs![TransactionOutput {
+        outputs: blvm_consensus::tx_outputs![TransactionOutput {
             value: 1000,
             script_pubkey: vec![0x51], // OP_1
         }],
