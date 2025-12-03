@@ -6,8 +6,8 @@
 
 use crate::error::ProtocolError;
 use crate::{BitcoinProtocolEngine, NetworkParameters, ProtocolVersion};
-use bllvm_consensus::types::{OutPoint, UTXO};
-use bllvm_consensus::{Block, Transaction, ValidationResult};
+use blvm_consensus::types::{OutPoint, UTXO};
+use blvm_consensus::{Block, Transaction, ValidationResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -308,8 +308,8 @@ impl BitcoinProtocolEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bllvm_consensus::types::{OutPoint, TransactionInput, TransactionOutput};
-    use bllvm_consensus::{Block, BlockHeader, Transaction};
+    use blvm_consensus::types::{OutPoint, TransactionInput, TransactionOutput};
+    use blvm_consensus::{Block, BlockHeader, Transaction};
     use std::collections::HashMap;
 
     #[test]
@@ -468,23 +468,38 @@ mod tests {
         let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
         let context = ProtocolValidationContext::new(ProtocolVersion::BitcoinV1, 1000).unwrap();
 
-        // Create a block that's within size limits
+        // Create a block that's within size limits with a valid coinbase transaction
+        let coinbase_tx = Transaction {
+            version: 1,
+            inputs: blvm_consensus::tx_inputs![TransactionInput {
+                prevout: OutPoint {
+                    hash: [0u8; 32],
+                    index: 0xffffffff,
+                },
+                script_sig: vec![0x01, 0x00], // Height 0
+                sequence: 0xffffffff,
+            }],
+            outputs: blvm_consensus::tx_outputs![TransactionOutput {
+                value: 50_0000_0000,
+                script_pubkey: vec![0x51], // Small script
+            }],
+            lock_time: 0,
+        };
+
+        // Calculate proper merkle root
+        let merkle_root = blvm_consensus::mining::calculate_merkle_root(&[coinbase_tx.clone()])
+            .expect("Should calculate merkle root");
+
         let small_block = Block {
             header: BlockHeader {
                 version: 1,
                 prev_block_hash: [0u8; 32],
-                merkle_root: [0u8; 32],
+                merkle_root,
                 timestamp: 1231006505,
                 bits: 0x1d00ffff,
                 nonce: 0,
             },
-            transactions: vec![Transaction {
-                version: 1,
-                inputs: bllvm_consensus::tx_inputs![],
-                outputs: bllvm_consensus::tx_outputs![],
-                lock_time: 0,
-            }]
-            .into_boxed_slice(),
+            transactions: vec![coinbase_tx].into_boxed_slice(),
         };
 
         // This should pass validation

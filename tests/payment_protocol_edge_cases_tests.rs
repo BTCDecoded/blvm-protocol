@@ -2,7 +2,7 @@
 //!
 //! Additional edge cases and error scenarios for BIP70 payment protocol.
 
-use bllvm_protocol::payment::{
+use blvm_protocol::payment::{
     Bip70Error, Payment, PaymentACK, PaymentOutput, PaymentRequest, SignedRefundAddress,
 };
 use secp256k1::{Message, Secp256k1, SecretKey};

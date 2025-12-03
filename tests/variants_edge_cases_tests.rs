@@ -2,8 +2,8 @@
 //!
 //! Edge cases and transition scenarios for protocol variants.
 
-use bllvm_protocol::variants::{ProtocolEvolution, ProtocolVariant};
-use bllvm_protocol::ProtocolVersion;
+use blvm_protocol::variants::{ProtocolEvolution, ProtocolVariant};
+use blvm_protocol::ProtocolVersion;
 
 #[test]
 fn test_all_variants_list() {

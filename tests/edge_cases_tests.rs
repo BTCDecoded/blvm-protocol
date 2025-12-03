@@ -3,12 +3,12 @@
 //! Tests for maximum sizes, boundary conditions, and extreme scenarios
 //! to ensure protocol limits are properly enforced.
 
-use bllvm_consensus::{BlockHeader, Hash};
-use bllvm_protocol::network::{
+use blvm_consensus::{BlockHeader, Hash};
+use blvm_protocol::network::{
     process_network_message, AddrMessage, GetBlocksMessage, GetHeadersMessage, HeadersMessage,
     InvMessage, NetworkAddress, NetworkMessage, NetworkResponse, PeerState,
 };
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 
 fn create_test_engine() -> BitcoinProtocolEngine {
     BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap()
@@ -58,8 +58,8 @@ fn test_inv_message_maximum_size() {
     let mut peer_state = create_test_peer_state();
 
     // Protocol limit: 50000 inventory items
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50000)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50000)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 1,
             hash: [i as u8; 32],
         })
@@ -239,8 +239,8 @@ fn test_inv_message_one_over_limit() {
     let mut peer_state = create_test_peer_state();
 
     // One over the limit (50001 items)
-    let inventory: Vec<bllvm_protocol::network::InventoryVector> = (0..50001)
-        .map(|i| bllvm_protocol::network::InventoryVector {
+    let inventory: Vec<blvm_protocol::network::InventoryVector> = (0..50001)
+        .map(|i| blvm_protocol::network::InventoryVector {
             inv_type: 1,
             hash: [i as u8; 32],
         })
@@ -342,7 +342,7 @@ fn test_inv_message_single_item() {
     let mut peer_state = create_test_peer_state();
 
     let inv = InvMessage {
-        inventory: vec![bllvm_protocol::network::InventoryVector {
+        inventory: vec![blvm_protocol::network::InventoryVector {
             inv_type: 1,
             hash: [0u8; 32],
         }],
@@ -401,7 +401,7 @@ fn test_version_message_maximum_start_height() {
     let engine = create_test_engine();
     let mut peer_state = create_test_peer_state();
 
-    let version = bllvm_protocol::network::VersionMessage {
+    let version = blvm_protocol::network::VersionMessage {
         version: 70015,
         services: 1,
         timestamp: 1234567890,

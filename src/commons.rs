@@ -172,7 +172,7 @@ pub struct EconomicNodeVetoMessage {
 }
 
 /// EconomicNodeStatus message - Query/response for node status
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct EconomicNodeStatusMessage {
     /// Request ID (for async request-response matching)
     pub request_id: u64,
@@ -185,7 +185,7 @@ pub struct EconomicNodeStatusMessage {
 }
 
 /// NodeStatusResponse - Status information for economic node
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NodeStatusResponse {
     /// Node ID
     pub node_id: i32,

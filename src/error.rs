@@ -15,7 +15,7 @@ use thiserror::Error;
 pub enum ProtocolError {
     /// Consensus validation error (wrapped from consensus layer)
     #[error("Consensus error: {0}")]
-    Consensus(#[from] bllvm_consensus::error::ConsensusError),
+    Consensus(#[from] blvm_consensus::error::ConsensusError),
 
     /// Protocol validation failed (size limits, feature flags, etc.)
     #[error("Protocol validation failed: {0}")]
@@ -51,6 +51,10 @@ pub enum ProtocolError {
     /// Service flag error
     #[error("Service flag error: {0}")]
     ServiceFlag(Cow<'static, str>),
+
+    /// Serialization error
+    #[error("Serialization error: {0}")]
+    Serialization(String),
 }
 
 /// Protocol-specific Result type

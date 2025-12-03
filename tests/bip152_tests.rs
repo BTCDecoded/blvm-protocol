@@ -4,13 +4,13 @@
 //! Tests cover SendCmpct negotiation, CmpctBlock reconstruction,
 //! GetBlockTxn/BlockTxn transaction fetching, and edge cases.
 
-use bllvm_consensus::{Block, BlockHeader, Hash, Transaction, TransactionInput, TransactionOutput};
-use bllvm_protocol::network::{
+use blvm_consensus::{Block, BlockHeader, Hash, Transaction, TransactionInput, TransactionOutput};
+use blvm_protocol::network::{
     process_network_message, BlockTxnMessage, ChainStateAccess, CmpctBlockMessage,
     GetBlockTxnMessage, NetworkMessage, NetworkResponse, PeerState, PrefilledTransaction,
     SendCmpctMessage,
 };
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -37,10 +37,10 @@ impl ChainStateAccess for MockChainForCompactBlocks {
         self.blocks.contains_key(hash)
     }
 
-    fn get_object(&self, hash: &Hash) -> Option<bllvm_protocol::network::ChainObject> {
+    fn get_object(&self, hash: &Hash) -> Option<blvm_protocol::network::ChainObject> {
         self.blocks
             .get(hash)
-            .map(|b| bllvm_protocol::network::ChainObject::Block(Arc::new(b.clone())))
+            .map(|b| blvm_protocol::network::ChainObject::Block(Arc::new(b.clone())))
     }
 
     fn get_headers_for_locator(&self, _locator: &[Hash], _stop: &Hash) -> Vec<BlockHeader> {
@@ -81,15 +81,15 @@ fn create_test_block_with_txs(tx_count: usize) -> (Hash, Block) {
     // Coinbase transaction
     transactions.push(Transaction {
         version: 1,
-        inputs: bllvm_consensus::tx_inputs![TransactionInput {
-            prevout: bllvm_consensus::types::OutPoint {
+        inputs: blvm_consensus::tx_inputs![TransactionInput {
+            prevout: blvm_consensus::types::OutPoint {
                 hash: [0u8; 32],
                 index: 0xffffffff,
             },
             script_sig: vec![0x01, 0x00], // Height 0
             sequence: 0xffffffff,
         }],
-        outputs: bllvm_consensus::tx_outputs![TransactionOutput {
+        outputs: blvm_consensus::tx_outputs![TransactionOutput {
             value: 50_0000_0000,
             script_pubkey: vec![0x51], // OP_1
         }],
@@ -100,15 +100,15 @@ fn create_test_block_with_txs(tx_count: usize) -> (Hash, Block) {
     for i in 0..tx_count {
         transactions.push(Transaction {
             version: 1,
-            inputs: bllvm_consensus::tx_inputs![TransactionInput {
-                prevout: bllvm_consensus::types::OutPoint {
+            inputs: blvm_consensus::tx_inputs![TransactionInput {
+                prevout: blvm_consensus::types::OutPoint {
                     hash: [i as u8; 32],
                     index: 0,
                 },
                 script_sig: vec![0x41, 0x04], // Signature
                 sequence: 0xffffffff,
             }],
-            outputs: bllvm_consensus::tx_outputs![TransactionOutput {
+            outputs: blvm_consensus::tx_outputs![TransactionOutput {
                 value: 1000,
                 script_pubkey: vec![0x51], // OP_1
             }],
@@ -276,15 +276,15 @@ fn test_cmpctblock_with_prefilled_txs() {
 
     let tx = Transaction {
         version: 1,
-        inputs: bllvm_consensus::tx_inputs![TransactionInput {
-            prevout: bllvm_consensus::types::OutPoint {
+        inputs: blvm_consensus::tx_inputs![TransactionInput {
+            prevout: blvm_consensus::types::OutPoint {
                 hash: [0u8; 32],
                 index: 0xffffffff,
             },
             script_sig: vec![0x01, 0x00],
             sequence: 0xffffffff,
         }],
-        outputs: bllvm_consensus::tx_outputs![TransactionOutput {
+        outputs: blvm_consensus::tx_outputs![TransactionOutput {
             value: 50_0000_0000,
             script_pubkey: vec![0x51],
         }],
@@ -458,15 +458,15 @@ fn test_blocktxn_message_processing() {
 
     let transactions = vec![Transaction {
         version: 1,
-        inputs: bllvm_consensus::tx_inputs![TransactionInput {
-            prevout: bllvm_consensus::types::OutPoint {
+        inputs: blvm_consensus::tx_inputs![TransactionInput {
+            prevout: blvm_consensus::types::OutPoint {
                 hash: [0u8; 32],
                 index: 0,
             },
             script_sig: vec![0x41, 0x04],
             sequence: 0xffffffff,
         }],
-        outputs: bllvm_consensus::tx_outputs![TransactionOutput {
+        outputs: blvm_consensus::tx_outputs![TransactionOutput {
             value: 1000,
             script_pubkey: vec![0x51],
         }],

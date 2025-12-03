@@ -1,7 +1,7 @@
 //! Edge case tests for features module (activation, dependencies, conflicts)
 
-use bllvm_protocol::features::{ActivationMethod, FeatureActivation, FeatureRegistry};
-use bllvm_protocol::ProtocolVersion;
+use blvm_protocol::features::{ActivationMethod, FeatureActivation, FeatureRegistry};
+use blvm_protocol::ProtocolVersion;
 
 #[test]
 fn test_feature_activation_height_based() {
