@@ -282,7 +282,7 @@ impl BitcoinProtocolEngine {
         //
         // This keeps protocol-level size limits aligned with the exact serialization
         // used for consensus checks and transaction size tests.
-        bllvm_consensus::transaction::calculate_transaction_size(tx) as u32
+        blvm_consensus::transaction::calculate_transaction_size(tx) as u32
     }
 }
 
