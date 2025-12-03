@@ -51,6 +51,16 @@ pub enum ProtocolError {
     /// Service flag error
     #[error("Service flag error: {0}")]
     ServiceFlag(Cow<'static, str>),
+
+    /// Serialization error
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+}
+
+impl From<bincode::Error> for ProtocolError {
+    fn from(err: bincode::Error) -> Self {
+        ProtocolError::Serialization(err.to_string())
+    }
 }
 
 /// Protocol-specific Result type

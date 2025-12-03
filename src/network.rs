@@ -18,7 +18,7 @@ pub mod commons {
 /// NetworkMessage: Bitcoin P2P protocol message types
 ///
 /// Network message types for Bitcoin P2P protocol
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NetworkMessage {
     Version(VersionMessage),
     VerAck,
@@ -369,6 +369,11 @@ pub fn process_network_message(
         NetworkMessage::FilteredBlock(filtered) => process_filteredblock_message(filtered),
         NetworkMessage::GetBanList(getbanlist) => process_getbanlist_message(getbanlist),
         NetworkMessage::BanList(banlist) => process_banlist_message(banlist),
+        NetworkMessage::EconomicNodeRegistration(msg) => {
+            process_economic_node_registration_message(msg, config)
+        }
+        NetworkMessage::EconomicNodeVeto(msg) => process_economic_node_veto_message(msg, config),
+        NetworkMessage::EconomicNodeStatus(msg) => process_economic_node_status_message(msg, config),
     }
 }
 
@@ -573,6 +578,8 @@ fn process_block_message(
 
     // Delegate to consensus via protocol engine (requires utxo_set and height)
     if let (Some(utxos), Some(h)) = (utxo_set, height) {
+        // Network-level validation does not currently compute median_time_past or
+        // adjusted network time; those are supplied by node-level validation.
         let context = ProtocolValidationContext::new(engine.get_protocol_version(), h)?;
         let result = engine.validate_block_with_protocol(block, utxos, h, &context)?;
 
@@ -895,5 +902,35 @@ fn process_getbanlist_message(_getbanlist: &commons::GetBanListMessage) -> Resul
 fn process_banlist_message(_banlist: &commons::BanListMessage) -> Result<NetworkResponse> {
     // Receive ban list from peer
     // For now, just acknowledge (actual implementation would validate and merge)
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process economic node registration message
+fn process_economic_node_registration_message(
+    _msg: &commons::EconomicNodeRegistrationMessage,
+    _config: &ProtocolConfig,
+) -> Result<NetworkResponse> {
+    // Process economic node registration
+    // For now, just acknowledge (actual implementation would validate and register)
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process economic node veto message
+fn process_economic_node_veto_message(
+    _msg: &commons::EconomicNodeVetoMessage,
+    _config: &ProtocolConfig,
+) -> Result<NetworkResponse> {
+    // Process economic node veto
+    // For now, just acknowledge (actual implementation would validate and process veto)
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process economic node status message
+fn process_economic_node_status_message(
+    _msg: &commons::EconomicNodeStatusMessage,
+    _config: &ProtocolConfig,
+) -> Result<NetworkResponse> {
+    // Process economic node status query/response
+    // For now, just acknowledge (actual implementation would query/return status)
     Ok(NetworkResponse::Ok)
 }
