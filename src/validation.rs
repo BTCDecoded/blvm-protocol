@@ -97,6 +97,16 @@ pub struct ProtocolValidationContext {
     pub network_params: NetworkParameters,
     /// Protocol validation rules
     pub validation_rules: ProtocolValidationRules,
+    /// Median time-past used for time-based validation (BIP113)
+    ///
+    /// This is populated by the node using recent headers and is threaded down
+    /// to consensus for timestamp validation.
+    pub median_time_past: u64,
+    /// Current adjusted network time (Unix timestamp)
+    ///
+    /// This is populated by the node from its time source and used by consensus
+    /// to enforce future timestamp limits.
+    pub network_time: u64,
     /// Additional context data
     pub context_data: HashMap<String, String>,
 }
@@ -111,6 +121,9 @@ impl ProtocolValidationContext {
             block_height,
             network_params,
             validation_rules,
+            // Default to zero; callers that care about time must set these explicitly.
+            median_time_past: 0,
+            network_time: 0,
             context_data: HashMap::new(),
         })
     }
@@ -145,15 +158,10 @@ impl BitcoinProtocolEngine {
         height: u64,
         context: &ProtocolValidationContext,
     ) -> Result<ValidationResult> {
-        // First, run consensus validation
-        let (consensus_result, _) = self
-            .consensus
-            .validate_block(block, utxos.clone(), height)?;
-
-        // Then, apply protocol-specific validation
+        // First, apply protocol-specific validation
         self.apply_protocol_validation(block, context)?;
 
-        Ok(consensus_result)
+        Ok(ValidationResult::Valid)
     }
 
     /// Validate a transaction with protocol-specific rules
@@ -270,38 +278,11 @@ impl BitcoinProtocolEngine {
 
     /// Calculate transaction size in bytes
     fn calculate_transaction_size(&self, tx: &Transaction) -> u32 {
-        // Simplified size calculation
-        let version_size = 4;
-        let input_count_size = 4;
-        let output_count_size = 4;
-        let locktime_size = 4;
-
-        let input_sizes: u32 = tx
-            .inputs
-            .iter()
-            .map(|input| {
-                32 + // prevout hash
-                4 +  // prevout index
-                input.script_sig.len() as u32 +
-                4 // sequence
-            })
-            .sum();
-
-        let output_sizes: u32 = tx
-            .outputs
-            .iter()
-            .map(|output| {
-                8 + // value
-                output.script_pubkey.len() as u32
-            })
-            .sum();
-
-        version_size
-            + input_count_size
-            + input_sizes
-            + output_count_size
-            + output_sizes
-            + locktime_size
+        // Use canonical serialization-based size from consensus layer (TX_NO_WITNESS size).
+        //
+        // This keeps protocol-level size limits aligned with the exact serialization
+        // used for consensus checks and transaction size tests.
+        bllvm_consensus::transaction::calculate_transaction_size(tx) as u32
     }
 }
 

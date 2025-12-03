@@ -28,6 +28,7 @@ pub use bllvm_consensus::error::Result as ConsensusResult;
 
 // Protocol-specific Result type
 pub use error::{ProtocolError, Result};
+pub use validation::ProtocolValidationContext;
 
 // Re-export commonly used modules
 pub mod mempool {
@@ -205,9 +206,14 @@ impl BitcoinProtocolEngine {
         height: u64,
     ) -> Result<ValidationResult> {
         let (result, _) = self
-            .consensus
-            .validate_block(block, utxos.clone(), height)
-            .map_err(ProtocolError::from)?;
+            .validate_and_connect_block(
+                block,
+                &[],
+                &UtxoSet::from(utxos.clone()),
+                height,
+                None,
+                &ProtocolValidationContext::new(self.protocol_version, height)?,
+            )?;
         Ok(result)
     }
 
@@ -290,19 +296,24 @@ impl BitcoinProtocolEngine {
             return Ok((protocol_result, utxos.clone()));
         }
 
-        // Then, consensus validation with UTXO update
-        // Convert protocol version to network type
+        // Then, consensus validation with UTXO update, using explicit time context.
         let network = match self.protocol_version {
             ProtocolVersion::BitcoinV1 => types::Network::Mainnet,
             ProtocolVersion::Testnet3 => types::Network::Testnet,
             ProtocolVersion::Regtest => types::Network::Regtest,
         };
-        let (result, new_utxo_set, _undo_log) = bllvm_consensus::block::connect_block(
+
+        let time_context = Some(crate::types::TimeContext {
+            network_time: context.network_time,
+            median_time_past: context.median_time_past,
+        });
+
+        let (result, new_utxo_set, _undo_log) = bllvm_consensus::block::connect_block_with_context(
             block,
             witnesses,
             utxos.clone(),
             height,
-            recent_headers,
+            time_context,
             network,
         )?;
 
