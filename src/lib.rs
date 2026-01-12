@@ -297,12 +297,17 @@ impl BitcoinProtocolEngine {
             ProtocolVersion::Testnet3 => types::Network::Testnet,
             ProtocolVersion::Regtest => types::Network::Regtest,
         };
+        let network_time = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
         let (result, new_utxo_set, _undo_log) = blvm_consensus::block::connect_block(
             block,
             witnesses,
             utxos.clone(),
             height,
             recent_headers,
+            network_time,
             network,
         )?;
 
