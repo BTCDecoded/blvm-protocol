@@ -13,21 +13,23 @@ Provides a Bitcoin protocol abstraction layer enabling:
 
 ## Architecture Position
 
-Tier 3 of the 6-tier Bitcoin Commons architecture (BLLVM technology stack):
+Tier 3 of the 6-tier Bitcoin Commons architecture (BLVM technology stack):
 
 ```
-1. bllvm-spec (Orange Paper - mathematical foundation)
-2. bllvm-consensus (pure math implementation)
-3. bllvm-protocol (Bitcoin abstraction)
-4. bllvm-node (full node implementation)
-5. bllvm-sdk (developer toolkit)
-6. bllvm-commons (governance enforcement)
+1. blvm-spec (Orange Paper - mathematical foundation)
+2. blvm-consensus (pure math implementation)
+3. blvm-protocol (Bitcoin abstraction)
+4. blvm-node (full node implementation)
+5. blvm-sdk (developer toolkit)
+6. blvm-commons (governance enforcement)
 ```
 
 ## Features
 
 - **Protocol Variants**: Mainnet, testnet, regtest support
 - **Network Messages**: Core P2P messages and BIP152 compact blocks
+- **FIBRE Protocol**: High-performance relay protocol with packet format definitions
+- **Governance Messages**: Economic node governance messages via P2P protocol
 - **Commons Extensions**: UTXO commitments, filtered blocks, ban list sharing
 - **Service Flags**: Standard and Commons-specific capability flags
 - **Validation Rules**: Protocol-specific size limits and validation
@@ -36,7 +38,7 @@ Tier 3 of the 6-tier Bitcoin Commons architecture (BLLVM technology stack):
 
 ## Purpose
 
-Sits between pure mathematical consensus rules (bllvm-consensus) and full Bitcoin implementation (bllvm-node). Provides:
+Sits between pure mathematical consensus rules (blvm-consensus) and full Bitcoin implementation (blvm-node). Provides:
 
 ### Protocol Abstraction
 - **Multiple Variants**: Support for mainnet, testnet, and regtest
@@ -91,7 +93,7 @@ Sits between pure mathematical consensus rules (bllvm-consensus) and full Bitcoi
 ### Basic Protocol Engine
 
 ```rust
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 
 // Create a mainnet protocol engine
 let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1)?;
@@ -110,7 +112,7 @@ if engine.supports_feature("segwit") {
 ### Configuration
 
 ```rust
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion, ProtocolConfig};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion, ProtocolConfig};
 
 // Create protocol configuration
 let mut config = ProtocolConfig::default();
@@ -138,14 +140,14 @@ The protocol configuration system provides:
 - **FIBRE**: Fast Internet Bitcoin Relay Engine configuration
 
 Configuration can be loaded from:
-- Environment variables (`BLLVM_PROTOCOL_<SECTION>_<KEY>`)
+- Environment variables (`BLVM_PROTOCOL_<SECTION>_<KEY>`)
 - Programmatic configuration (struct initialization)
 - Configuration files (via serde serialization)
 
 ### Service Flags
 
 ```rust
-use bllvm_protocol::service_flags::{self, standard, commons};
+use blvm_protocol::service_flags::{self, standard, commons};
 
 // Check service flags
 let services = standard::NODE_NETWORK | standard::NODE_WITNESS | commons::NODE_FIBRE;
@@ -161,8 +163,8 @@ assert!(service_flags::has_flag(commons_flags, commons::NODE_BAN_LIST_SHARING));
 ### Network Message Processing
 
 ```rust
-use bllvm_protocol::network::{process_network_message, NetworkMessage, PeerState};
-use bllvm_protocol::BitcoinProtocolEngine;
+use blvm_protocol::network::{process_network_message, NetworkMessage, PeerState};
+use blvm_protocol::BitcoinProtocolEngine;
 
 let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1)?;
 let mut peer_state = PeerState::new();
@@ -182,8 +184,8 @@ let response = process_network_message(
 ### Commons Protocol Extensions
 
 ```rust
-use bllvm_protocol::commons::{GetUTXOSetMessage, GetBanListMessage};
-use bllvm_protocol::network::NetworkMessage;
+use blvm_protocol::commons::{GetUTXOSetMessage, GetBanListMessage};
+use blvm_protocol::network::NetworkMessage;
 
 // Request UTXO set at specific height
 let get_utxo = NetworkMessage::GetUTXOSet(GetUTXOSetMessage {
@@ -201,7 +203,7 @@ let get_banlist = NetworkMessage::GetBanList(GetBanListMessage {
 ### BIP152 Compact Block Relay
 
 ```rust
-use bllvm_protocol::network::{NetworkMessage, SendCmpctMessage};
+use blvm_protocol::network::{NetworkMessage, SendCmpctMessage};
 
 // Negotiate compact block relay
 let sendcmpct = NetworkMessage::SendCmpct(SendCmpctMessage {
@@ -213,7 +215,7 @@ let sendcmpct = NetworkMessage::SendCmpct(SendCmpctMessage {
 ### Protocol-Specific Validation
 
 ```rust
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 
 let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1)?;
 
@@ -227,7 +229,7 @@ let result = engine.validate_transaction(&tx)?;
 ### Regtest Mode
 
 ```rust
-use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
 
 // Create regtest protocol engine
 let engine = BitcoinProtocolEngine::new(ProtocolVersion::Regtest)?;
