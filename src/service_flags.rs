@@ -25,6 +25,10 @@ pub mod standard {
 
     /// Node Network Limited (pruned node)
     pub const NODE_NETWORK_LIMITED: u64 = 1 << 10;
+
+    /// Node supports BIP324 v2 encrypted transport
+    #[cfg(feature = "bip324")]
+    pub const NODE_V2_TRANSPORT: u64 = 1 << 11;
 }
 
 /// Commons-specific service flags

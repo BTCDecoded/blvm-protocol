@@ -38,6 +38,10 @@ sha2 = "=0.10.9"
 ripemd = "=0.1.3"
 secp256k1 = "=0.28.2"  # For BIP70 payment protocol signatures
 hex = "=0.4"  # For hex encoding/decoding
+chacha20poly1305 = "=0.10.1"  # For BIP324 v2 encrypted transport
+aead = "=0.5.2"  # AEAD trait for ChaCha20Poly1305
+getrandom = "=0.2.17"  # For random key generation in BIP324
+hkdf = "=0.12.4"  # HKDF key derivation for BIP324
 
 # Address encoding (BIP173/350/351)
 bech32 = "=0.9"
@@ -52,6 +56,8 @@ production = ["blvm-consensus/production"]
 utxo-commitments = ["blvm-consensus/utxo-commitments"]
 # CTV (BIP119 CheckTemplateVerify) - passed through from blvm-consensus
 ctv = ["blvm-consensus/ctv"]
+# BIP324: v2 encrypted transport protocol
+bip324 = []
 # Sigop counting module (always available, no feature flag needed)
 # sigop module is always compiled in blvm-consensus
 
