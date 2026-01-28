@@ -67,6 +67,10 @@ pub mod network;
 pub mod service_flags;
 pub mod varint;
 
+// BIP324: v2 encrypted transport
+#[cfg(feature = "bip324")]
+pub mod v2_transport;
+
 // Re-export commonly used types for convenience
 pub use commons::{
     BanListMessage, FilteredBlockMessage, GetBanListMessage, GetFilteredBlockMessage,
@@ -78,6 +82,9 @@ pub use config::{
 pub use service_flags::{commons as service_flags_commons, standard as service_flags_standard};
 // Wire format module - Bitcoin P2P wire protocol serialization
 pub mod wire;
+
+#[cfg(test)]
+mod bip155_serialization_tests;
 pub mod types {
     pub use blvm_consensus::types::*;
 }
@@ -278,7 +285,9 @@ impl BitcoinProtocolEngine {
     pub fn validate_and_connect_block(
         &self,
         block: &Block,
-        witnesses: &[segwit::Witness],
+        witnesses: &[Vec<segwit::Witness>], // CRITICAL FIX: Changed from &[Witness] to &[Vec<Witness>]
+        // witnesses is now Vec<Vec<Witness>> where each Vec<Witness> is for one transaction
+        // and each Witness is for one input
         utxos: &UtxoSet,
         height: u64,
         recent_headers: Option<&[BlockHeader]>,

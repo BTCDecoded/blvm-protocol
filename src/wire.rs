@@ -42,6 +42,7 @@ pub fn serialize_message(message: &NetworkMessage, magic_bytes: [u8; 4]) -> Resu
         NetworkMessage::Version(v) => ("version", serialize_version(v)?),
         NetworkMessage::VerAck => ("verack", vec![]),
         NetworkMessage::Addr(a) => ("addr", serialize_addr(a)?),
+        NetworkMessage::AddrV2(a) => ("addrv2", serialize_addrv2(a)?),
         NetworkMessage::Inv(i) => ("inv", serialize_inv(i)?),
         NetworkMessage::GetData(g) => ("getdata", serialize_getdata(g)?),
         NetworkMessage::GetHeaders(gh) => ("getheaders", serialize_getheaders(gh)?),
@@ -190,6 +191,7 @@ pub fn deserialize_message<R: Read>(
         "version" => NetworkMessage::Version(deserialize_version(&payload)?),
         "verack" => NetworkMessage::VerAck,
         "addr" => NetworkMessage::Addr(deserialize_addr(&payload)?),
+        "addrv2" => NetworkMessage::AddrV2(deserialize_addrv2(&payload)?),
         "inv" => NetworkMessage::Inv(deserialize_inv(&payload)?),
         "getdata" => NetworkMessage::GetData(deserialize_getdata(&payload)?),
         "getheaders" => NetworkMessage::GetHeaders(deserialize_getheaders(&payload)?),
@@ -445,6 +447,122 @@ fn deserialize_addr(_data: &[u8]) -> Result<crate::network::AddrMessage> {
     Err(ProtocolError::Consensus(ConsensusError::Serialization(
         Cow::Owned("Not implemented".to_string()),
     )))
+}
+
+/// Serialize AddrV2Message to Bitcoin wire format (BIP155)
+/// Format: CompactSize(count) + [time(4) + services(8) + address_type(1) + address(var) + port(2)]*
+pub fn serialize_addrv2(addrv2: &crate::network::AddrV2Message) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+    
+    let mut buf = Vec::new();
+    
+    // CompactSize: number of addresses
+    write_varint(&mut buf, addrv2.addresses.len() as u64)?;
+    
+    // Serialize each address
+    for addr in &addrv2.addresses {
+        // time: u32 (4 bytes, little-endian)
+        buf.extend_from_slice(&addr.time.to_le_bytes());
+        
+        // services: u64 (8 bytes, little-endian)
+        buf.extend_from_slice(&addr.services.to_le_bytes());
+        
+        // address_type: u8 (1 byte)
+        buf.push(addr.address_type as u8);
+        
+        // address: variable length based on type
+        buf.extend_from_slice(&addr.address);
+        
+        // port: u16 (2 bytes, big-endian)
+        buf.extend_from_slice(&addr.port.to_be_bytes());
+    }
+    
+    Ok(buf)
+}
+
+/// Deserialize AddrV2Message from Bitcoin wire format (BIP155)
+pub fn deserialize_addrv2(data: &[u8]) -> Result<crate::network::AddrV2Message> {
+    use crate::varint::read_varint;
+    use std::io::Cursor;
+    
+    let mut cursor = Cursor::new(data);
+    
+    // CompactSize: number of addresses
+    let count = read_varint(&mut cursor)?;
+    if count > 1000 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("Too many addresses in addrv2".to_string()),
+        )));
+    }
+    
+    let mut addresses = Vec::with_capacity(count as usize);
+    
+    // Deserialize each address
+    for _ in 0..count {
+        // time: u32 (4 bytes, little-endian)
+        let mut time_bytes = [0u8; 4];
+        cursor.read_exact(&mut time_bytes).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+                "Failed to read time: {e}"
+            ))))
+        })?;
+        let time = u32::from_le_bytes(time_bytes);
+        
+        // services: u64 (8 bytes, little-endian)
+        let mut services_bytes = [0u8; 8];
+        cursor.read_exact(&mut services_bytes).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+                "Failed to read services: {e}"
+            ))))
+        })?;
+        let services = u64::from_le_bytes(services_bytes);
+        
+        // address_type: u8 (1 byte)
+        let mut addr_type_byte = [0u8; 1];
+        cursor.read_exact(&mut addr_type_byte).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+                "Failed to read address_type: {e}"
+            ))))
+        })?;
+        let address_type = crate::network::AddressType::from_u8(addr_type_byte[0])
+            .ok_or_else(|| {
+                ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+                    "Invalid address type: {}",
+                    addr_type_byte[0]
+                ))))
+            })?;
+        
+        // address: variable length based on type
+        let addr_len = address_type.address_length();
+        let mut address = vec![0u8; addr_len];
+        cursor.read_exact(&mut address).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+                "Failed to read address: {e}"
+            ))))
+        })?;
+        
+        // port: u16 (2 bytes, big-endian)
+        let mut port_bytes = [0u8; 2];
+        cursor.read_exact(&mut port_bytes).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+                "Failed to read port: {e}"
+            ))))
+        })?;
+        let port = u16::from_be_bytes(port_bytes);
+        
+        // Create NetworkAddressV2
+        let addr_v2 = crate::network::NetworkAddressV2::new(
+            time,
+            services,
+            address_type,
+            address,
+            port,
+        )?;
+        
+        addresses.push(addr_v2);
+    }
+    
+    Ok(crate::network::AddrV2Message { addresses })
 }
 
 fn serialize_inv(_i: &crate::network::InvMessage) -> Result<Vec<u8>> {

@@ -126,6 +126,12 @@ pub struct ServiceFlagsConfig {
     #[serde(default = "default_false")]
     pub node_ban_list_sharing: bool,
 
+    /// Advertise NODE_V2_TRANSPORT capability (BIP324)
+    /// Default: false (requires bip324 feature)
+    #[cfg(feature = "bip324")]
+    #[serde(default = "default_false")]
+    pub node_v2_transport: bool,
+
     /// Advertise Commons NODE_GOVERNANCE capability (governance message relay)
     /// Default: false
     #[serde(default = "default_false")]
@@ -153,6 +159,8 @@ impl Default for ServiceFlagsConfig {
             node_utxo_commitments: false,
             node_ban_list_sharing: false,
             node_governance: false,
+            #[cfg(feature = "bip324")]
+            node_v2_transport: false,
         }
     }
 }

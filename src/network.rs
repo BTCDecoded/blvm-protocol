@@ -4,16 +4,28 @@
 //! Protocol-specific limits and validation are handled here, with consensus
 //! validation delegated to the consensus layer.
 
+use crate::error::ProtocolError;
 use crate::validation::ProtocolValidationContext;
 use crate::{BitcoinProtocolEngine, ProtocolConfig, Result};
+use blvm_consensus::error::ConsensusError;
 use blvm_consensus::types::UtxoSet;
 use blvm_consensus::{Block, BlockHeader, Hash, Transaction, ValidationResult};
+use std::borrow::Cow;
 use std::sync::Arc;
 
 // Commons module is always available (ban list sharing doesn't require utxo-commitments)
 pub mod commons {
     pub use crate::commons::*;
 }
+
+// BIP324: v2 encrypted transport
+#[cfg(feature = "bip324")]
+pub mod v2_transport {
+    pub use crate::v2_transport::*;
+}
+
+#[cfg(test)]
+mod bip155_tests;
 
 /// NetworkMessage: Bitcoin P2P protocol message types
 ///
@@ -23,6 +35,7 @@ pub enum NetworkMessage {
     Version(VersionMessage),
     VerAck,
     Addr(AddrMessage),
+    AddrV2(AddrV2Message), // BIP155: Extended address format
     Inv(InvMessage),
     GetData(GetDataMessage),
     GetHeaders(GetHeadersMessage),
@@ -195,12 +208,133 @@ pub struct BlockTxnMessage {
     pub transactions: Vec<Transaction>,
 }
 
-/// Network address structure
+/// Network address structure (legacy format)
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NetworkAddress {
     pub services: u64,
-    pub ip: [u8; 16], // IPv6 address
+    pub ip: [u8; 16], // IPv6 address (IPv4 mapped to IPv6)
     pub port: u16,
+}
+
+/// BIP155: Address type for addrv2 message
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum AddressType {
+    IPv4 = 1,
+    IPv6 = 2,
+    TorV2 = 3,
+    TorV3 = 4,
+    I2P = 5,
+    CJDNS = 6,
+}
+
+impl AddressType {
+    /// Get the expected address length in bytes for this type
+    pub fn address_length(&self) -> usize {
+        match self {
+            AddressType::IPv4 => 4,
+            AddressType::IPv6 => 16,
+            AddressType::TorV2 => 10,
+            AddressType::TorV3 => 32,
+            AddressType::I2P => 32,
+            AddressType::CJDNS => 16,
+        }
+    }
+
+    /// Try to create AddressType from u8
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            1 => Some(AddressType::IPv4),
+            2 => Some(AddressType::IPv6),
+            3 => Some(AddressType::TorV2),
+            4 => Some(AddressType::TorV3),
+            5 => Some(AddressType::I2P),
+            6 => Some(AddressType::CJDNS),
+            _ => None,
+        }
+    }
+}
+
+/// BIP155: Extended address message (addrv2)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AddrV2Message {
+    pub addresses: Vec<NetworkAddressV2>,
+}
+
+/// BIP155: Extended network address structure
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NetworkAddressV2 {
+    pub time: u32,
+    pub services: u64,
+    pub address_type: AddressType,
+    pub address: Vec<u8>, // Variable length based on address_type
+    pub port: u16,
+}
+
+impl NetworkAddressV2 {
+    /// Create a new NetworkAddressV2
+    pub fn new(
+        time: u32,
+        services: u64,
+        address_type: AddressType,
+        address: Vec<u8>,
+        port: u16,
+    ) -> Result<Self> {
+        let expected_len = address_type.address_length();
+        if address.len() != expected_len {
+            return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+                std::borrow::Cow::Owned(format!(
+                    "Invalid address length for type {:?}: expected {}, got {}",
+                    address_type,
+                    expected_len,
+                    address.len()
+                )),
+            )));
+        }
+        Ok(Self {
+            time,
+            services,
+            address_type,
+            address,
+            port,
+        })
+    }
+
+    /// Convert to legacy NetworkAddress (if possible)
+    pub fn to_legacy(&self) -> Option<NetworkAddress> {
+        match self.address_type {
+            AddressType::IPv4 => {
+                if self.address.len() == 4 {
+                    // Map IPv4 to IPv6-mapped format
+                    let mut ipv6 = [0u8; 16];
+                    ipv6[10] = 0xff;
+                    ipv6[11] = 0xff;
+                    ipv6[12..16].copy_from_slice(&self.address);
+                    Some(NetworkAddress {
+                        services: self.services,
+                        ip: ipv6,
+                        port: self.port,
+                    })
+                } else {
+                    None
+                }
+            }
+            AddressType::IPv6 => {
+                if self.address.len() == 16 {
+                    let mut ipv6 = [0u8; 16];
+                    ipv6.copy_from_slice(&self.address);
+                    Some(NetworkAddress {
+                        services: self.services,
+                        ip: ipv6,
+                        port: self.port,
+                    })
+                } else {
+                    None
+                }
+            }
+            _ => None, // Tor, I2P, CJDNS cannot be converted to legacy format
+        }
+    }
 }
 
 /// Inventory vector identifying objects
@@ -220,7 +354,7 @@ pub enum NetworkResponse {
 }
 
 /// Peer connection state
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PeerState {
     pub version: u32,
     pub services: u64,
@@ -231,6 +365,13 @@ pub struct PeerState {
     pub ping_nonce: Option<u64>,
     pub last_pong: Option<std::time::SystemTime>,
     pub min_fee_rate: Option<u64>,
+    /// BIP324: v2 encrypted transport state (if enabled)
+    /// Note: V2Transport is not Clone, so we use Option<Box<V2Transport>> for storage
+    #[cfg(feature = "bip324")]
+    pub v2_transport: Option<std::sync::Arc<crate::v2_transport::V2Transport>>,
+    /// BIP324: Whether v2 transport handshake is in progress
+    #[cfg(feature = "bip324")]
+    pub v2_handshake: Option<std::sync::Arc<crate::v2_transport::V2Handshake>>,
 }
 
 impl PeerState {
@@ -245,7 +386,24 @@ impl PeerState {
             ping_nonce: None,
             last_pong: None,
             min_fee_rate: None,
+            #[cfg(feature = "bip324")]
+            v2_transport: None,
+            #[cfg(feature = "bip324")]
+            v2_handshake: None,
         }
+    }
+
+    /// Check if peer supports BIP324 v2 encrypted transport
+    #[cfg(feature = "bip324")]
+    pub fn supports_v2_transport(&self) -> bool {
+        use crate::service_flags::{has_flag, standard};
+        has_flag(self.services, standard::NODE_V2_TRANSPORT)
+    }
+
+    /// Check if v2 transport is active
+    #[cfg(feature = "bip324")]
+    pub fn is_v2_transport_active(&self) -> bool {
+        self.v2_transport.is_some()
     }
 }
 
@@ -328,6 +486,7 @@ pub fn process_network_message(
         NetworkMessage::Version(version) => process_version_message(version, peer_state, config),
         NetworkMessage::VerAck => process_verack_message(peer_state),
         NetworkMessage::Addr(addr) => process_addr_message(addr, peer_state, config),
+        NetworkMessage::AddrV2(addrv2) => process_addrv2_message(addrv2, peer_state, config),
         NetworkMessage::Inv(inv) => process_inv_message(inv, chain_access, config),
         NetworkMessage::GetData(getdata) => process_getdata_message(getdata, chain_access, config),
         NetworkMessage::GetHeaders(getheaders) => {
@@ -400,6 +559,22 @@ fn process_version_message(
     peer_state.user_agent = version.user_agent.clone();
     peer_state.start_height = version.start_height;
 
+    // BIP324: Check if peer supports v2 transport and we should negotiate it
+    #[cfg(feature = "bip324")]
+    {
+        use crate::service_flags::{has_flag, standard};
+        let peer_supports_v2 = has_flag(version.services, standard::NODE_V2_TRANSPORT);
+        let we_support_v2 = config.service_flags.node_v2_transport;
+        
+        if peer_supports_v2 && we_support_v2 {
+            // Initiate v2 handshake (responder side)
+            let handshake = crate::v2_transport::V2Handshake::new_responder();
+            peer_state.v2_handshake = Some(std::sync::Arc::new(handshake));
+            // Note: Actual handshake happens at connection level, not in version message
+            // This just records that we should use v2 transport
+        }
+    }
+
     // Send verack response
     Ok(NetworkResponse::SendMessage(Box::new(
         NetworkMessage::VerAck,
@@ -428,6 +603,32 @@ fn process_addr_message(
 
     // Store addresses for future use
     peer_state.known_addresses.extend(addr.addresses.clone());
+
+    Ok(NetworkResponse::Ok)
+}
+
+/// Process addrv2 message (BIP155)
+fn process_addrv2_message(
+    addrv2: &AddrV2Message,
+    peer_state: &mut PeerState,
+    config: &ProtocolConfig,
+) -> Result<NetworkResponse> {
+    // Validate address count (from config)
+    if addrv2.addresses.len() > config.network_limits.max_addr_addresses {
+        return Ok(NetworkResponse::Reject(format!(
+            "Too many addresses (max {})",
+            config.network_limits.max_addr_addresses
+        )));
+    }
+
+    // Convert addrv2 addresses to legacy format where possible and store
+    for addr_v2 in &addrv2.addresses {
+        if let Some(legacy_addr) = addr_v2.to_legacy() {
+            peer_state.known_addresses.push(legacy_addr);
+        }
+        // Note: Tor v3, I2P, CJDNS addresses cannot be converted to legacy format
+        // but we still process them (they're stored in addrv2 format in node layer)
+    }
 
     Ok(NetworkResponse::Ok)
 }
