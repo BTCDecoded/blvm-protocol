@@ -29,7 +29,7 @@ Tier 3 of the 6-tier Bitcoin Commons architecture (BLVM technology stack):
 - **Protocol Variants**: Mainnet, testnet, regtest support
 - **Network Messages**: Core P2P messages and BIP152 compact blocks
 - **FIBRE Protocol**: High-performance relay protocol with packet format definitions
-- **Governance Messages**: Economic node governance messages via P2P protocol
+- **Governance Messages**: Governance messages via P2P protocol
 - **Commons Extensions**: UTXO commitments, filtered blocks, ban list sharing
 - **Service Flags**: Standard and Commons-specific capability flags
 - **Validation Rules**: Protocol-specific size limits and validation
