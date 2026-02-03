@@ -9,7 +9,7 @@ use crate::validation::ProtocolValidationContext;
 use crate::{BitcoinProtocolEngine, ProtocolConfig, Result};
 use blvm_consensus::error::ConsensusError;
 use blvm_consensus::types::UtxoSet;
-use blvm_consensus::{Block, BlockHeader, Hash, Transaction, ValidationResult};
+use blvm_consensus::types::{Block, BlockHeader, Hash, Transaction, ValidationResult};
 use std::borrow::Cow;
 use std::sync::Arc;
 

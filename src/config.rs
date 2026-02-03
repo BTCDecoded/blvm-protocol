@@ -9,7 +9,7 @@
 //! bllvm-consensus to avoid duplication. Use .cargo/config.toml for local development.
 
 use crate::ProtocolVersion;
-use blvm_consensus::NetworkMessageLimits;
+use crate::NetworkMessageLimits;
 use serde::{Deserialize, Serialize};
 
 /// Protocol validation rules configuration

@@ -12,7 +12,7 @@
 use crate::error::ProtocolError;
 use crate::network::NetworkMessage;
 use crate::Result;
-use blvm_consensus::ConsensusError;
+use crate::ConsensusError;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::io::Read;
@@ -417,14 +417,14 @@ pub fn deserialize_version(data: &[u8]) -> Result<crate::network::VersionMessage
     })?;
     let start_height = i32::from_le_bytes(start_height_bytes);
 
-    // relay: u8 (1 byte, 0 or 1)
-    let mut relay_byte = [0u8; 1];
-    cursor.read_exact(&mut relay_byte).map_err(|e| {
-        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
-            "Failed to read relay: {e}"
-        ))))
-    })?;
-    let relay = relay_byte[0] != 0;
+    // relay: u8 (1 byte, 0 or 1) - OPTIONAL field (version >= 70001)
+    let relay = {
+        let mut relay_byte = [0u8; 1];
+        match cursor.read_exact(&mut relay_byte) {
+            Ok(_) => relay_byte[0] != 0,
+            Err(_) => true, // Default to relay=true if not present
+        }
+    };
 
     Ok(crate::network::VersionMessage {
         version,
@@ -565,13 +565,62 @@ pub fn deserialize_addrv2(data: &[u8]) -> Result<crate::network::AddrV2Message> 
     Ok(crate::network::AddrV2Message { addresses })
 }
 
-fn serialize_inv(_i: &crate::network::InvMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+/// Serialize InvMessage to Bitcoin wire format
+/// Format: count (varint) + count * (type u32 LE + hash 32 bytes)
+pub fn serialize_inv(i: &crate::network::InvMessage) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+    
+    let capacity = 9 + (36 * i.inventory.len()); // varint + (4 + 32) per item
+    let mut buf = Vec::with_capacity(capacity);
+    
+    write_varint(&mut buf, i.inventory.len() as u64)?;
+    
+    for item in &i.inventory {
+        buf.extend_from_slice(&item.inv_type.to_le_bytes());
+        buf.extend_from_slice(&item.hash);
+    }
+    
+    Ok(buf)
 }
-fn deserialize_inv(_data: &[u8]) -> Result<crate::network::InvMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+
+/// Deserialize InvMessage from Bitcoin wire format
+pub fn deserialize_inv(data: &[u8]) -> Result<crate::network::InvMessage> {
+    use crate::varint::read_varint;
+    use std::io::Cursor;
+    
+    if data.is_empty() {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("Inv message is empty".to_string()),
+        )));
+    }
+    
+    let mut cursor = Cursor::new(data);
+    
+    let count = read_varint(&mut cursor)? as usize;
+    
+    // Sanity check (max 50000 inventory items per message)
+    if count > 50000 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned(format!("Too many inventory items: {}", count)),
+        )));
+    }
+    
+    let mut inventory = Vec::with_capacity(count);
+    
+    for _ in 0..count {
+        let mut type_bytes = [0u8; 4];
+        std::io::Read::read_exact(&mut cursor, &mut type_bytes)
+            .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+        let inv_type = u32::from_le_bytes(type_bytes);
+        
+        let mut hash = [0u8; 32];
+        std::io::Read::read_exact(&mut cursor, &mut hash)
+            .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+        
+        inventory.push(crate::network::InventoryVector { inv_type, hash });
+    }
+    
+    Ok(crate::network::InvMessage { inventory })
 }
 
 fn serialize_getdata(_g: &crate::network::GetDataMessage) -> Result<Vec<u8>> {
@@ -583,22 +632,192 @@ fn deserialize_getdata(_data: &[u8]) -> Result<crate::network::GetDataMessage> {
     )))
 }
 
-fn serialize_getheaders(_gh: &crate::network::GetHeadersMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
-}
-fn deserialize_getheaders(_data: &[u8]) -> Result<crate::network::GetHeadersMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+/// Serialize GetHeadersMessage to Bitcoin wire format
+/// Format: version (4 bytes LE) + hash_count (varint) + hashes (32 bytes each) + hash_stop (32 bytes)
+pub fn serialize_getheaders(gh: &crate::network::GetHeadersMessage) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+    use std::io::Cursor;
+    
+    // Estimate capacity: 4 + 1-9 + (32 * hash_count) + 32
+    let capacity = 4 + 9 + (32 * gh.block_locator_hashes.len()) + 32;
+    let mut buf = Vec::with_capacity(capacity);
+    
+    // Protocol version (4 bytes, little-endian)
+    buf.extend_from_slice(&(gh.version as i32).to_le_bytes());
+    
+    // Hash count (varint)
+    let mut cursor = Cursor::new(&mut buf);
+    cursor.set_position(4);
+    write_varint(&mut buf, gh.block_locator_hashes.len() as u64)?;
+    
+    // Block locator hashes (32 bytes each, in internal byte order)
+    for hash in &gh.block_locator_hashes {
+        buf.extend_from_slice(hash);
+    }
+    
+    // Hash stop (32 bytes)
+    buf.extend_from_slice(&gh.hash_stop);
+    
+    Ok(buf)
 }
 
-fn serialize_headers(_h: &crate::network::HeadersMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+/// Deserialize GetHeadersMessage from Bitcoin wire format
+pub fn deserialize_getheaders(data: &[u8]) -> Result<crate::network::GetHeadersMessage> {
+    use crate::varint::read_varint;
+    use std::io::Cursor;
+    
+    if data.len() < 4 + 1 + 32 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("GetHeaders message too short".to_string()),
+        )));
+    }
+    
+    let mut cursor = Cursor::new(data);
+    
+    // Protocol version (4 bytes, little-endian)
+    let mut version_bytes = [0u8; 4];
+    std::io::Read::read_exact(&mut cursor, &mut version_bytes)
+        .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+    let version = i32::from_le_bytes(version_bytes) as u32;
+    
+    // Hash count (varint)
+    let hash_count = read_varint(&mut cursor)? as usize;
+    
+    // Sanity check on hash count
+    if hash_count > 2000 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned(format!("Too many locator hashes: {}", hash_count)),
+        )));
+    }
+    
+    // Block locator hashes
+    let mut block_locator_hashes = Vec::with_capacity(hash_count);
+    for _ in 0..hash_count {
+        let mut hash = [0u8; 32];
+        std::io::Read::read_exact(&mut cursor, &mut hash)
+            .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+        block_locator_hashes.push(hash);
+    }
+    
+    // Hash stop (32 bytes)
+    let mut hash_stop = [0u8; 32];
+    std::io::Read::read_exact(&mut cursor, &mut hash_stop)
+        .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+    
+    Ok(crate::network::GetHeadersMessage {
+        version,
+        block_locator_hashes,
+        hash_stop,
+    })
 }
-fn deserialize_headers(_data: &[u8]) -> Result<crate::network::HeadersMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+
+/// Serialize HeadersMessage to Bitcoin wire format
+/// Format: count (varint) + headers (each: 80 bytes header + varint tx_count which is always 0)
+pub fn serialize_headers(h: &crate::network::HeadersMessage) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+    
+    // Estimate capacity: 1-9 varint + (81 bytes per header: 80 header + 1 tx_count)
+    let capacity = 9 + (81 * h.headers.len());
+    let mut buf = Vec::with_capacity(capacity);
+    
+    // Header count (varint)
+    write_varint(&mut buf, h.headers.len() as u64)?;
+    
+    // Headers (80 bytes each + 1 byte tx_count = 0)
+    for header in &h.headers {
+        // version (4 bytes LE)
+        buf.extend_from_slice(&(header.version as i32).to_le_bytes());
+        // prev_block_hash (32 bytes)
+        buf.extend_from_slice(&header.prev_block_hash);
+        // merkle_root (32 bytes)
+        buf.extend_from_slice(&header.merkle_root);
+        // timestamp (4 bytes LE)
+        buf.extend_from_slice(&(header.timestamp as u32).to_le_bytes());
+        // bits (4 bytes LE)
+        buf.extend_from_slice(&(header.bits as u32).to_le_bytes());
+        // nonce (4 bytes LE)
+        buf.extend_from_slice(&(header.nonce as u32).to_le_bytes());
+        // tx_count (varint, always 0 for headers message)
+        buf.push(0);
+    }
+    
+    Ok(buf)
+}
+
+/// Deserialize HeadersMessage from Bitcoin wire format
+pub fn deserialize_headers(data: &[u8]) -> Result<crate::network::HeadersMessage> {
+    use crate::varint::read_varint;
+    use std::io::Cursor;
+    
+    if data.is_empty() {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("Headers message is empty".to_string()),
+        )));
+    }
+    
+    let mut cursor = Cursor::new(data);
+    
+    // Header count (varint)
+    let header_count = read_varint(&mut cursor)? as usize;
+    
+    // Sanity check on header count (max 2000 per Bitcoin protocol)
+    if header_count > 2000 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned(format!("Too many headers: {}", header_count)),
+        )));
+    }
+    
+    let mut headers = Vec::with_capacity(header_count);
+    
+    for _ in 0..header_count {
+        // version (4 bytes LE)
+        let mut version_bytes = [0u8; 4];
+        std::io::Read::read_exact(&mut cursor, &mut version_bytes)
+            .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+        let version = i32::from_le_bytes(version_bytes) as i64;
+        
+        // prev_block_hash (32 bytes)
+        let mut prev_block_hash = [0u8; 32];
+        std::io::Read::read_exact(&mut cursor, &mut prev_block_hash)
+            .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+        
+        // merkle_root (32 bytes)
+        let mut merkle_root = [0u8; 32];
+        std::io::Read::read_exact(&mut cursor, &mut merkle_root)
+            .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+        
+        // timestamp (4 bytes LE)
+        let mut timestamp_bytes = [0u8; 4];
+        std::io::Read::read_exact(&mut cursor, &mut timestamp_bytes)
+            .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+        let timestamp = u32::from_le_bytes(timestamp_bytes) as u64;
+        
+        // bits (4 bytes LE)
+        let mut bits_bytes = [0u8; 4];
+        std::io::Read::read_exact(&mut cursor, &mut bits_bytes)
+            .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+        let bits = u32::from_le_bytes(bits_bytes) as u64;
+        
+        // nonce (4 bytes LE)
+        let mut nonce_bytes = [0u8; 4];
+        std::io::Read::read_exact(&mut cursor, &mut nonce_bytes)
+            .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+        let nonce = u32::from_le_bytes(nonce_bytes) as u64;
+        
+        // tx_count (varint, should be 0 for headers message, but we read and discard)
+        let _tx_count = read_varint(&mut cursor)?;
+        
+        headers.push(crate::BlockHeader {
+            version,
+            prev_block_hash,
+            merkle_root,
+            timestamp,
+            bits,
+            nonce,
+        });
+    }
+    
+    Ok(crate::network::HeadersMessage { headers })
 }
 
 fn serialize_block(_b: &crate::Block) -> Result<Vec<u8>> {
@@ -619,22 +838,40 @@ fn deserialize_tx(_data: &[u8]) -> Result<crate::Transaction> {
     )))
 }
 
-fn serialize_ping(_p: &crate::network::PingMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
-}
-fn deserialize_ping(_data: &[u8]) -> Result<crate::network::PingMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+/// Serialize PingMessage to Bitcoin wire format (8-byte nonce)
+pub fn serialize_ping(p: &crate::network::PingMessage) -> Result<Vec<u8>> {
+    Ok(p.nonce.to_le_bytes().to_vec())
 }
 
-fn serialize_pong(_p: &crate::network::PongMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+/// Deserialize PingMessage from Bitcoin wire format
+pub fn deserialize_ping(data: &[u8]) -> Result<crate::network::PingMessage> {
+    if data.len() < 8 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned(format!("Ping message too short: {} bytes", data.len())),
+        )));
+    }
+    
+    let nonce = u64::from_le_bytes([data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]]);
+    
+    Ok(crate::network::PingMessage { nonce })
 }
-fn deserialize_pong(_data: &[u8]) -> Result<crate::network::PongMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+
+/// Serialize PongMessage to Bitcoin wire format (8-byte nonce)
+pub fn serialize_pong(p: &crate::network::PongMessage) -> Result<Vec<u8>> {
+    Ok(p.nonce.to_le_bytes().to_vec())
+}
+
+/// Deserialize PongMessage from Bitcoin wire format
+pub fn deserialize_pong(data: &[u8]) -> Result<crate::network::PongMessage> {
+    if data.len() < 8 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned(format!("Pong message too short: {} bytes", data.len())),
+        )));
+    }
+    
+    let nonce = u64::from_le_bytes([data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]]);
+    
+    Ok(crate::network::PongMessage { nonce })
 }
 
 fn serialize_feefilter(_f: &crate::network::FeeFilterMessage) -> Result<Vec<u8>> {

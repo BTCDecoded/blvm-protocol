@@ -23,7 +23,7 @@ pub fn mainnet_genesis() -> Block {
         },
         transactions: vec![Transaction {
             version: 1,
-            inputs: blvm_consensus::tx_inputs![TransactionInput {
+              inputs: crate::tx_inputs![TransactionInput {
                 prevout: OutPoint {
                     hash: [0u8; 32],
                     index: 0xffffffff,
@@ -38,7 +38,7 @@ pub fn mainnet_genesis() -> Block {
                 ], // "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks"
                 sequence: 0xffffffff,
             }],
-            outputs: blvm_consensus::tx_outputs![TransactionOutput {
+              outputs: crate::tx_outputs![TransactionOutput {
                 value: 50_0000_0000, // 50 BTC in satoshis
                 script_pubkey: vec![
                     0x41, 0x04, 0x67, 0x8a, 0xfd, 0xb0, 0xfe, 0x55, 0x48, 0x27, 0x19, 0x67, 0xf1,
@@ -74,7 +74,7 @@ pub fn testnet_genesis() -> Block {
         },
         transactions: vec![Transaction {
             version: 1,
-            inputs: blvm_consensus::tx_inputs![TransactionInput {
+              inputs: crate::tx_inputs![TransactionInput {
                 prevout: OutPoint {
                     hash: [0u8; 32],
                     index: 0xffffffff,
@@ -89,7 +89,7 @@ pub fn testnet_genesis() -> Block {
                 ],
                 sequence: 0xffffffff,
             }],
-            outputs: blvm_consensus::tx_outputs![TransactionOutput {
+              outputs: crate::tx_outputs![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
                     0x41, 0x04, 0x67, 0x8a, 0xfd, 0xb0, 0xfe, 0x55, 0x48, 0x27, 0x19, 0x67, 0xf1,
@@ -125,7 +125,7 @@ pub fn regtest_genesis() -> Block {
         },
         transactions: vec![Transaction {
             version: 1,
-            inputs: blvm_consensus::tx_inputs![TransactionInput {
+              inputs: crate::tx_inputs![TransactionInput {
                 prevout: OutPoint {
                     hash: [0u8; 32],
                     index: 0xffffffff,
@@ -140,7 +140,7 @@ pub fn regtest_genesis() -> Block {
                 ],
                 sequence: 0xffffffff,
             }],
-            outputs: blvm_consensus::tx_outputs![TransactionOutput {
+              outputs: crate::tx_outputs![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
                     0x41, 0x04, 0x67, 0x8a, 0xfd, 0xb0, 0xfe, 0x55, 0x48, 0x27, 0x19, 0x67, 0xf1,

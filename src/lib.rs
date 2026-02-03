@@ -19,12 +19,19 @@ use serde::{Deserialize, Serialize};
 // Re-export commonly used types from consensus-proof for convenience
 // This allows upper layers (like reference-node) to depend only on protocol-engine
 pub use blvm_consensus::{
-    Block, BlockHeader, ByteString, ConsensusProof, Hash, Integer, Natural, NetworkMessageLimits,
-    OutPoint, Transaction, TransactionInput, TransactionOutput, UtxoSet, ValidationResult, UTXO,
+    ConsensusProof,
 };
+pub use blvm_consensus::types::{
+    Block, BlockHeader, ByteString, Hash, Integer, Natural,
+    OutPoint, Transaction, TransactionInput, TransactionOutput, UtxoSet, UTXO,
+    ValidationResult,
+};
+pub use blvm_consensus::config::NetworkMessageLimits;
+pub use blvm_consensus::error::{ConsensusError, Result as ConsensusResult};
 
-// Re-export consensus Result as ConsensusResult for backward compatibility
-pub use blvm_consensus::error::Result as ConsensusResult;
+// Re-export smallvec for macro use when production feature is enabled
+#[cfg(feature = "production")]
+pub use smallvec;
 
 // Protocol-specific Result type
 pub use error::{ProtocolError, Result};
@@ -98,9 +105,6 @@ pub use blvm_consensus::tx_outputs;
 #[cfg(not(feature = "production"))]
 pub use blvm_consensus::tx_outputs;
 pub mod error;
-
-// Re-export consensus error types for backward compatibility
-pub use blvm_consensus::error::ConsensusError;
 
 // Re-export feature and economic modules for convenience
 pub use economic::EconomicParameters;

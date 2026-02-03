@@ -7,7 +7,7 @@
 use crate::error::ProtocolError;
 use crate::{BitcoinProtocolEngine, NetworkParameters, ProtocolVersion};
 use blvm_consensus::types::{OutPoint, UTXO};
-use blvm_consensus::{Block, Transaction, ValidationResult};
+use crate::{Block, Transaction, ValidationResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
