@@ -6,7 +6,7 @@
 
 use crate::error::ProtocolError;
 use crate::{BitcoinProtocolEngine, NetworkParameters, ProtocolVersion};
-use blvm_consensus::types::{OutPoint, UTXO};
+use blvm_consensus::types::{OutPoint, UTXO, UtxoSet};
 use crate::{Block, Transaction, ValidationResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -154,7 +154,7 @@ impl BitcoinProtocolEngine {
     pub fn validate_block_with_protocol(
         &self,
         block: &Block,
-        utxos: &HashMap<OutPoint, UTXO>,
+        utxos: &UtxoSet,
         height: u64,
         context: &ProtocolValidationContext,
     ) -> Result<ValidationResult> {
@@ -485,7 +485,7 @@ mod tests {
 
         // This should pass validation
         let result =
-            engine.validate_block_with_protocol(&small_block, &HashMap::new(), 1000, &context);
+            engine.validate_block_with_protocol(&small_block, &UtxoSet::default(), 1000, &context);
         assert!(result.is_ok());
     }
 

@@ -4,9 +4,8 @@
 //! creating mock objects, and setting up test scenarios.
 
 use blvm_consensus::{Block, Transaction, BlockHeader};
-use blvm_consensus::types::{OutPoint, UTXO, TxInput, TxOutput};
+use blvm_consensus::types::{OutPoint, UTXO, TxInput, TxOutput, UtxoSet};
 use crate::{BitcoinProtocolEngine, ProtocolVersion, NetworkParameters, NetworkConstants};
-use std::collections::HashMap;
 
 /// Test block builder with sensible defaults
 pub struct TestBlockBuilder {
@@ -145,13 +144,13 @@ impl TestTransactionBuilder {
 
 /// UTXO set generator for testing
 pub struct TestUtxoSetBuilder {
-    utxos: HashMap<OutPoint, UTXO>,
+    utxos: UtxoSet,
 }
 
 impl TestUtxoSetBuilder {
     pub fn new() -> Self {
         Self {
-            utxos: HashMap::new(),
+            utxos: UtxoSet::default(),
         }
     }
     
@@ -171,7 +170,7 @@ impl TestUtxoSetBuilder {
         self
     }
     
-    pub fn build(self) -> HashMap<OutPoint, UTXO> {
+    pub fn build(self) -> UtxoSet {
         self.utxos
     }
 }

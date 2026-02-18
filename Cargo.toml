@@ -61,6 +61,8 @@ production = ["blvm-consensus/production", "dep:smallvec"]
 utxo-commitments = ["blvm-consensus/utxo-commitments"]
 # CTV (BIP119 CheckTemplateVerify) - passed through from blvm-consensus
 ctv = ["blvm-consensus/ctv"]
+# IBD/PERF profiling - passed through from blvm-consensus (profile_log, BATCH, etc.)
+profile = ["blvm-consensus/profile"]
 # BIP324: v2 encrypted transport protocol
 bip324 = []
 # Sigop counting module (always available, no feature flag needed)

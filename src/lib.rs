@@ -209,10 +209,7 @@ impl BitcoinProtocolEngine {
     pub fn validate_block(
         &self,
         block: &Block,
-        utxos: &std::collections::HashMap<
-            blvm_consensus::types::OutPoint,
-            blvm_consensus::types::UTXO,
-        >,
+        utxos: &UtxoSet,
         height: u64,
     ) -> Result<ValidationResult> {
         let (result, _) = self
@@ -423,7 +420,6 @@ impl NetworkParameters {
 mod tests {
     use super::*;
     use blvm_consensus::types::{BlockHeader, OutPoint, TransactionInput, TransactionOutput};
-    use std::collections::HashMap;
 
     #[test]
     fn test_bllvm_protocol_creation() {
@@ -514,7 +510,7 @@ mod tests {
     #[test]
     fn test_block_validation_empty_utxos() {
         let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
-        let utxos = HashMap::new();
+        let utxos = UtxoSet::default();
 
         // Create a simple block with just a coinbase transaction
         let coinbase_tx = Transaction {
