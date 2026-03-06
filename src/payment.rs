@@ -47,7 +47,7 @@ pub struct PaymentDetails {
 }
 
 /// Payment Output - Address and amount
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PaymentOutput {
     /// Bitcoin address or script
     pub script: Vec<u8>,
@@ -256,8 +256,8 @@ impl PaymentRequest {
         let secp = Secp256k1::new();
         let signature = secp.sign_ecdsa(&message, private_key);
 
-        // Get public key
-        let pubkey = secp256k1::PublicKey::from_secret_key(&secp, private_key);
+        // Get public key (0.32 API: from_secret_key no longer needs Secp256k1 context)
+        let pubkey = secp256k1::PublicKey::from_secret_key(private_key);
         let pubkey_serialized = pubkey.serialize();
 
         // Store signature and public key

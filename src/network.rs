@@ -95,13 +95,13 @@ pub struct AddrMessage {
 }
 
 /// Inventory message listing available objects
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InvMessage {
     pub inventory: Vec<InventoryVector>,
 }
 
 /// GetData message requesting specific objects
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GetDataMessage {
     pub inventory: Vec<InventoryVector>,
 }
@@ -147,7 +147,7 @@ pub struct GetBlocksMessage {
 }
 
 /// NotFound message indicating requested object not found
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct NotFoundMessage {
     pub inventory: Vec<InventoryVector>,
 }
@@ -175,6 +175,8 @@ pub struct SendCmpctMessage {
 pub struct CmpctBlockMessage {
     /// Block header
     pub header: BlockHeader,
+    /// Nonce for short transaction ID calculation (SipHash key derivation)
+    pub nonce: u64,
     /// Short transaction IDs (6 bytes each)
     pub short_ids: Vec<[u8; 6]>,
     /// Prefilled transactions (transactions that are likely missing)
@@ -188,6 +190,8 @@ pub struct PrefilledTransaction {
     pub index: u16,
     /// Transaction data
     pub tx: Transaction,
+    /// Witness data (one stack per input). If Some and non-empty, serializes with TX_WITH_WITNESS per BIP152/Core.
+    pub witness: Option<Vec<blvm_consensus::segwit::Witness>>,
 }
 
 /// GetBlockTxn message - Request missing transactions from compact block (BIP152)
@@ -206,6 +210,8 @@ pub struct BlockTxnMessage {
     pub block_hash: Hash,
     /// Requested transactions in order
     pub transactions: Vec<Transaction>,
+    /// Witness data (one Vec<Witness> per tx, one Witness per input). If Some and len matches transactions, serializes with TX_WITH_WITNESS per BIP152/Core.
+    pub witnesses: Option<Vec<Vec<blvm_consensus::segwit::Witness>>>,
 }
 
 /// Network address structure (legacy format)
@@ -338,7 +344,7 @@ impl NetworkAddressV2 {
 }
 
 /// Inventory vector identifying objects
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct InventoryVector {
     pub inv_type: u32,
     pub hash: Hash,
@@ -1037,6 +1043,7 @@ fn process_getblocktxn_message(
                 NetworkMessage::BlockTxn(BlockTxnMessage {
                     block_hash: getblocktxn.block_hash,
                     transactions,
+                    witnesses: None, // Chain access returns tx only; no witness data
                 }),
             )));
         }

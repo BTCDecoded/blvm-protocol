@@ -251,6 +251,7 @@ fn test_cmpctblock_message_processing() {
             bits: 0x1d00ffff,
             nonce: 0,
         },
+        nonce: 0,
         short_ids: vec![],
         prefilled_txs: vec![],
     };
@@ -300,8 +301,13 @@ fn test_cmpctblock_with_prefilled_txs() {
             bits: 0x1d00ffff,
             nonce: 0,
         },
+        nonce: 0,
         short_ids: vec![],
-        prefilled_txs: vec![PrefilledTransaction { index: 0, tx }],
+        prefilled_txs: vec![PrefilledTransaction {
+            index: 0,
+            tx,
+            witness: None,
+        }],
     };
 
     let response = process_network_message(
@@ -476,6 +482,7 @@ fn test_blocktxn_message_processing() {
     let blocktxn = BlockTxnMessage {
         block_hash: [0u8; 32],
         transactions,
+        witnesses: None,
     };
 
     let response = process_network_message(
@@ -509,6 +516,7 @@ fn test_cmpctblock_empty_short_ids() {
             bits: 0x1d00ffff,
             nonce: 0,
         },
+        nonce: 0,
         short_ids: vec![], // Empty short IDs (all transactions prefilled)
         prefilled_txs: vec![],
     };

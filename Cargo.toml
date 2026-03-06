@@ -36,7 +36,8 @@ thiserror = "=1.0.69"
 # Cryptography - EXACT VERSIONS for security
 sha2 = "=0.10.9"
 ripemd = "=0.1.3"
-secp256k1 = "=0.28.2"  # For BIP70 payment protocol signatures
+# Use fork (same as blvm-consensus) for BIP70, BIP324, ElligatorSwift
+secp256k1 = { path = "../secp256k1-fork", default-features = true }
 hex = "=0.4"  # For hex encoding/decoding
 chacha20poly1305 = "=0.10.1"  # For BIP324 v2 encrypted transport
 aead = "=0.5.2"  # AEAD trait for ChaCha20Poly1305
@@ -71,3 +72,8 @@ bip324 = []
 [dev-dependencies]
 tempfile = "=3.8.1"
 cargo-tarpaulin = "0.27"
+
+# Fast release: opt-level 2 for iteration (matches blvm/blvm-node/blvm-consensus)
+[profile.release-fast]
+inherits = "release"
+opt-level = 2

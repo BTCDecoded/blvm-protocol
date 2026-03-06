@@ -7,13 +7,12 @@ use blvm_protocol::payment::{
     Bip70Error, Payment, PaymentACK, PaymentDetails, PaymentOutput, PaymentProtocolServer,
     PaymentRequest, SignedRefundAddress,
 };
-use secp256k1::{Secp256k1, SecretKey};
+use secp256k1::{SecretKey};
 
-/// Test helper: Generate a test keypair
+/// Test helper: Generate a test keypair (0.32 API: from_secret_bytes, PublicKey::from_secret_key)
 fn generate_test_keypair() -> (SecretKey, secp256k1::PublicKey) {
-    let secp = Secp256k1::new();
-    let secret_key = SecretKey::from_slice(&[1; 32]).unwrap();
-    let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
+    let secret_key = SecretKey::from_secret_bytes([1; 32]).unwrap();
+    let public_key = secp256k1::PublicKey::from_secret_key(&secret_key);
     (secret_key, public_key)
 }
 

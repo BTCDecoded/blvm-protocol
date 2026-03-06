@@ -439,14 +439,74 @@ pub fn deserialize_version(data: &[u8]) -> Result<crate::network::VersionMessage
     })
 }
 
-// Stub implementations for other message types (would need full wire format encoding)
-fn serialize_addr(_a: &crate::network::AddrMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+/// Serialize AddrMessage to Bitcoin wire format (legacy addr)
+/// Format: CompactSize(count) + [timestamp(4) + services(8) + addr(16) + port(2)]*
+fn serialize_addr(a: &crate::network::AddrMessage) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+
+    let mut buf = Vec::new();
+    write_varint(&mut buf, a.addresses.len() as u64)?;
+
+    for addr in &a.addresses {
+        // time: u32 (4 bytes, little-endian) - use 0 when not stored in NetworkAddress
+        buf.extend_from_slice(&0u32.to_le_bytes());
+        // services: u64 (8 bytes, little-endian)
+        buf.extend_from_slice(&addr.services.to_le_bytes());
+        // address: 16 bytes (IPv6, IPv4-mapped)
+        buf.extend_from_slice(&addr.ip);
+        // port: u16 (2 bytes, big-endian)
+        buf.extend_from_slice(&addr.port.to_be_bytes());
+    }
+    Ok(buf)
 }
-fn deserialize_addr(_data: &[u8]) -> Result<crate::network::AddrMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_addr(data: &[u8]) -> Result<crate::network::AddrMessage> {
+    use crate::varint::read_varint;
+    use std::io::Read;
+
+    let mut cursor = std::io::Cursor::new(data);
+    let count = read_varint(&mut cursor)?;
+    if count > 1000 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("Too many addresses in addr".to_string()),
+        )));
+    }
+
+    let mut addresses = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        let mut time_bytes = [0u8; 4];
+        cursor.read_exact(&mut time_bytes).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+                "Addr time: {e}"
+            ))))
+        })?;
+        let _time = u32::from_le_bytes(time_bytes);
+
+        let mut services_bytes = [0u8; 8];
+        cursor.read_exact(&mut services_bytes).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+                "Addr services: {e}"
+            ))))
+        })?;
+        let services = u64::from_le_bytes(services_bytes);
+
+        let mut ip = [0u8; 16];
+        cursor.read_exact(&mut ip).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+                "Addr ip: {e}"
+            ))))
+        })?;
+
+        let mut port_bytes = [0u8; 2];
+        cursor.read_exact(&mut port_bytes).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
+                "Addr port: {e}"
+            ))))
+        })?;
+        let port = u16::from_be_bytes(port_bytes);
+
+        addresses.push(crate::network::NetworkAddress { services, ip, port });
+    }
+    Ok(crate::network::AddrMessage { addresses })
 }
 
 /// Serialize AddrV2Message to Bitcoin wire format (BIP155)
@@ -868,22 +928,31 @@ pub fn deserialize_headers(data: &[u8]) -> Result<crate::network::HeadersMessage
     Ok(crate::network::HeadersMessage { headers })
 }
 
-fn serialize_block(_b: &crate::Block) -> Result<Vec<u8>> {
-    Ok(vec![])
+fn serialize_block(b: &crate::Block) -> Result<Vec<u8>> {
+    use crate::serialization::serialize_block_with_witnesses;
+
+    // NetworkMessage::Block only has Arc<Block>; no witnesses. Use empty witnesses and
+    // include_witness=false for legacy/pre-SegWit format. For SegWit blocks, this produces
+    // non-witness serialization (valid for some use cases).
+    let empty_witnesses: Vec<Vec<blvm_consensus::segwit::Witness>> = (0..b.transactions.len())
+        .map(|_| Vec::new())
+        .collect();
+    Ok(serialize_block_with_witnesses(b, &empty_witnesses, false))
 }
-pub fn deserialize_block(_data: &[u8]) -> Result<crate::Block> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+pub fn deserialize_block(data: &[u8]) -> Result<crate::Block> {
+    use crate::serialization::block::deserialize_block_with_witnesses;
+
+    let (block, _witnesses) = deserialize_block_with_witnesses(data)?;
+    Ok(block)
 }
 
-fn serialize_tx(_tx: &crate::Transaction) -> Result<Vec<u8>> {
-    Ok(vec![])
+fn serialize_tx(tx: &crate::Transaction) -> Result<Vec<u8>> {
+    Ok(crate::serialization::serialize_transaction(tx))
 }
-fn deserialize_tx(_data: &[u8]) -> Result<crate::Transaction> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_tx(data: &[u8]) -> Result<crate::Transaction> {
+    crate::serialization::deserialize_transaction(data).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+    })
 }
 
 /// Serialize PingMessage to Bitcoin wire format (8-byte nonce)
@@ -922,138 +991,505 @@ pub fn deserialize_pong(data: &[u8]) -> Result<crate::network::PongMessage> {
     Ok(crate::network::PongMessage { nonce })
 }
 
-fn serialize_feefilter(_f: &crate::network::FeeFilterMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+/// Serialize FeeFilterMessage per BIP133: 8-byte feerate (LE)
+fn serialize_feefilter(f: &crate::network::FeeFilterMessage) -> Result<Vec<u8>> {
+    Ok(f.feerate.to_le_bytes().to_vec())
 }
-fn deserialize_feefilter(_data: &[u8]) -> Result<crate::network::FeeFilterMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
-}
-
-fn serialize_getblocks(_gb: &crate::network::GetBlocksMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
-}
-fn deserialize_getblocks(_data: &[u8]) -> Result<crate::network::GetBlocksMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_feefilter(data: &[u8]) -> Result<crate::network::FeeFilterMessage> {
+    if data.len() < 8 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("FeeFilter message too short".to_string()),
+        )));
+    }
+    let feerate = u64::from_le_bytes([data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]]);
+    Ok(crate::network::FeeFilterMessage { feerate })
 }
 
-fn serialize_notfound(_nf: &crate::network::NotFoundMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+/// Serialize GetBlocksMessage - same structure as GetHeaders (version + locator + hash_stop)
+fn serialize_getblocks(gb: &crate::network::GetBlocksMessage) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+
+    let mut buf = Vec::new();
+    buf.extend_from_slice(&(gb.version as u32).to_le_bytes());
+    write_varint(&mut buf, gb.block_locator_hashes.len() as u64)?;
+    for hash in &gb.block_locator_hashes {
+        buf.extend_from_slice(hash);
+    }
+    buf.extend_from_slice(&gb.hash_stop);
+    Ok(buf)
 }
-fn deserialize_notfound(_data: &[u8]) -> Result<crate::network::NotFoundMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_getblocks(data: &[u8]) -> Result<crate::network::GetBlocksMessage> {
+    use crate::varint::read_varint;
+    use std::io::Read;
+
+    if data.len() < 4 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("GetBlocks message too short".to_string()),
+        )));
+    }
+    let mut cursor = std::io::Cursor::new(data);
+    let version = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as u32;
+    cursor.set_position(4);
+
+    let count = read_varint(&mut cursor)? as usize;
+    if count > 101 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("GetBlocks locator too long".to_string()),
+        )));
+    }
+    let mut block_locator_hashes = Vec::with_capacity(count);
+    for _ in 0..count {
+        let mut hash = [0u8; 32];
+        cursor.read_exact(&mut hash).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!("GetBlocks: {e}"))))
+        })?;
+        block_locator_hashes.push(hash);
+    }
+    let mut hash_stop = [0u8; 32];
+    cursor.read_exact(&mut hash_stop).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!("GetBlocks hash_stop: {e}"))))
+    })?;
+
+    Ok(crate::network::GetBlocksMessage {
+        version,
+        block_locator_hashes,
+        hash_stop,
+    })
 }
 
-fn serialize_reject(_r: &crate::network::RejectMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
-}
-fn deserialize_reject(_data: &[u8]) -> Result<crate::network::RejectMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+/// Serialize NotFoundMessage to Bitcoin wire format.
+/// Format: identical to Inv/GetData - count (varint) + count * (type u32 LE + hash 32 bytes)
+pub fn serialize_notfound(nf: &crate::network::NotFoundMessage) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+
+    let capacity = 9 + (36 * nf.inventory.len());
+    let mut buf = Vec::with_capacity(capacity);
+
+    write_varint(&mut buf, nf.inventory.len() as u64)?;
+
+    for item in &nf.inventory {
+        buf.extend_from_slice(&item.inv_type.to_le_bytes());
+        buf.extend_from_slice(&item.hash);
+    }
+
+    Ok(buf)
 }
 
-fn serialize_sendcmpct(_sc: &crate::network::SendCmpctMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
-}
-fn deserialize_sendcmpct(_data: &[u8]) -> Result<crate::network::SendCmpctMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+/// Deserialize NotFoundMessage from Bitcoin wire format.
+pub fn deserialize_notfound(data: &[u8]) -> Result<crate::network::NotFoundMessage> {
+    use crate::varint::read_varint;
+    use std::io::Cursor;
+
+    if data.is_empty() {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("NotFound message is empty".to_string()),
+        )));
+    }
+
+    let mut cursor = Cursor::new(data);
+
+    let count = read_varint(&mut cursor)? as usize;
+
+    if count > 50000 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned(format!("Too many inventory items: {}", count)),
+        )));
+    }
+
+    let mut inventory = Vec::with_capacity(count);
+
+    for _ in 0..count {
+        let mut type_bytes = [0u8; 4];
+        std::io::Read::read_exact(&mut cursor, &mut type_bytes)
+            .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+        let inv_type = u32::from_le_bytes(type_bytes);
+
+        let mut hash = [0u8; 32];
+        std::io::Read::read_exact(&mut cursor, &mut hash)
+            .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+
+        inventory.push(crate::network::InventoryVector { inv_type, hash });
+    }
+
+    Ok(crate::network::NotFoundMessage { inventory })
 }
 
-fn serialize_cmpctblock(_cb: &crate::network::CmpctBlockMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+/// Serialize RejectMessage per BIP61: message(12) + ccode(1) + reason(var) + data(32 optional)
+fn serialize_reject(r: &crate::network::RejectMessage) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+
+    let mut buf = Vec::with_capacity(12 + 1 + 9 + r.reason.len() + 32);
+    let msg_bytes = r.message.as_bytes();
+    if msg_bytes.len() > 12 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("Reject message field too long".to_string()),
+        )));
+    }
+    buf.extend_from_slice(msg_bytes);
+    buf.extend_from_slice(&[0u8; 12][msg_bytes.len()..]);
+
+    buf.push(r.code);
+
+    write_varint(&mut buf, r.reason.len() as u64)?;
+    buf.extend_from_slice(r.reason.as_bytes());
+
+    if let Some(ref h) = r.extra_data {
+        buf.extend_from_slice(h);
+    }
+    Ok(buf)
 }
-fn deserialize_cmpctblock(_data: &[u8]) -> Result<crate::network::CmpctBlockMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_reject(data: &[u8]) -> Result<crate::network::RejectMessage> {
+    use crate::varint::read_varint;
+    use std::io::Read;
+
+    if data.len() < 13 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("Reject message too short".to_string()),
+        )));
+    }
+    let message = String::from_utf8_lossy(&data[0..12])
+        .trim_end_matches('\0')
+        .to_string();
+    let code = data[12];
+    let mut cursor = std::io::Cursor::new(&data[13..]);
+    let reason_len = read_varint(&mut cursor)? as usize;
+    let pos = 13 + cursor.position() as usize;
+    if data.len() < pos + reason_len {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("Reject reason truncated".to_string()),
+        )));
+    }
+    let reason = String::from_utf8_lossy(&data[pos..pos + reason_len]).to_string();
+    let pos = pos + reason_len;
+    let extra_data = if data.len() >= pos + 32 {
+        Some({
+            let mut h = [0u8; 32];
+            h.copy_from_slice(&data[pos..pos + 32]);
+            h
+        })
+    } else {
+        None
+    };
+    Ok(crate::network::RejectMessage {
+        message,
+        code,
+        reason,
+        extra_data,
+    })
 }
 
-fn serialize_getblocktxn(_gbt: &crate::network::GetBlockTxnMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+/// BIP152: sendcmpct - 1 byte prefer_cmpct + 8 bytes version (LE)
+fn serialize_sendcmpct(sc: &crate::network::SendCmpctMessage) -> Result<Vec<u8>> {
+    let mut buf = Vec::with_capacity(9);
+    buf.push(sc.prefer_cmpct);
+    buf.extend_from_slice(&sc.version.to_le_bytes());
+    Ok(buf)
 }
-fn deserialize_getblocktxn(_data: &[u8]) -> Result<crate::network::GetBlockTxnMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_sendcmpct(data: &[u8]) -> Result<crate::network::SendCmpctMessage> {
+    if data.len() < 9 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("SendCmpct message too short".to_string()),
+        )));
+    }
+    Ok(crate::network::SendCmpctMessage {
+        prefer_cmpct: data[0],
+        version: u64::from_le_bytes([data[1], data[2], data[3], data[4], data[5], data[6], data[7], data[8]]),
+    })
 }
 
-fn serialize_blocktxn(_bt: &crate::network::BlockTxnMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+/// BIP152: cmpctblock - header(80) + nonce(8) + shortids(varint+6*count) + prefilled(varint+each: diff_index+tx)
+fn serialize_cmpctblock(cb: &crate::network::CmpctBlockMessage) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+
+    let mut buf = Vec::new();
+    buf.extend_from_slice(&crate::serialization::serialize_block_header(&cb.header));
+    buf.extend_from_slice(&cb.nonce.to_le_bytes());
+    write_varint(&mut buf, cb.short_ids.len() as u64)?;
+    for sid in &cb.short_ids {
+        buf.extend_from_slice(sid);
+    }
+    write_varint(&mut buf, cb.prefilled_txs.len() as u64)?;
+    let mut last_index = -1i64;
+    for pt in &cb.prefilled_txs {
+        let diff = (pt.index as i64) - last_index - 1;
+        write_varint(&mut buf, diff as u64)?;
+        last_index = pt.index as i64;
+        let tx_bytes = match &pt.witness {
+            Some(wit) if wit.iter().any(|w| !w.is_empty()) => {
+                crate::serialization::serialize_transaction_with_witness(&pt.tx, wit)
+            }
+            _ => crate::serialization::serialize_transaction(&pt.tx),
+        };
+        buf.extend_from_slice(&tx_bytes);
+    }
+    Ok(buf)
 }
-fn deserialize_blocktxn(_data: &[u8]) -> Result<crate::network::BlockTxnMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_cmpctblock(data: &[u8]) -> Result<crate::network::CmpctBlockMessage> {
+    use crate::varint::read_varint;
+    use std::io::Read;
+
+    if data.len() < 80 + 8 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("CmpctBlock message too short".to_string()),
+        )));
+    }
+    let header = crate::serialization::deserialize_block_header(&data[0..80])
+        .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string()))))?;
+    let nonce = u64::from_le_bytes([data[80], data[81], data[82], data[83], data[84], data[85], data[86], data[87]]);
+    let mut cursor = std::io::Cursor::new(&data[88..]);
+    let shortids_len = read_varint(&mut cursor)? as usize;
+    let mut short_ids = Vec::with_capacity(shortids_len);
+    for _ in 0..shortids_len {
+        let mut sid = [0u8; 6];
+        cursor.read_exact(&mut sid).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!("CmpctBlock shortid: {e}"))))
+        })?;
+        short_ids.push(sid);
+    }
+    let prefilled_len = read_varint(&mut cursor)? as usize;
+    let mut prefilled_txs = Vec::with_capacity(prefilled_len);
+    let mut last_index: i64 = -1;
+    let mut pos = cursor.position() as usize;
+    for _ in 0..prefilled_len {
+        let diff = read_varint(&mut cursor)? as i64;
+        let index = last_index + diff + 1;
+        last_index = index;
+        pos = cursor.position() as usize;
+        let slice = &data[88..];
+        if pos >= slice.len() {
+            return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+                Cow::Owned("CmpctBlock prefilled tx truncated".to_string()),
+            )));
+        }
+        // Use deserialize_transaction_with_witness: returns actual bytes consumed.
+        // Core sends prefilled txs with TX_WITH_WITNESS (SegWit); serialize_transaction().len()
+        // would undercount and corrupt subsequent parsing.
+        let (tx, witnesses, consumed) =
+            crate::serialization::deserialize_transaction_with_witness(&slice[pos..])
+                .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+                    e.to_string(),
+                ))))?;
+        cursor.set_position((pos + consumed) as u64);
+        let witness = witnesses.iter().any(|w| !w.is_empty()).then_some(witnesses);
+        prefilled_txs.push(crate::network::PrefilledTransaction {
+            index: index as u16,
+            tx,
+            witness,
+        });
+    }
+    Ok(crate::network::CmpctBlockMessage {
+        header,
+        nonce,
+        short_ids,
+        prefilled_txs,
+    })
+}
+
+/// BIP152: getblocktxn - block_hash(32) + indexes(varint count + diff-encoded varints)
+fn serialize_getblocktxn(gbt: &crate::network::GetBlockTxnMessage) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+
+    let mut buf = Vec::new();
+    buf.extend_from_slice(&gbt.block_hash);
+    write_varint(&mut buf, gbt.indices.len() as u64)?;
+    let mut last: i64 = -1;
+    for &idx in &gbt.indices {
+        let diff = (idx as i64) - last - 1;
+        if diff < 0 {
+            return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+                Cow::Owned("GetBlockTxn indices must be strictly increasing".to_string()),
+            )));
+        }
+        write_varint(&mut buf, diff as u64)?;
+        last = idx as i64;
+    }
+    Ok(buf)
+}
+fn deserialize_getblocktxn(data: &[u8]) -> Result<crate::network::GetBlockTxnMessage> {
+    use crate::varint::read_varint;
+    use std::io::Read;
+
+    if data.len() < 32 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("GetBlockTxn message too short".to_string()),
+        )));
+    }
+    let mut block_hash = [0u8; 32];
+    block_hash.copy_from_slice(&data[0..32]);
+    let mut cursor = std::io::Cursor::new(&data[32..]);
+    let count = read_varint(&mut cursor)? as usize;
+    if count > 50000 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("GetBlockTxn too many indices".to_string()),
+        )));
+    }
+    let mut indices = Vec::with_capacity(count);
+    let mut last: i64 = -1;
+    for _ in 0..count {
+        let diff = read_varint(&mut cursor)? as i64;
+        last = last + diff + 1;
+        if last > 0xffff {
+            return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+                Cow::Owned("GetBlockTxn index overflow".to_string()),
+            )));
+        }
+        indices.push(last as u16);
+    }
+    Ok(crate::network::GetBlockTxnMessage {
+        block_hash,
+        indices,
+    })
+}
+
+/// BIP152: blocktxn - block_hash(32) + count(varint) + transactions
+fn serialize_blocktxn(bt: &crate::network::BlockTxnMessage) -> Result<Vec<u8>> {
+    use crate::varint::write_varint;
+
+    let mut buf = Vec::new();
+    buf.extend_from_slice(&bt.block_hash);
+    write_varint(&mut buf, bt.transactions.len() as u64)?;
+    match (&bt.witnesses, bt.transactions.len()) {
+        (Some(witnesses), len) if witnesses.len() == len => {
+            for (tx, wit) in bt.transactions.iter().zip(witnesses.iter()) {
+                buf.extend_from_slice(&crate::serialization::serialize_transaction_with_witness(tx, wit));
+            }
+        }
+        _ => {
+            for tx in &bt.transactions {
+                buf.extend_from_slice(&crate::serialization::serialize_transaction(tx));
+            }
+        }
+    }
+    Ok(buf)
+}
+fn deserialize_blocktxn(data: &[u8]) -> Result<crate::network::BlockTxnMessage> {
+    use crate::varint::read_varint;
+    use std::io::Read;
+
+    if data.len() < 32 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("BlockTxn message too short".to_string()),
+        )));
+    }
+    let mut block_hash = [0u8; 32];
+    block_hash.copy_from_slice(&data[0..32]);
+    let mut cursor = std::io::Cursor::new(&data[32..]);
+    let count = read_varint(&mut cursor)? as usize;
+    if count > 2000 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("BlockTxn too many transactions".to_string()),
+        )));
+    }
+    let mut transactions = Vec::with_capacity(count);
+    let mut all_witnesses = Vec::with_capacity(count);
+    let mut pos = 32 + (cursor.position() as usize);
+    for _ in 0..count {
+        if pos >= data.len() {
+            return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+                Cow::Owned("BlockTxn truncated".to_string()),
+            )));
+        }
+        // BIP152: blocktxn txs use same format as block (TX_WITH_WITNESS). Use
+        // deserialize_transaction_with_witness for correct bytes consumed.
+        let (tx, witnesses, consumed) =
+            crate::serialization::deserialize_transaction_with_witness(&data[pos..])
+                .map_err(|e| ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+                    e.to_string(),
+                ))))?;
+        pos += consumed;
+        transactions.push(tx);
+        all_witnesses.push(witnesses);
+    }
+    let witnesses = all_witnesses
+        .iter()
+        .any(|w| w.iter().any(|s| !s.is_empty()))
+        .then_some(all_witnesses);
+    Ok(crate::network::BlockTxnMessage {
+        block_hash,
+        transactions,
+        witnesses,
+    })
 }
 
 #[cfg(feature = "utxo-commitments")]
-fn serialize_getutxoset(_gus: &crate::commons::GetUTXOSetMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+fn serialize_getutxoset(gus: &crate::commons::GetUTXOSetMessage) -> Result<Vec<u8>> {
+    let mut buf = Vec::with_capacity(40);
+    buf.extend_from_slice(&gus.height.to_le_bytes());
+    buf.extend_from_slice(&gus.block_hash);
+    Ok(buf)
 }
 #[cfg(feature = "utxo-commitments")]
-fn deserialize_getutxoset(_data: &[u8]) -> Result<crate::commons::GetUTXOSetMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_getutxoset(data: &[u8]) -> Result<crate::commons::GetUTXOSetMessage> {
+    if data.len() < 40 {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("GetUTXOSet message too short".to_string()),
+        )));
+    }
+    let height = u64::from_le_bytes([data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]]);
+    let mut block_hash = [0u8; 32];
+    block_hash.copy_from_slice(&data[8..40]);
+    Ok(crate::commons::GetUTXOSetMessage { height, block_hash })
 }
 
 #[cfg(feature = "utxo-commitments")]
-fn serialize_utxoset(_us: &crate::commons::UTXOSetMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+fn serialize_utxoset(us: &crate::commons::UTXOSetMessage) -> Result<Vec<u8>> {
+    bincode::serialize(us).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+    })
 }
 #[cfg(feature = "utxo-commitments")]
-fn deserialize_utxoset(_data: &[u8]) -> Result<crate::commons::UTXOSetMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_utxoset(data: &[u8]) -> Result<crate::commons::UTXOSetMessage> {
+    bincode::deserialize(data).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+    })
 }
 
 #[cfg(feature = "utxo-commitments")]
-fn serialize_getfilteredblock(_gfb: &crate::commons::GetFilteredBlockMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+fn serialize_getfilteredblock(gfb: &crate::commons::GetFilteredBlockMessage) -> Result<Vec<u8>> {
+    bincode::serialize(gfb).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+    })
 }
 #[cfg(feature = "utxo-commitments")]
-fn deserialize_getfilteredblock(_data: &[u8]) -> Result<crate::commons::GetFilteredBlockMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_getfilteredblock(data: &[u8]) -> Result<crate::commons::GetFilteredBlockMessage> {
+    bincode::deserialize(data).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+    })
 }
 
 #[cfg(feature = "utxo-commitments")]
-fn serialize_filteredblock(_fb: &crate::commons::FilteredBlockMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+fn serialize_filteredblock(fb: &crate::commons::FilteredBlockMessage) -> Result<Vec<u8>> {
+    bincode::serialize(fb).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+    })
 }
 #[cfg(feature = "utxo-commitments")]
-fn deserialize_filteredblock(_data: &[u8]) -> Result<crate::commons::FilteredBlockMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_filteredblock(data: &[u8]) -> Result<crate::commons::FilteredBlockMessage> {
+    bincode::deserialize(data).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+    })
 }
 
-fn serialize_getbanlist(_gbl: &crate::commons::GetBanListMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+fn serialize_getbanlist(gbl: &crate::commons::GetBanListMessage) -> Result<Vec<u8>> {
+    bincode::serialize(gbl).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+    })
 }
-fn deserialize_getbanlist(_data: &[u8]) -> Result<crate::commons::GetBanListMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_getbanlist(data: &[u8]) -> Result<crate::commons::GetBanListMessage> {
+    bincode::deserialize(data).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+    })
 }
 
-fn serialize_banlist(_bl: &crate::commons::BanListMessage) -> Result<Vec<u8>> {
-    Ok(vec![])
+fn serialize_banlist(bl: &crate::commons::BanListMessage) -> Result<Vec<u8>> {
+    bincode::serialize(bl).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+    })
 }
-fn deserialize_banlist(_data: &[u8]) -> Result<crate::commons::BanListMessage> {
-    Err(ProtocolError::Consensus(ConsensusError::Serialization(
-        Cow::Owned("Not implemented".to_string()),
-    )))
+fn deserialize_banlist(data: &[u8]) -> Result<crate::commons::BanListMessage> {
+    bincode::deserialize(data).map_err(|e| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+    })
 }
 
 // Governance message serialization
