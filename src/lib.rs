@@ -9,25 +9,22 @@
 //! This is Tier 3 of the 5-tier BTCDecoded architecture:
 //!
 //! 1. Orange Paper (mathematical foundation)
-//! 2. consensus-proof (pure math implementation)
-//! 3. protocol-engine (Bitcoin abstraction) ← THIS CRATE
-//! 4. reference-node (full Bitcoin node)
-//! 5. developer-sdk (ergonomic API)
+//! 2. blvm-consensus (pure math implementation)
+//! 3. blvm-protocol (Bitcoin abstraction) ← THIS CRATE
+//! 4. blvm-node (full Bitcoin node)
+//! 5. blvm-sdk (ergonomic API)
 
 use serde::{Deserialize, Serialize};
 
-// Re-export commonly used types from consensus-proof for convenience
-// This allows upper layers (like reference-node) to depend only on protocol-engine
-pub use blvm_consensus::{
-    ConsensusProof,
-};
-pub use blvm_consensus::types::{
-    Block, BlockHeader, ByteString, Hash, Integer, Natural,
-    OutPoint, Transaction, TransactionInput, TransactionOutput, UtxoSet, UTXO,
-    ValidationResult,
-};
+// Re-export commonly used types from blvm-consensus for convenience
+// This allows upper layers (like blvm-node) to depend only on blvm-protocol
 pub use blvm_consensus::config::NetworkMessageLimits;
 pub use blvm_consensus::error::{ConsensusError, Result as ConsensusResult};
+pub use blvm_consensus::types::{
+    Block, BlockHeader, ByteString, Hash, Integer, Natural, OutPoint, Transaction,
+    TransactionInput, TransactionOutput, UtxoSet, ValidationResult, UTXO,
+};
+pub use blvm_consensus::ConsensusProof;
 
 // Re-export smallvec for macro use when production feature is enabled
 #[cfg(feature = "production")]
@@ -95,7 +92,7 @@ mod bip155_serialization_tests;
 pub mod types {
     pub use blvm_consensus::types::*;
 }
-// Re-export macros from bllvm-consensus for convenience
+// Re-export macros from blvm-consensus for convenience
 #[cfg(feature = "production")]
 pub use blvm_consensus::tx_inputs;
 #[cfg(not(feature = "production"))]
@@ -128,7 +125,7 @@ pub mod payment; // BIP70: Payment protocol (P2P variant) // FIBRE: Fast Interne
 /// Bitcoin Protocol Engine
 ///
 /// Provides protocol abstraction for different Bitcoin variants and evolution.
-/// Acts as a bridge between consensus-proof (pure math) and reference-node (implementation).
+/// Acts as a bridge between blvm-consensus (pure math) and blvm-node (implementation).
 pub struct BitcoinProtocolEngine {
     consensus: ConsensusProof,
     protocol_version: ProtocolVersion,
@@ -250,9 +247,9 @@ impl BitcoinProtocolEngine {
     /// # Example
     ///
     /// ```rust,no_run
-    /// use bllvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
-    /// use bllvm_protocol::validation::ProtocolValidationContext;
-    /// use bllvm_protocol::{Block, UtxoSet};
+    /// use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
+    /// use blvm_protocol::validation::ProtocolValidationContext;
+    /// use blvm_protocol::{Block, UtxoSet};
     ///
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1)?;
@@ -422,14 +419,14 @@ mod tests {
     use blvm_consensus::types::{BlockHeader, OutPoint, TransactionInput, TransactionOutput};
 
     #[test]
-    fn test_bllvm_protocol_creation() {
+    fn test_blvm_protocol_creation() {
         let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
         assert_eq!(engine.get_protocol_version(), ProtocolVersion::BitcoinV1);
         assert_eq!(engine.get_network_params().network_name, "mainnet");
     }
 
     #[test]
-    fn test_bllvm_protocol_creation_all_variants() {
+    fn test_blvm_protocol_creation_all_variants() {
         // Test mainnet
         let mainnet = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
         assert_eq!(mainnet.get_protocol_version(), ProtocolVersion::BitcoinV1);
@@ -526,8 +523,13 @@ mod tests {
             outputs: blvm_consensus::tx_outputs![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
-                    0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_DUP,
+                    blvm_consensus::opcodes::OP_HASH160,
+                    blvm_consensus::opcodes::PUSH_20_BYTES,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_EQUALVERIFY,
+                    blvm_consensus::opcodes::OP_CHECKSIG,
                 ], // P2PKH
             }],
             lock_time: 0,
@@ -566,15 +568,20 @@ mod tests {
                     hash: [0u8; 32],
                     index: 0,
                 },
-                script_sig: vec![0x41, 0x04], // Simple signature
+                script_sig: vec![blvm_consensus::opcodes::PUSH_65_BYTES, 0x04],
                 sequence: 0xffffffff,
             }]
             .into(),
             outputs: vec![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
-                    0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_DUP,
+                    blvm_consensus::opcodes::OP_HASH160,
+                    blvm_consensus::opcodes::PUSH_20_BYTES,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_EQUALVERIFY,
+                    blvm_consensus::opcodes::OP_CHECKSIG,
                 ], // P2PKH
             }]
             .into(),

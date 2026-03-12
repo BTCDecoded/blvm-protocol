@@ -1,15 +1,15 @@
-//! Configuration for bllvm-protocol
+//! Configuration for blvm-protocol
 //!
 //! Provides configurable parameters for protocol-level settings, service flags,
 //! protocol validation rules, and Commons-specific extensions. These settings
-//! complement bllvm-consensus configuration by focusing on protocol abstraction
+//! complement blvm-consensus configuration by focusing on protocol abstraction
 //! rather than consensus validation.
 //!
 //! Network message limits (addr, inv, headers, user_agent) are imported from
-//! bllvm-consensus to avoid duplication. Use .cargo/config.toml for local development.
+//! blvm-consensus to avoid duplication. Use .cargo/config.toml for local development.
 
-use crate::ProtocolVersion;
 use crate::NetworkMessageLimits;
+use crate::ProtocolVersion;
 use serde::{Deserialize, Serialize};
 
 /// Protocol validation rules configuration
@@ -339,7 +339,7 @@ pub struct ProtocolConfig {
     #[serde(default = "default_protocol_version")]
     pub protocol_version: ProtocolVersion,
 
-    /// Network message limits (from bllvm-consensus to avoid duplication)
+    /// Network message limits (from blvm-consensus to avoid duplication)
     /// These limits protect against DoS attacks by bounding message sizes
     #[serde(default)]
     pub network_limits: NetworkMessageLimits,
@@ -414,7 +414,7 @@ impl ProtocolConfig {
             };
         }
 
-        // Load network limits (from bllvm-consensus config)
+        // Load network limits (from blvm-consensus config)
         if let Ok(val) = std::env::var("BLLVM_CONSENSUS_NETWORK_LIMITS_MAX_ADDR_ADDRESSES") {
             if let Ok(count) = val.parse::<usize>() {
                 config.network_limits.max_addr_addresses = count;

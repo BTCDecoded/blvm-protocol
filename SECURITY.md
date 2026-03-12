@@ -12,7 +12,7 @@ Security updates are provided for supported protocol versions. See the [CHANGELO
 
 ### Critical Security Issues
 
-If you discover a security vulnerability in protocol-engine, please report it immediately:
+If you discover a security vulnerability in blvm-protocol, please report it immediately:
 
 1. **DO NOT** create a public GitHub issue
 2. **DO NOT** discuss the vulnerability publicly
@@ -21,7 +21,7 @@ If you discover a security vulnerability in protocol-engine, please report it im
 ### How to Report
 
 **Email:** security@btcdecoded.org  
-**Subject:** [SECURITY] protocol-engine vulnerability
+**Subject:** [SECURITY] blvm-protocol vulnerability
 
 Include the following information:
 - Description of the vulnerability

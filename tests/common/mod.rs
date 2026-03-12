@@ -1,4 +1,4 @@
-//! Common test utilities for bllvm-protocol tests
+//! Common test utilities for blvm-protocol tests
 //! 
 //! This module provides shared test utilities for building test data,
 //! creating mock objects, and setting up test scenarios.
@@ -227,24 +227,34 @@ pub mod helpers {
     
     /// Create a simple P2PKH script
     pub fn p2pkh_script(pubkey_hash: [u8; 20]) -> Vec<u8> {
-        let mut script = vec![0x76, 0xa9, 0x14]; // OP_DUP OP_HASH160 20
+        let mut script = vec![
+            blvm_consensus::opcodes::OP_DUP,
+            blvm_consensus::opcodes::OP_HASH160,
+            blvm_consensus::opcodes::PUSH_20_BYTES,
+        ];
         script.extend_from_slice(&pubkey_hash);
-        script.push(0x88); // OP_EQUALVERIFY
-        script.push(0xac); // OP_CHECKSIG
+        script.push(blvm_consensus::opcodes::OP_EQUALVERIFY);
+        script.push(blvm_consensus::opcodes::OP_CHECKSIG);
         script
     }
     
     /// Create a simple P2SH script
     pub fn p2sh_script(script_hash: [u8; 20]) -> Vec<u8> {
-        let mut script = vec![0xa9, 0x14]; // OP_HASH160 20
+        let mut script = vec![
+            blvm_consensus::opcodes::OP_HASH160,
+            blvm_consensus::opcodes::PUSH_20_BYTES,
+        ];
         script.extend_from_slice(&script_hash);
-        script.push(0x87); // OP_EQUAL
+        script.push(blvm_consensus::opcodes::OP_EQUAL);
         script
     }
     
     /// Create a simple P2WPKH script
     pub fn p2wpkh_script(pubkey_hash: [u8; 20]) -> Vec<u8> {
-        let mut script = vec![0x00, 0x14]; // OP_0 20
+        let mut script = vec![
+            blvm_consensus::opcodes::OP_0,
+            blvm_consensus::opcodes::PUSH_20_BYTES,
+        ];
         script.extend_from_slice(&pubkey_hash);
         script
     }
@@ -258,7 +268,10 @@ pub mod helpers {
     
     /// Create a simple P2TR script
     pub fn p2tr_script(taproot_output: [u8; 32]) -> Vec<u8> {
-        let mut script = vec![0x51, 0x20]; // OP_1 32
+        let mut script = vec![
+            blvm_consensus::opcodes::OP_1,
+            blvm_consensus::opcodes::PUSH_32_BYTES,
+        ];
         script.extend_from_slice(&taproot_output);
         script
     }
@@ -298,7 +311,7 @@ pub mod helpers {
         TestTransactionBuilder::new()
             .add_input(
                 OutPoint { hash: random_hash(), index: 0 },
-                vec![0x41, 0x04], // Simple signature
+                vec![blvm_consensus::opcodes::PUSH_65_BYTES, 0x04],
                 0xffffffff,
             )
             .add_output(50_0000_0000, p2pkh_script(random_hash20()))

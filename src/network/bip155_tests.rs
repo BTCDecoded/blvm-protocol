@@ -30,14 +30,8 @@ mod tests {
     fn test_network_address_v2_creation() {
         // Valid IPv4 address
         let ipv4_addr = vec![192, 168, 1, 1];
-        let addr = NetworkAddressV2::new(
-            1234567890,
-            1,
-            AddressType::IPv4,
-            ipv4_addr.clone(),
-            8333,
-        )
-        .unwrap();
+        let addr = NetworkAddressV2::new(1234567890, 1, AddressType::IPv4, ipv4_addr.clone(), 8333)
+            .unwrap();
         assert_eq!(addr.time, 1234567890);
         assert_eq!(addr.services, 1);
         assert_eq!(addr.address_type, AddressType::IPv4);
@@ -49,13 +43,7 @@ mod tests {
     fn test_network_address_v2_invalid_length() {
         // IPv4 address with wrong length
         let invalid_addr = vec![192, 168, 1]; // Only 3 bytes, should be 4
-        let result = NetworkAddressV2::new(
-            1234567890,
-            1,
-            AddressType::IPv4,
-            invalid_addr,
-            8333,
-        );
+        let result = NetworkAddressV2::new(1234567890, 1, AddressType::IPv4, invalid_addr, 8333);
         assert!(result.is_err());
     }
 
@@ -66,14 +54,8 @@ mod tests {
             0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x01,
         ];
-        let addr = NetworkAddressV2::new(
-            1234567890,
-            1,
-            AddressType::IPv6,
-            ipv6_addr.clone(),
-            8333,
-        )
-        .unwrap();
+        let addr = NetworkAddressV2::new(1234567890, 1, AddressType::IPv6, ipv6_addr.clone(), 8333)
+            .unwrap();
         assert_eq!(addr.address_type, AddressType::IPv6);
         assert_eq!(addr.address, ipv6_addr);
     }
@@ -85,14 +67,8 @@ mod tests {
         for i in 0..32 {
             tor_addr[i] = i as u8;
         }
-        let addr = NetworkAddressV2::new(
-            1234567890,
-            1,
-            AddressType::TorV3,
-            tor_addr.clone(),
-            8333,
-        )
-        .unwrap();
+        let addr = NetworkAddressV2::new(1234567890, 1, AddressType::TorV3, tor_addr.clone(), 8333)
+            .unwrap();
         assert_eq!(addr.address_type, AddressType::TorV3);
         assert_eq!(addr.address, tor_addr);
     }
@@ -101,14 +77,8 @@ mod tests {
     fn test_to_legacy_ipv4() {
         // IPv4 address should convert to legacy format
         let ipv4_addr = vec![192, 168, 1, 1];
-        let addr = NetworkAddressV2::new(
-            1234567890,
-            1,
-            AddressType::IPv4,
-            ipv4_addr,
-            8333,
-        )
-        .unwrap();
+        let addr =
+            NetworkAddressV2::new(1234567890, 1, AddressType::IPv4, ipv4_addr, 8333).unwrap();
         let legacy = addr.to_legacy();
         assert!(legacy.is_some());
         let legacy_addr = legacy.unwrap();
@@ -130,14 +100,8 @@ mod tests {
             0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x01,
         ];
-        let addr = NetworkAddressV2::new(
-            1234567890,
-            1,
-            AddressType::IPv6,
-            ipv6_addr.clone(),
-            8333,
-        )
-        .unwrap();
+        let addr = NetworkAddressV2::new(1234567890, 1, AddressType::IPv6, ipv6_addr.clone(), 8333)
+            .unwrap();
         let legacy = addr.to_legacy();
         assert!(legacy.is_some());
         let legacy_addr = legacy.unwrap();
@@ -156,14 +120,8 @@ mod tests {
         for i in 0..32 {
             tor_addr[i] = i as u8;
         }
-        let addr = NetworkAddressV2::new(
-            1234567890,
-            1,
-            AddressType::TorV3,
-            tor_addr,
-            8333,
-        )
-        .unwrap();
+        let addr =
+            NetworkAddressV2::new(1234567890, 1, AddressType::TorV3, tor_addr, 8333).unwrap();
         let legacy = addr.to_legacy();
         assert!(legacy.is_none()); // Tor addresses can't be converted
     }
@@ -171,13 +129,13 @@ mod tests {
     #[test]
     fn test_addrv2_message() {
         let mut addresses = Vec::new();
-        
+
         // Add IPv4 address
         let ipv4_addr = vec![192, 168, 1, 1];
         addresses.push(
             NetworkAddressV2::new(1234567890, 1, AddressType::IPv4, ipv4_addr, 8333).unwrap(),
         );
-        
+
         // Add IPv6 address
         let ipv6_addr = vec![
             0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -186,7 +144,7 @@ mod tests {
         addresses.push(
             NetworkAddressV2::new(1234567890, 1, AddressType::IPv6, ipv6_addr, 8333).unwrap(),
         );
-        
+
         // Add Tor v3 address
         let mut tor_addr = vec![0u8; 32];
         for i in 0..32 {
@@ -195,9 +153,8 @@ mod tests {
         addresses.push(
             NetworkAddressV2::new(1234567890, 1, AddressType::TorV3, tor_addr, 8333).unwrap(),
         );
-        
+
         let addrv2 = AddrV2Message { addresses };
         assert_eq!(addrv2.addresses.len(), 3);
     }
 }
-

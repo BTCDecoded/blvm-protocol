@@ -53,9 +53,14 @@ fn test_full_block_validation_workflow() {
             outputs: blvm_consensus::tx_outputs![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
-                    0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_DUP,
+                    blvm_consensus::opcodes::OP_HASH160,
+                    blvm_consensus::opcodes::PUSH_20_BYTES,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ], // P2PKH
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_EQUALVERIFY,
+                    blvm_consensus::opcodes::OP_CHECKSIG,
+                ],
             }],
             lock_time: 0,
         }]
@@ -95,9 +100,14 @@ fn test_multi_block_chain_validation() {
             outputs: blvm_consensus::tx_outputs![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
-                    0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_DUP,
+                    blvm_consensus::opcodes::OP_HASH160,
+                    blvm_consensus::opcodes::PUSH_20_BYTES,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ], // P2PKH
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_EQUALVERIFY,
+                    blvm_consensus::opcodes::OP_CHECKSIG,
+                ],
             }],
             lock_time: 0,
         }]
@@ -117,8 +127,13 @@ fn test_multi_block_chain_validation() {
         UTXO {
             value: 50_0000_0000,
             script_pubkey: vec![
-                0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                blvm_consensus::opcodes::OP_DUP,
+                blvm_consensus::opcodes::OP_HASH160,
+                blvm_consensus::opcodes::PUSH_20_BYTES,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                blvm_consensus::opcodes::OP_EQUALVERIFY,
+                blvm_consensus::opcodes::OP_CHECKSIG,
             ],
             height: 0,
             is_coinbase: false,
@@ -148,9 +163,14 @@ fn test_multi_block_chain_validation() {
             outputs: blvm_consensus::tx_outputs![TransactionOutput {
                 value: 25_0000_0000,
                 script_pubkey: vec![
-                    0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_DUP,
+                    blvm_consensus::opcodes::OP_HASH160,
+                    blvm_consensus::opcodes::PUSH_20_BYTES,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ], // P2PKH
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_EQUALVERIFY,
+                    blvm_consensus::opcodes::OP_CHECKSIG,
+                ],
             }],
             lock_time: 0,
         }]
@@ -181,8 +201,13 @@ fn test_transaction_creation_and_validation_workflow() {
         outputs: vec![TransactionOutput {
             value: 50_0000_0000,
             script_pubkey: vec![
-                0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                blvm_consensus::opcodes::OP_DUP,
+                blvm_consensus::opcodes::OP_HASH160,
+                blvm_consensus::opcodes::PUSH_20_BYTES,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                blvm_consensus::opcodes::OP_EQUALVERIFY,
+                blvm_consensus::opcodes::OP_CHECKSIG,
             ], // P2PKH
         }]
         .into(),
@@ -208,8 +233,13 @@ fn test_utxo_tracking_across_transactions() {
         UTXO {
             value: 100_0000_0000,
             script_pubkey: vec![
-                0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                blvm_consensus::opcodes::OP_DUP,
+                blvm_consensus::opcodes::OP_HASH160,
+                blvm_consensus::opcodes::PUSH_20_BYTES,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                blvm_consensus::opcodes::OP_EQUALVERIFY,
+                blvm_consensus::opcodes::OP_CHECKSIG,
             ],
             height: 0,
             is_coinbase: false,
@@ -232,16 +262,26 @@ fn test_utxo_tracking_across_transactions() {
             TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
-                    0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_DUP,
+                    blvm_consensus::opcodes::OP_HASH160,
+                    blvm_consensus::opcodes::PUSH_20_BYTES,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ], // P2PKH
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_EQUALVERIFY,
+                    blvm_consensus::opcodes::OP_CHECKSIG,
+                ],
             },
             TransactionOutput {
                 value: 49_0000_0000, // Change output
                 script_pubkey: vec![
-                    0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_DUP,
+                    blvm_consensus::opcodes::OP_HASH160,
+                    blvm_consensus::opcodes::PUSH_20_BYTES,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ], // P2PKH
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_EQUALVERIFY,
+                    blvm_consensus::opcodes::OP_CHECKSIG,
+                ],
             },
         ]
         .into(),
@@ -295,15 +335,20 @@ fn test_concurrent_validation_requests() {
                         hash: [i as u8; 32],
                         index: 0,
                     },
-                    script_sig: vec![0x41, 0x04],
+                    script_sig: vec![blvm_consensus::opcodes::PUSH_65_BYTES, 0x04],
                     sequence: 0xffffffff,
                 }]
                 .into(),
                 outputs: vec![TransactionOutput {
                     value: 50_0000_0000,
                     script_pubkey: vec![
-                        0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        blvm_consensus::opcodes::OP_DUP,
+                        blvm_consensus::opcodes::OP_HASH160,
+                        blvm_consensus::opcodes::PUSH_20_BYTES,
+                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                        blvm_consensus::opcodes::OP_EQUALVERIFY,
+                        blvm_consensus::opcodes::OP_CHECKSIG,
                     ],
                 }]
                 .into(),

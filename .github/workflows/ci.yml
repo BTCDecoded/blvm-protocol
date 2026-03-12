@@ -52,20 +52,20 @@ jobs:
       - name: Checkout consensus
         uses: actions/checkout@v4
         with:
-          repository: BTCDecoded/bllvm-consensus
-          path: _temp-consensus-proof
+          repository: BTCDecoded/blvm-consensus
+          path: _temp-blvm-consensus
       
       - name: Move consensus
         run: |
-          if [ -d "../bllvm-consensus" ]; then rm -rf ../bllvm-consensus; fi
-          mv _temp-consensus-proof ../bllvm-consensus
+          if [ -d "../blvm-consensus" ]; then rm -rf ../blvm-consensus; fi
+          mv _temp-blvm-consensus ../blvm-consensus
       
       - name: Setup local dependencies for build
         run: |
           mkdir -p .cargo
           cat > .cargo/config.toml << EOF
           [patch.crates-io]
-          bllvm-consensus = { path = "../bllvm-consensus" }
+          blvm-consensus = { path = "../blvm-consensus" }
           EOF
           echo "✅ Created .cargo/config.toml for local dependency builds"
       
@@ -76,7 +76,7 @@ jobs:
           
           # Generate cache keys from Cargo.lock hashes
           DEPS_KEY=$(sha256sum Cargo.lock | cut -d' ' -f1)
-          CONSENSUS_DEPS_KEY=$(sha256sum ../bllvm-consensus/Cargo.lock | cut -d' ' -f1)
+          CONSENSUS_DEPS_KEY=$(sha256sum ../blvm-consensus/Cargo.lock | cut -d' ' -f1)
           
           # Include toolchain version in cache key
           TOOLCHAIN=$(grep -E '^channel|rust-version' rust-toolchain.toml Cargo.toml 2>/dev/null | head -1 | sha256sum | cut -d' ' -f1 || echo "1.88.0")
@@ -87,7 +87,7 @@ jobs:
           # Set up cache directories
           CARGO_CACHE_DIR="$CACHE_ROOT/cargo/$CACHE_KEY"
           TARGET_CACHE_DIR="$CACHE_ROOT/target/$CACHE_KEY"
-          CONSENSUS_TARGET_DIR="$CACHE_ROOT/bllvm-consensus-target/$CONSENSUS_CACHE_KEY"
+          CONSENSUS_TARGET_DIR="$CACHE_ROOT/blvm-consensus-target/$CONSENSUS_CACHE_KEY"
           
           echo "CARGO_CACHE_DIR=$CARGO_CACHE_DIR" >> $GITHUB_ENV
           echo "TARGET_CACHE_DIR=$TARGET_CACHE_DIR" >> $GITHUB_ENV
@@ -120,13 +120,13 @@ jobs:
       - name: Checkout consensus
         uses: actions/checkout@v4
         with:
-          repository: BTCDecoded/bllvm-consensus
-          path: _temp-consensus-proof
+          repository: BTCDecoded/blvm-consensus
+          path: _temp-blvm-consensus
       
       - name: Move consensus
         run: |
-          if [ -d "../bllvm-consensus" ]; then rm -rf ../bllvm-consensus; fi
-          mv _temp-consensus-proof ../bllvm-consensus
+          if [ -d "../blvm-consensus" ]; then rm -rf ../blvm-consensus; fi
+          mv _temp-blvm-consensus ../blvm-consensus
       
       - name: Cache
         run: |
@@ -136,7 +136,7 @@ jobs:
           
           echo "CARGO_CACHE_DIR=$CACHE_ROOT/cargo/$CACHE_KEY" >> $GITHUB_ENV
           echo "TARGET_CACHE_DIR=$CACHE_ROOT/target/$CACHE_KEY" >> $GITHUB_ENV
-          echo "CONSENSUS_TARGET_DIR=$CACHE_ROOT/bllvm-consensus-target/$CONSENSUS_CACHE_KEY" >> $GITHUB_ENV
+          echo "CONSENSUS_TARGET_DIR=$CACHE_ROOT/blvm-consensus-target/$CONSENSUS_CACHE_KEY" >> $GITHUB_ENV
       
       - name: Restore registry
         run: |
@@ -159,10 +159,10 @@ jobs:
       - name: Restore consensus
         run: |
           if [ -d "$CONSENSUS_TARGET_DIR" ] && [ "$(ls -A $CONSENSUS_TARGET_DIR 2>/dev/null)" ]; then
-            mkdir -p ../bllvm-consensus/target
-            rsync -a --delete "$CONSENSUS_TARGET_DIR/" ../bllvm-consensus/target/ || true
+            mkdir -p ../blvm-consensus/target
+            rsync -a --delete "$CONSENSUS_TARGET_DIR/" ../blvm-consensus/target/ || true
           else
-            echo "💿 No bllvm-consensus target cache found"
+            echo "💿 No blvm-consensus target cache found"
           fi
       
       - name: Restore target
@@ -210,8 +210,8 @@ jobs:
       - name: Cache consensus
         if: always()
         run: |
-          if [ -d "../bllvm-consensus/target" ] && [ "$CONSENSUS_TARGET_DIR" != "" ]; then
-            rsync -a --delete ../bllvm-consensus/target/ "$CONSENSUS_TARGET_DIR/" || true
+          if [ -d "../blvm-consensus/target" ] && [ "$CONSENSUS_TARGET_DIR" != "" ]; then
+            rsync -a --delete ../blvm-consensus/target/ "$CONSENSUS_TARGET_DIR/" || true
           fi
       
       - name: Cache target
@@ -228,7 +228,7 @@ jobs:
           CACHE_ROOT="/tmp/runner-cache"
           find "$CACHE_ROOT/cargo" -maxdepth 1 -type d -mtime +1 2>/dev/null | head -n -5 | xargs rm -rf 2>/dev/null || true
           find "$CACHE_ROOT/target" -maxdepth 1 -type d -mtime +1 2>/dev/null | head -n -3 | xargs rm -rf 2>/dev/null || true
-          find "$CACHE_ROOT/bllvm-consensus-target" -maxdepth 1 -type d -mtime +1 2>/dev/null | head -n -3 | xargs rm -rf 2>/dev/null || true
+          find "$CACHE_ROOT/blvm-consensus-target" -maxdepth 1 -type d -mtime +1 2>/dev/null | head -n -3 | xargs rm -rf 2>/dev/null || true
 
   clippy:
     name: Clippy
@@ -246,20 +246,20 @@ jobs:
       - name: Checkout consensus
         uses: actions/checkout@v4
         with:
-          repository: BTCDecoded/bllvm-consensus
-          path: _temp-consensus-proof
+          repository: BTCDecoded/blvm-consensus
+          path: _temp-blvm-consensus
       
       - name: Move consensus
         run: |
-          if [ -d "../bllvm-consensus" ]; then rm -rf ../bllvm-consensus; fi
-          mv _temp-consensus-proof ../bllvm-consensus
+          if [ -d "../blvm-consensus" ]; then rm -rf ../blvm-consensus; fi
+          mv _temp-blvm-consensus ../blvm-consensus
       
       - name: Setup local dependencies for build
         run: |
           mkdir -p .cargo
           cat > .cargo/config.toml << EOF
           [patch.crates-io]
-          bllvm-consensus = { path = "../bllvm-consensus" }
+          blvm-consensus = { path = "../blvm-consensus" }
           EOF
           echo "✅ Created .cargo/config.toml for local dependency builds"
       
@@ -410,20 +410,20 @@ jobs:
       - name: Checkout consensus
         uses: actions/checkout@v4
         with:
-          repository: BTCDecoded/bllvm-consensus
-          path: _temp-consensus-proof
+          repository: BTCDecoded/blvm-consensus
+          path: _temp-blvm-consensus
       
       - name: Move consensus
         run: |
-          if [ -d "../bllvm-consensus" ]; then rm -rf ../bllvm-consensus; fi
-          mv _temp-consensus-proof ../bllvm-consensus
+          if [ -d "../blvm-consensus" ]; then rm -rf ../blvm-consensus; fi
+          mv _temp-blvm-consensus ../blvm-consensus
       
       - name: Setup local dependencies for build
         run: |
           mkdir -p .cargo
           cat > .cargo/config.toml << EOF
           [patch.crates-io]
-          bllvm-consensus = { path = "../bllvm-consensus" }
+          blvm-consensus = { path = "../blvm-consensus" }
           EOF
           echo "✅ Created .cargo/config.toml for local dependency builds"
       
@@ -435,7 +435,7 @@ jobs:
           
           echo "CARGO_CACHE_DIR=$CACHE_ROOT/cargo/$CACHE_KEY" >> $GITHUB_ENV
           echo "TARGET_CACHE_DIR=$CACHE_ROOT/target/$CACHE_KEY" >> $GITHUB_ENV
-          echo "CONSENSUS_TARGET_DIR=$CACHE_ROOT/bllvm-consensus-target/$CONSENSUS_CACHE_KEY" >> $GITHUB_ENV
+          echo "CONSENSUS_TARGET_DIR=$CACHE_ROOT/blvm-consensus-target/$CONSENSUS_CACHE_KEY" >> $GITHUB_ENV
       
       - name: Restore registry
         run: |
@@ -454,8 +454,8 @@ jobs:
       - name: Restore consensus
         run: |
           if [ -d "$CONSENSUS_TARGET_DIR" ] && [ "$(ls -A $CONSENSUS_TARGET_DIR 2>/dev/null)" ]; then
-            mkdir -p ../bllvm-consensus/target
-            rsync -a --delete "$CONSENSUS_TARGET_DIR/" ../bllvm-consensus/target/ || true
+            mkdir -p ../blvm-consensus/target
+            rsync -a --delete "$CONSENSUS_TARGET_DIR/" ../blvm-consensus/target/ || true
           fi
       
       - name: Restore target
@@ -475,8 +475,8 @@ jobs:
       - name: Cache consensus
         if: always()
         run: |
-          if [ -d "../bllvm-consensus/target" ] && [ "$CONSENSUS_TARGET_DIR" != "" ]; then
-            rsync -a --delete ../bllvm-consensus/target/ "$CONSENSUS_TARGET_DIR/" || true
+          if [ -d "../blvm-consensus/target" ] && [ "$CONSENSUS_TARGET_DIR" != "" ]; then
+            rsync -a --delete ../blvm-consensus/target/ "$CONSENSUS_TARGET_DIR/" || true
           fi
       
       - name: Cache target
@@ -634,16 +634,16 @@ jobs:
           echo "version_tag=${VERSION_TAG}" >> $GITHUB_OUTPUT
           echo "✅ Releasing version: ${VERSION_TAG}"
       
-      - name: Get latest bllvm-consensus version from crates.io
+      - name: Get latest blvm-consensus version from crates.io
         id: consensus-version
         run: |
-          CONSENSUS_VER=$(cargo search bllvm-consensus --limit 1 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
+          CONSENSUS_VER=$(cargo search blvm-consensus --limit 1 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo "")
           if [ -z "$CONSENSUS_VER" ]; then
-            echo "ERROR: bllvm-consensus not found on crates.io. It must be published first."
+            echo "ERROR: blvm-consensus not found on crates.io. It must be published first."
             exit 1
           fi
           echo "version=${CONSENSUS_VER}" >> $GITHUB_OUTPUT
-          echo "Using bllvm-consensus version: ${CONSENSUS_VER}"
+          echo "Using blvm-consensus version: ${CONSENSUS_VER}"
       
       - name: Update Cargo.toml to use crates.io dependencies
         run: |
@@ -653,13 +653,13 @@ jobs:
           # Update version
           sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
           
-          # Update bllvm-consensus dependency to use crates.io version
-          sed -i 's|bllvm-consensus = {[^}]*}|bllvm-consensus = "'"${CONSENSUS_VER}"'"|g' Cargo.toml
+          # Update blvm-consensus dependency to use crates.io version
+          sed -i 's|blvm-consensus = {[^}]*}|blvm-consensus = "'"${CONSENSUS_VER}"'"|g' Cargo.toml
           
           echo "Updated Cargo.toml:"
           echo "  version: ${VERSION}"
-          echo "  bllvm-consensus: ${CONSENSUS_VER}"
-          grep -E "^(version|bllvm-consensus)" Cargo.toml
+          echo "  blvm-consensus: ${CONSENSUS_VER}"
+          grep -E "^(version|blvm-consensus)" Cargo.toml
       
       - name: Check for crates.io token
         run: |

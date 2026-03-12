@@ -6,8 +6,8 @@
 
 use crate::error::ProtocolError;
 use crate::{BitcoinProtocolEngine, NetworkParameters, ProtocolVersion};
-use blvm_consensus::types::{OutPoint, UTXO, UtxoSet};
 use crate::{Block, Transaction, ValidationResult};
+use blvm_consensus::types::UtxoSet;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -154,8 +154,8 @@ impl BitcoinProtocolEngine {
     pub fn validate_block_with_protocol(
         &self,
         block: &Block,
-        utxos: &UtxoSet,
-        height: u64,
+        _utxos: &UtxoSet,
+        _height: u64,
         context: &ProtocolValidationContext,
     ) -> Result<ValidationResult> {
         // First, apply protocol-specific validation
@@ -462,7 +462,7 @@ mod tests {
             }],
             outputs: blvm_consensus::tx_outputs![TransactionOutput {
                 value: 50_0000_0000,
-                script_pubkey: vec![0x51], // Small script
+                script_pubkey: vec![blvm_consensus::opcodes::OP_1],
             }],
             lock_time: 0,
         };
@@ -502,16 +502,21 @@ mod tests {
                     hash: [0u8; 32],
                     index: 0,
                 },
-                script_sig: vec![0x41, 0x04], // Small signature
+                script_sig: vec![blvm_consensus::opcodes::PUSH_65_BYTES, 0x04],
                 sequence: 0xffffffff,
             }]
             .into(),
             outputs: vec![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
-                    0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_DUP,
+                    blvm_consensus::opcodes::OP_HASH160,
+                    blvm_consensus::opcodes::PUSH_20_BYTES,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ], // P2PKH
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_EQUALVERIFY,
+                    blvm_consensus::opcodes::OP_CHECKSIG,
+                ],
             }]
             .into(),
             lock_time: 0,
@@ -535,16 +540,21 @@ mod tests {
                     hash: [0u8; 32],
                     index: 0,
                 },
-                script_sig: vec![0x41, 0x04], // Small script sig
+                script_sig: vec![blvm_consensus::opcodes::PUSH_65_BYTES, 0x04],
                 sequence: 0xffffffff,
             }]
             .into(),
             outputs: vec![TransactionOutput {
                 value: 50_0000_0000,
                 script_pubkey: vec![
-                    0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_DUP,
+                    blvm_consensus::opcodes::OP_HASH160,
+                    blvm_consensus::opcodes::PUSH_20_BYTES,
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ], // Small script pubkey
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    blvm_consensus::opcodes::OP_EQUALVERIFY,
+                    blvm_consensus::opcodes::OP_CHECKSIG,
+                ],
             }]
             .into(),
             lock_time: 0,

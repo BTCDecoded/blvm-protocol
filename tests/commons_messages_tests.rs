@@ -246,12 +246,12 @@ fn test_filteredblock_message_processing() {
                 hash: [0u8; 32],
                 index: 0,
             },
-            script_sig: vec![0x41, 0x04],
+            script_sig: vec![blvm_consensus::opcodes::PUSH_65_BYTES, 0x04],
             sequence: 0xffffffff,
         }],
         outputs: blvm_consensus::tx_outputs![TransactionOutput {
             value: 10000, // Above dust threshold
-            script_pubkey: vec![0x51],
+            script_pubkey: vec![blvm_consensus::opcodes::OP_1],
         }],
         lock_time: 0,
     };

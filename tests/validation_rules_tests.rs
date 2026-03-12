@@ -17,12 +17,12 @@ fn create_simple_transaction() -> Transaction {
                 hash: [0u8; 32],
                 index: 0xffffffff,
             },
-            script_sig: vec![0x51], // OP_1
+            script_sig: vec![blvm_consensus::opcodes::OP_1],
             sequence: 0xffffffff,
         }],
         outputs: blvm_consensus::tx_outputs![TransactionOutput {
             value: 1000,
-            script_pubkey: vec![0x51], // OP_1
+            script_pubkey: vec![blvm_consensus::opcodes::OP_1],
         }],
         lock_time: 0,
     }

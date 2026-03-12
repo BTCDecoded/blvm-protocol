@@ -38,7 +38,7 @@ impl std::fmt::Display for AddressError {
 
 impl std::error::Error for AddressError {}
 
-// Re-export Network from bllvm-consensus to avoid duplication
+// Re-export Network from blvm-consensus to avoid duplication
 pub use blvm_consensus::types::Network;
 
 /// Encoded Bitcoin address

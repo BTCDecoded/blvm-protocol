@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Initial release of protocol-engine crate
+- Initial release of blvm-protocol crate
 - Bitcoin protocol abstraction layer
 - Multiple protocol variant support
 - Network parameter management
@@ -79,7 +79,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 0.1.0 - Initial Release
 
-This is the initial release of protocol-engine, providing a protocol abstraction layer for Bitcoin implementations.
+This is the initial release of blvm-protocol, providing a protocol abstraction layer for Bitcoin implementations.
 
 **Key Features:**
 - Protocol abstraction for multiple Bitcoin variants

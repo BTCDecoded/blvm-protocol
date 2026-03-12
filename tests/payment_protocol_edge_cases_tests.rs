@@ -5,11 +5,12 @@
 use blvm_protocol::payment::{
     Bip70Error, Payment, PaymentACK, PaymentOutput, PaymentRequest, SignedRefundAddress,
 };
-use secp256k1::{Message, SecretKey};
+use secp256k1::{Message, Secp256k1, SecretKey};
 
 fn generate_test_keypair() -> (SecretKey, secp256k1::PublicKey) {
-    let secret_key = SecretKey::from_secret_bytes([1; 32]).unwrap();
-    let public_key = secp256k1::PublicKey::from_secret_key(&secret_key);
+    let secret_key = SecretKey::from_slice(&[1; 32]).unwrap();
+    let secp = Secp256k1::new();
+    let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
     (secret_key, public_key)
 }
 
@@ -17,7 +18,7 @@ fn generate_test_keypair() -> (SecretKey, secp256k1::PublicKey) {
 fn test_payment_request_invalid_network() {
     // Test payment request with invalid network identifier
     let outputs = vec![PaymentOutput {
-        script: vec![0x51],
+        script: vec![blvm_consensus::opcodes::OP_1],
         amount: Some(1000),
     }];
 
@@ -31,7 +32,7 @@ fn test_payment_request_invalid_network() {
 fn test_payment_request_expired() {
     // Test payment request that has already expired
     let outputs = vec![PaymentOutput {
-        script: vec![0x51],
+        script: vec![blvm_consensus::opcodes::OP_1],
         amount: Some(1000),
     }];
 
@@ -56,10 +57,11 @@ fn test_payment_request_empty_outputs() {
 fn test_payment_request_invalid_signature() {
     // Test payment request with invalid signature
     let (secret_key, _) = generate_test_keypair();
-    let pubkey_bytes = secp256k1::PublicKey::from_secret_key(&secret_key).serialize();
+    let secp = Secp256k1::new();
+    let pubkey_bytes = secp256k1::PublicKey::from_secret_key(&secp, &secret_key).serialize();
 
     let outputs = vec![PaymentOutput {
-        script: vec![0x51],
+        script: vec![blvm_consensus::opcodes::OP_1],
         amount: Some(1000),
     }];
 
@@ -86,7 +88,7 @@ fn test_payment_request_missing_signature() {
     let pubkey_bytes = pubkey.serialize();
 
     let outputs = vec![PaymentOutput {
-        script: vec![0x51],
+        script: vec![blvm_consensus::opcodes::OP_1],
         amount: Some(1000),
     }];
 
@@ -116,7 +118,7 @@ fn test_payment_request_malformed_output() {
 fn test_payment_request_negative_amount() {
     // Test payment request with invalid amount (should use Option<u64> so None is valid)
     let outputs = vec![PaymentOutput {
-        script: vec![0x51],
+        script: vec![blvm_consensus::opcodes::OP_1],
         amount: None, // All available funds
     }];
 
@@ -174,7 +176,7 @@ fn test_signed_refund_address_invalid_signature() {
     let (_, _pubkey) = generate_test_keypair();
 
     let address = PaymentOutput {
-        script: vec![0x51],
+        script: vec![blvm_consensus::opcodes::OP_1],
         amount: None,
     };
 
@@ -189,7 +191,7 @@ fn test_signed_refund_address_invalid_signature() {
     // Verification should fail - from_compact will fail for invalid signature
     use sha2::{Digest, Sha256};
     let hash = Sha256::digest(&[0x42; 32]);
-    let message = Message::from_digest_slice(&hash).unwrap();
+    let message = Message::from_digest(hash.into());
     let sig_result = secp256k1::ecdsa::Signature::from_compact(&signed_refund.signature);
     // Invalid signature should fail to parse
     assert!(sig_result.is_err());
@@ -200,7 +202,7 @@ fn test_payment_request_very_large_memo() {
     // Test payment request with very large memo
     let large_memo = "x".repeat(10000);
     let outputs = vec![PaymentOutput {
-        script: vec![0x51],
+        script: vec![blvm_consensus::opcodes::OP_1],
         amount: Some(1000),
     }];
 
@@ -217,34 +219,35 @@ fn test_payment_request_multiple_refund_addresses() {
     let pubkey_bytes = pubkey.serialize();
 
     let outputs = vec![PaymentOutput {
-        script: vec![0x51],
+        script: vec![blvm_consensus::opcodes::OP_1],
         amount: Some(1000),
     }];
 
     // Create multiple refund addresses
     let refund1 = PaymentOutput {
-        script: vec![0x51],
+        script: vec![blvm_consensus::opcodes::OP_1],
         amount: None,
     };
     let refund2 = PaymentOutput {
-        script: vec![0x52], // OP_2
+        script: vec![blvm_consensus::opcodes::OP_2],
         amount: None,
     };
 
-    // Sign refund addresses (0.32: ecdsa::sign doesn't need Secp256k1 context)
-    use secp256k1::ecdsa;
+    // Sign refund addresses (secp256k1 0.28: use Secp256k1 context)
+    use secp256k1::Secp256k1;
     use sha2::{Digest, Sha256};
+    let secp = Secp256k1::new();
     let hash1 = Sha256::digest(&refund1.script);
-    let message1 = Message::from_digest_slice(&hash1).unwrap();
-    let sig1 = ecdsa::sign(message1, &secret_key);
+    let message1 = Message::from_digest(hash1.into());
+    let sig1 = secp.sign_ecdsa(&message1, &secret_key);
     let signed_refund1 = SignedRefundAddress {
         address: refund1,
         signature: sig1.serialize_compact().to_vec(),
     };
 
     let hash2 = Sha256::digest(&refund2.script);
-    let message2 = Message::from_digest_slice(&hash2).unwrap();
-    let sig2 = ecdsa::sign(message2, &secret_key);
+    let message2 = Message::from_digest(hash2.into());
+    let sig2 = secp.sign_ecdsa(&message2, &secret_key);
     let signed_refund2 = SignedRefundAddress {
         address: refund2,
         signature: sig2.serialize_compact().to_vec(),
@@ -265,7 +268,7 @@ fn test_payment_request_multiple_refund_addresses() {
 fn test_payment_request_network_timeout_scenario() {
     // Test payment request expiration handling (simulated timeout)
     let outputs = vec![PaymentOutput {
-        script: vec![0x51],
+        script: vec![blvm_consensus::opcodes::OP_1],
         amount: Some(1000),
     }];
 

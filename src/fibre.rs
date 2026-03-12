@@ -1,7 +1,7 @@
 //! FIBRE: Fast Internet Bitcoin Relay Engine - Protocol Definitions
 //!
 //! This module provides FIBRE protocol packet format definitions, serialization,
-//! and protocol-level types. Transport implementation is in bllvm-node.
+//! and protocol-level types. Transport implementation is in blvm-node.
 
 use crate::Hash;
 use serde::{Deserialize, Serialize};

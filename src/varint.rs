@@ -6,8 +6,8 @@
 //! - Values < 0xffffffff: encoded as 0xfe + 4 bytes (little-endian)
 //! - Values >= 0xffffffff: encoded as 0xff + 8 bytes (little-endian)
 
-use crate::Result;
 use crate::ConsensusError;
+use crate::Result;
 use std::io::{Read, Write};
 
 /// Maximum value for a varint (2^64 - 1)

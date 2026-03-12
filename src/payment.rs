@@ -119,8 +119,7 @@ impl PaymentACK {
         let hash = hasher.finalize();
 
         // Create message for signing
-        let message = Message::from_digest_slice(&hash)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid message: {e}")))?;
+        let message = Message::from_digest(hash.into());
 
         // Sign with secp256k1
         let secp = Secp256k1::new();
@@ -160,8 +159,7 @@ impl PaymentACK {
         let hash = hasher.finalize();
 
         // Create message for verification
-        let message = Message::from_digest_slice(&hash)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid message: {e}")))?;
+        let message = Message::from_digest(hash.into());
 
         // Verify signature
         let secp = Secp256k1::new();
@@ -237,8 +235,6 @@ impl PaymentRequest {
 
     /// Sign payment request with merchant's private key
     pub fn sign(&mut self, private_key: &secp256k1::SecretKey) -> Result<(), Bip70Error> {
-        use secp256k1::Message as SecpMessage;
-
         // Serialize payment_details for signing
         let serialized = bincode::serialize(&self.payment_details)
             .map_err(|e| Bip70Error::SerializationError(e.to_string()))?;
@@ -249,15 +245,12 @@ impl PaymentRequest {
         let hash = hasher.finalize();
 
         // Create message for signing
-        let message = SecpMessage::from_digest_slice(&hash)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid message: {e}")))?;
+        let message = Message::from_digest(hash.into());
 
         // Sign with secp256k1
         let secp = Secp256k1::new();
         let signature = secp.sign_ecdsa(&message, private_key);
-
-        // Get public key (0.32 API: from_secret_key no longer needs Secp256k1 context)
-        let pubkey = secp256k1::PublicKey::from_secret_key(private_key);
+        let pubkey = secp256k1::PublicKey::from_secret_key(&secp, private_key);
         let pubkey_serialized = pubkey.serialize();
 
         // Store signature and public key
@@ -296,8 +289,7 @@ impl PaymentRequest {
         let hash = hasher.finalize();
 
         // Create message for verification
-        let message = Message::from_digest_slice(&hash)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid message: {e}")))?;
+        let message = Message::from_digest(hash.into());
 
         // Verify signature
         let secp = Secp256k1::new();
@@ -431,7 +423,7 @@ pub enum Bip70Error {
 
 /// BIP70 Payment Protocol client (for making payments via P2P)
 ///
-/// Note: Node-specific message creation functions are in bllvm-node.
+/// Note: Node-specific message creation functions are in blvm-node.
 /// This struct provides protocol-level validation only.
 pub struct PaymentProtocolClient;
 
@@ -493,8 +485,7 @@ impl PaymentProtocolClient {
             hasher.update(&serialized);
             let hash = hasher.finalize();
 
-            let message = Message::from_digest_slice(&hash)
-                .map_err(|e| Bip70Error::SignatureError(format!("Invalid message: {e}")))?;
+            let message = Message::from_digest(hash.into());
 
             let signature = Signature::from_compact(merchant_signature)
                 .map_err(|e| Bip70Error::SignatureError(format!("Invalid signature: {e}")))?;
@@ -514,7 +505,7 @@ impl PaymentProtocolClient {
 
 /// BIP70 Payment Protocol server (for receiving payments via P2P)
 ///
-/// Note: Node-specific message creation functions are in bllvm-node.
+/// Note: Node-specific message creation functions are in blvm-node.
 /// This struct provides protocol-level processing only.
 pub struct PaymentProtocolServer;
 
@@ -648,8 +639,7 @@ impl PaymentProtocolServer {
         let hash = hasher.finalize();
 
         // Sign
-        let message = Message::from_digest_slice(&hash)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid message: {e}")))?;
+        let message = Message::from_digest(hash.into());
 
         let secp = Secp256k1::new();
         let signature = secp.sign_ecdsa(&message, merchant_private_key);
@@ -675,8 +665,7 @@ impl PaymentProtocolServer {
         hasher.update(&serialized);
         let hash = hasher.finalize();
 
-        let message = Message::from_digest_slice(&hash)
-            .map_err(|e| Bip70Error::SignatureError(format!("Invalid message: {e}")))?;
+        let message = Message::from_digest(hash.into());
 
         let signature = Signature::from_compact(&signed_refund.signature)
             .map_err(|e| Bip70Error::SignatureError(format!("Invalid signature: {e}")))?;
@@ -700,7 +689,7 @@ mod tests {
     #[test]
     fn test_payment_request_creation() {
         let output = PaymentOutput {
-            script: vec![0x51],   // OP_1 (placeholder)
+            script: vec![blvm_consensus::opcodes::OP_1],
             amount: Some(100000), // 0.001 BTC
         };
 
@@ -716,7 +705,7 @@ mod tests {
         let request = PaymentRequest::new(
             "main".to_string(),
             vec![PaymentOutput {
-                script: vec![0x51],
+                script: vec![blvm_consensus::opcodes::OP_1],
                 amount: Some(100000),
             }],
             1234567890,
@@ -731,7 +720,7 @@ mod tests {
         let request = PaymentRequest::new(
             "main".to_string(),
             vec![PaymentOutput {
-                script: vec![0x51],
+                script: vec![blvm_consensus::opcodes::OP_1],
                 amount: Some(100000),
             }],
             expired_time,

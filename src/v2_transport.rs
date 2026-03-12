@@ -66,14 +66,11 @@ impl V2Transport {
         let nonce = Nonce::from_slice(&nonce_bytes);
 
         // Encrypt plaintext
-        let ciphertext = self
-            .send_cipher
-            .encrypt(nonce, plaintext)
-            .map_err(|e| {
-                ProtocolError::Consensus(blvm_consensus::error::ConsensusError::Serialization(
-                    Cow::Owned(format!("Encryption failed: {}", e)),
-                ))
-            })?;
+        let ciphertext = self.send_cipher.encrypt(nonce, plaintext).map_err(|e| {
+            ProtocolError::Consensus(blvm_consensus::error::ConsensusError::Serialization(
+                Cow::Owned(format!("Encryption failed: {}", e)),
+            ))
+        })?;
 
         // Increment nonce counter
         self.send_nonce += 1;
@@ -86,33 +83,33 @@ impl V2Transport {
 
         // Build packet: [tag(16)][length(3)][ignored(1)][payload(var)]
         let mut packet = Vec::with_capacity(20 + ciphertext.len());
-        
+
         // Extract tag (last 16 bytes of ciphertext are the tag)
         if ciphertext.len() < 16 {
             return Err(ProtocolError::Consensus(
-                blvm_consensus::error::ConsensusError::Serialization(
-                    Cow::Owned("Ciphertext too short".to_string()),
-                ),
+                blvm_consensus::error::ConsensusError::Serialization(Cow::Owned(
+                    "Ciphertext too short".to_string(),
+                )),
             ));
         }
         let tag_start = ciphertext.len() - 16;
         packet.extend_from_slice(&ciphertext[tag_start..]);
-        
+
         // Length (3 bytes, little-endian, max 2^24-1)
         let payload_len = ciphertext.len() - 16; // Exclude tag
         if payload_len > 0xFFFFFF {
             return Err(ProtocolError::Consensus(
-                blvm_consensus::error::ConsensusError::Serialization(
-                    Cow::Owned("Payload too large".to_string()),
-                ),
+                blvm_consensus::error::ConsensusError::Serialization(Cow::Owned(
+                    "Payload too large".to_string(),
+                )),
             ));
         }
         let len_bytes = (payload_len as u32).to_le_bytes();
         packet.extend_from_slice(&len_bytes[..3]);
-        
+
         // Ignored byte (set to 0)
         packet.push(0);
-        
+
         // Payload (ciphertext without tag)
         packet.extend_from_slice(&ciphertext[..tag_start]);
 
@@ -124,9 +121,9 @@ impl V2Transport {
         // BIP324 packet format: [16-byte poly1305 tag][3-byte length][1-byte ignored][encrypted payload]
         if packet.len() < 20 {
             return Err(ProtocolError::Consensus(
-                blvm_consensus::error::ConsensusError::Serialization(
-                    Cow::Owned("Packet too short".to_string()),
-                ),
+                blvm_consensus::error::ConsensusError::Serialization(Cow::Owned(
+                    "Packet too short".to_string(),
+                )),
             ));
         }
 
@@ -140,9 +137,9 @@ impl V2Transport {
 
         if packet.len() < payload_end {
             return Err(ProtocolError::Consensus(
-                blvm_consensus::error::ConsensusError::Serialization(
-                    Cow::Owned("Packet incomplete".to_string()),
-                ),
+                blvm_consensus::error::ConsensusError::Serialization(Cow::Owned(
+                    "Packet incomplete".to_string(),
+                )),
             ));
         }
 
@@ -185,13 +182,12 @@ impl V2Handshake {
         // Generate random 32 bytes for secret key
         let mut key_bytes = [0u8; 32];
         getrandom(&mut key_bytes).expect("Failed to generate random bytes");
-        let private_key = SecretKey::from_slice(&key_bytes)
-            .expect("Failed to generate secret key");
-        
+        let private_key = SecretKey::from_slice(&key_bytes).expect("Failed to generate secret key");
+
         // Generate random aux_rand for ElligatorSwift encoding
         let mut aux_rand = [0u8; 32];
         getrandom(&mut aux_rand).expect("Failed to generate aux_rand");
-        
+
         // Create ElligatorSwift encoding from secret key (BIP324-compatible)
         let ellswift = ElligatorSwift::from_seckey(&secp, private_key, Some(aux_rand));
         let encoded = ellswift.to_array();
@@ -210,8 +206,7 @@ impl V2Handshake {
         // Generate random 32 bytes for secret key
         let mut key_bytes = [0u8; 32];
         getrandom(&mut key_bytes).expect("Failed to generate random bytes");
-        let private_key = SecretKey::from_slice(&key_bytes)
-            .expect("Failed to generate secret key");
+        let private_key = SecretKey::from_slice(&key_bytes).expect("Failed to generate secret key");
 
         Self::Responder {
             private_key,
@@ -226,9 +221,9 @@ impl V2Handshake {
     ) -> Result<(Vec<u8>, V2Transport)> {
         if initiator_msg.len() != 64 {
             return Err(ProtocolError::Consensus(
-                blvm_consensus::error::ConsensusError::Serialization(
-                    Cow::Owned("Invalid initiator message length".to_string()),
-                ),
+                blvm_consensus::error::ConsensusError::Serialization(Cow::Owned(
+                    "Invalid initiator message length".to_string(),
+                )),
             ));
         }
 
@@ -243,34 +238,35 @@ impl V2Handshake {
             Self::Responder { private_key, .. } => *private_key,
             _ => {
                 return Err(ProtocolError::Consensus(
-                    blvm_consensus::error::ConsensusError::Serialization(
-                        Cow::Owned("Not a responder handshake".to_string()),
-                    ),
+                    blvm_consensus::error::ConsensusError::Serialization(Cow::Owned(
+                        "Not a responder handshake".to_string(),
+                    )),
                 ));
             }
         };
-        
+
         // Generate random aux_rand for ElligatorSwift encoding
         let mut aux_rand = [0u8; 32];
         getrandom(&mut aux_rand).expect("Failed to generate aux_rand");
-        
+
         // Create ElligatorSwift encoding from secret key (BIP324-compatible)
-        let responder_ellswift = ElligatorSwift::from_seckey(&secp, responder_private, Some(aux_rand));
+        let responder_ellswift =
+            ElligatorSwift::from_seckey(&secp, responder_private, Some(aux_rand));
         let responder_ellswift_bytes = responder_ellswift.to_array();
 
         // Perform X-only ECDH using ElligatorSwift shared secret (BIP324-compatible)
         // Use secp256k1's built-in shared_secret computation with ElligatorSwift objects
         use secp256k1::ellswift::ElligatorSwiftParty;
-        
+
         // Compute shared secret using ElligatorSwift::shared_secret (BIP324-compatible)
         let shared_secret = ElligatorSwift::shared_secret(
             initiator_ellswift,
             responder_ellswift,
             responder_private,
             ElligatorSwiftParty::B, // Responder is party B
-            None, // No additional data for BIP324
+            None,                   // No additional data for BIP324
         );
-        
+
         let shared_x = shared_secret.to_secret_bytes();
 
         // Derive keys using HKDF
@@ -293,15 +289,12 @@ impl V2Handshake {
     }
 
     /// Complete handshake (initiator side)
-    pub fn complete_handshake(
-        self,
-        responder_msg: &[u8],
-    ) -> Result<V2Transport> {
+    pub fn complete_handshake(self, responder_msg: &[u8]) -> Result<V2Transport> {
         if responder_msg.len() != 64 {
             return Err(ProtocolError::Consensus(
-                blvm_consensus::error::ConsensusError::Serialization(
-                    Cow::Owned("Invalid responder message length".to_string()),
-                ),
+                blvm_consensus::error::ConsensusError::Serialization(Cow::Owned(
+                    "Invalid responder message length".to_string(),
+                )),
             ));
         }
 
@@ -314,29 +307,33 @@ impl V2Handshake {
         // Use secp256k1's built-in shared_secret computation with ElligatorSwift objects
         use secp256k1::ellswift::ElligatorSwiftParty;
         let (private_key, initiator_ellswift) = match self {
-            Self::Initiator { private_key, ellswift, .. } => {
+            Self::Initiator {
+                private_key,
+                ellswift,
+                ..
+            } => {
                 (private_key, ellswift) // ellswift is Copy, private_key is not
             }
             _ => {
                 return Err(ProtocolError::Consensus(
-                    blvm_consensus::error::ConsensusError::Serialization(
-                        Cow::Owned("Not an initiator handshake".to_string()),
-                    ),
+                    blvm_consensus::error::ConsensusError::Serialization(Cow::Owned(
+                        "Not an initiator handshake".to_string(),
+                    )),
                 ));
             }
         };
-        
+
         // Compute shared secret using ElligatorSwift::shared_secret (BIP324-compatible)
         let shared_secret = ElligatorSwift::shared_secret(
             initiator_ellswift,
             responder_ellswift,
             private_key,
             ElligatorSwiftParty::A, // Initiator is party A
-            None, // No additional data for BIP324
+            None,                   // No additional data for BIP324
         );
-        
+
         let shared_x = shared_secret.to_secret_bytes();
-        
+
         // Derive keys using HKDF
         let send_key = hkdf_sha256(&shared_x, b"bitcoin_v2_shared_secret_send");
         let recv_key = hkdf_sha256(&shared_x, b"bitcoin_v2_shared_secret_recv");
@@ -356,7 +353,7 @@ fn elligator_swift_encode(pubkey: &PublicKey) -> [u8; 64] {
 
 /// ElligatorSwift decoding (BIP324)
 /// Decodes 64 bytes to an ElligatorSwift object (not directly to PublicKey)
-/// 
+///
 /// Note: For BIP324, we work with ElligatorSwift objects directly in the handshake.
 /// The shared secret computation uses ElligatorSwift objects, not raw public keys.
 fn elligator_swift_decode(encoded: &[u8; 64]) -> ElligatorSwift {
@@ -370,7 +367,7 @@ fn elligator_swift_decode(encoded: &[u8; 64]) -> ElligatorSwift {
 /// Uses the hkdf library for proper HMAC-SHA256-based key derivation
 fn hkdf_sha256(ikm: &[u8], info: &[u8]) -> [u8; 32] {
     use hkdf::Hkdf;
-    
+
     // BIP324 uses HKDF with empty salt and info parameter
     let hk = Hkdf::<sha2::Sha256>::new(None, ikm);
     let mut okm = [0u8; 32];
@@ -411,4 +408,3 @@ mod tests {
         assert_eq!(encoded, re_encoded);
     }
 }
-

@@ -7,12 +7,13 @@ use blvm_protocol::payment::{
     Bip70Error, Payment, PaymentACK, PaymentDetails, PaymentOutput, PaymentProtocolServer,
     PaymentRequest, SignedRefundAddress,
 };
-use secp256k1::{SecretKey};
+use secp256k1::{Secp256k1, SecretKey};
 
-/// Test helper: Generate a test keypair (0.32 API: from_secret_bytes, PublicKey::from_secret_key)
+/// Test helper: Generate a test keypair (secp256k1 0.28 API)
 fn generate_test_keypair() -> (SecretKey, secp256k1::PublicKey) {
-    let secret_key = SecretKey::from_secret_bytes([1; 32]).unwrap();
-    let public_key = secp256k1::PublicKey::from_secret_key(&secret_key);
+    let secret_key = SecretKey::from_slice(&[1; 32]).unwrap();
+    let secp = Secp256k1::new();
+    let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
     (secret_key, public_key)
 }
 
@@ -20,8 +21,13 @@ fn generate_test_keypair() -> (SecretKey, secp256k1::PublicKey) {
 fn create_test_payment_output() -> PaymentOutput {
     PaymentOutput {
         script: vec![
-            0x76, 0xa9, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            blvm_consensus::opcodes::OP_DUP,
+            blvm_consensus::opcodes::OP_HASH160,
+            blvm_consensus::opcodes::PUSH_20_BYTES,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            blvm_consensus::opcodes::OP_EQUALVERIFY,
+            blvm_consensus::opcodes::OP_CHECKSIG,
         ],
         amount: Some(1000),
     }
@@ -86,7 +92,7 @@ fn test_payment_request_with_multiple_outputs() {
     let outputs = vec![
         create_test_payment_output(),
         PaymentOutput {
-            script: vec![0x51], // OP_1
+            script: vec![blvm_consensus::opcodes::OP_1],
             amount: Some(2000),
         },
     ];

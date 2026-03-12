@@ -356,7 +356,7 @@ mod tests {
             .into(),
             outputs: vec![TransactionOutput {
                 value: 1000,
-                script_pubkey: vec![0x51, 0x52], // OP_1 OP_2
+                script_pubkey: vec![blvm_consensus::opcodes::OP_1, blvm_consensus::opcodes::OP_2],
             }]
             .into(),
             lock_time: 0,

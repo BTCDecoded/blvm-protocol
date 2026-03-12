@@ -91,7 +91,7 @@ fn create_test_block_with_txs(tx_count: usize) -> (Hash, Block) {
         }],
         outputs: blvm_consensus::tx_outputs![TransactionOutput {
             value: 50_0000_0000,
-            script_pubkey: vec![0x51], // OP_1
+            script_pubkey: vec![blvm_consensus::opcodes::OP_1],
         }],
         lock_time: 0,
     });
@@ -105,12 +105,12 @@ fn create_test_block_with_txs(tx_count: usize) -> (Hash, Block) {
                     hash: [i as u8; 32],
                     index: 0,
                 },
-                script_sig: vec![0x41, 0x04], // Signature
+                script_sig: vec![blvm_consensus::opcodes::PUSH_65_BYTES, 0x04],
                 sequence: 0xffffffff,
             }],
             outputs: blvm_consensus::tx_outputs![TransactionOutput {
                 value: 1000,
-                script_pubkey: vec![0x51], // OP_1
+                script_pubkey: vec![blvm_consensus::opcodes::OP_1],
             }],
             lock_time: 0,
         });
@@ -287,7 +287,7 @@ fn test_cmpctblock_with_prefilled_txs() {
         }],
         outputs: blvm_consensus::tx_outputs![TransactionOutput {
             value: 50_0000_0000,
-            script_pubkey: vec![0x51],
+            script_pubkey: vec![blvm_consensus::opcodes::OP_1],
         }],
         lock_time: 0,
     };
@@ -469,12 +469,12 @@ fn test_blocktxn_message_processing() {
                 hash: [0u8; 32],
                 index: 0,
             },
-            script_sig: vec![0x41, 0x04],
+            script_sig: vec![blvm_consensus::opcodes::PUSH_65_BYTES, 0x04],
             sequence: 0xffffffff,
         }],
         outputs: blvm_consensus::tx_outputs![TransactionOutput {
             value: 1000,
-            script_pubkey: vec![0x51],
+            script_pubkey: vec![blvm_consensus::opcodes::OP_1],
         }],
         lock_time: 0,
     }];

@@ -10,7 +10,6 @@ use crate::{BitcoinProtocolEngine, ProtocolConfig, Result};
 use blvm_consensus::error::ConsensusError;
 use blvm_consensus::types::UtxoSet;
 use blvm_consensus::types::{Block, BlockHeader, Hash, Transaction, ValidationResult};
-use std::borrow::Cow;
 use std::sync::Arc;
 
 // Commons module is always available (ban list sharing doesn't require utxo-commitments)
@@ -571,7 +570,7 @@ fn process_version_message(
         use crate::service_flags::{has_flag, standard};
         let peer_supports_v2 = has_flag(version.services, standard::NODE_V2_TRANSPORT);
         let we_support_v2 = config.service_flags.node_v2_transport;
-        
+
         if peer_supports_v2 && we_support_v2 {
             // Initiate v2 handshake (responder side)
             let handshake = crate::v2_transport::V2Handshake::new_responder();
