@@ -23,6 +23,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 # [replace]
 # "blvm-consensus:0.1.6" = { path = "../blvm-consensus" }
 blvm-consensus = { path = "../blvm-consensus" }
+# Spec-lock for #[spec_locked] annotations (UTXO commitments 11.4)
+blvm-spec-lock = { path = "../blvm-spec-lock", default-features = false, optional = true }
 
 # Serialization - EXACT VERSIONS for security
 serde = { version = "=1.0.228", features = ["derive"] }  # Updated for iroh 0.95 compatibility
@@ -50,6 +52,14 @@ bech32 = "=0.9"
 # CRC32 for FIBRE packet checksums
 crc32fast = "=1.3"
 
+# UTXO commitments (sparse merkle tree, randomness)
+sparse-merkle-tree = { version = "0.6", optional = true }
+rand = { version = "=0.8.5", optional = true }
+# LruCache for spam filter script type cache (production)
+lru = { version = "0.12", optional = true }
+# Rayon for parallel UTXO proof verification
+rayon = { version = "1.10", optional = true }
+
 [dependencies.smallvec]
 version = "1.11"
 optional = true
@@ -57,21 +67,26 @@ features = ["serde"]
 
 [features]
 # Production performance optimizations (passed through from blvm-consensus)
-production = ["blvm-consensus/production", "dep:smallvec"]
-# UTXO commitments module (passed through from blvm-consensus)
-utxo-commitments = ["blvm-consensus/utxo-commitments"]
+production = ["blvm-consensus/production", "dep:smallvec", "dep:lru", "dep:rayon"]
+# UTXO commitments module (implementation in blvm-protocol)
+utxo-commitments = ["sparse-merkle-tree", "dep:rand", "dep:blvm-spec-lock"]
 # CTV (BIP119 CheckTemplateVerify) - passed through from blvm-consensus
 ctv = ["blvm-consensus/ctv"]
 # IBD/PERF profiling - passed through from blvm-consensus (profile_log, BATCH, etc.)
 profile = ["blvm-consensus/profile"]
 # BIP324: v2 encrypted transport protocol
 bip324 = []
+# UTXO proof verification (optional, for future use)
+utxo-proof-verification = []
+# Parallel UTXO proof verification (requires rayon)
+parallel-verification = ["dep:rayon"]
 # Sigop counting module (always available, no feature flag needed)
 # sigop module is always compiled in blvm-consensus
 
 [dev-dependencies]
 tempfile = "=3.8.1"
 cargo-tarpaulin = "0.27"
+bytes = "1.11.1"  # RUSTSEC-2026-0007: force upgrade for cargo-tarpaulin transitive dep
 
 # Fast release: opt-level 2 for iteration (matches blvm/blvm-node/blvm-consensus)
 [profile.release-fast]

@@ -396,17 +396,13 @@ impl Default for ProtocolConfig {
 impl ProtocolConfig {
     /// Load configuration from environment variables
     ///
-    /// Environment variables follow the pattern: `BLLVM_PROTOCOL_<SECTION>_<KEY>`
-    ///
-    /// Examples:
-    /// - `BLLVM_PROTOCOL_PROTOCOL_VERSION=Testnet3`
-    /// - `BLLVM_PROTOCOL_VALIDATION_MAX_BLOCK_SIZE=4000000`
-    /// - `BLLVM_PROTOCOL_SERVICE_FLAGS_NODE_FIBRE=true`
+    /// Uses short names aligned with blvm-consensus where applicable.
+    /// Examples: `BLVM_PROTOCOL_VERSION=Testnet3`, `BLVM_MAX_BLOCK_SIZE=4000000`
     pub fn from_env() -> Self {
         let mut config = Self::default();
 
-        // Load protocol version
-        if let Ok(val) = std::env::var("BLLVM_PROTOCOL_PROTOCOL_VERSION") {
+        // Protocol version
+        if let Ok(val) = std::env::var("BLVM_PROTOCOL_VERSION") {
             config.protocol_version = match val.as_str() {
                 "Testnet3" | "testnet" => ProtocolVersion::Testnet3,
                 "Regtest" | "regtest" => ProtocolVersion::Regtest,
@@ -414,76 +410,76 @@ impl ProtocolConfig {
             };
         }
 
-        // Load network limits (from blvm-consensus config)
-        if let Ok(val) = std::env::var("BLLVM_CONSENSUS_NETWORK_LIMITS_MAX_ADDR_ADDRESSES") {
+        // Network limits (same vars as blvm-consensus)
+        if let Ok(val) = std::env::var("BLVM_MAX_ADDR_ADDRESSES") {
             if let Ok(count) = val.parse::<usize>() {
                 config.network_limits.max_addr_addresses = count;
             }
         }
-        if let Ok(val) = std::env::var("BLLVM_CONSENSUS_NETWORK_LIMITS_MAX_INV_ITEMS") {
+        if let Ok(val) = std::env::var("BLVM_MAX_INV_ITEMS") {
             if let Ok(count) = val.parse::<usize>() {
                 config.network_limits.max_inv_items = count;
             }
         }
-        if let Ok(val) = std::env::var("BLLVM_CONSENSUS_NETWORK_LIMITS_MAX_HEADERS") {
+        if let Ok(val) = std::env::var("BLVM_MAX_HEADERS") {
             if let Ok(count) = val.parse::<usize>() {
                 config.network_limits.max_headers = count;
             }
         }
-        if let Ok(val) = std::env::var("BLLVM_CONSENSUS_NETWORK_LIMITS_MAX_USER_AGENT_LENGTH") {
+        if let Ok(val) = std::env::var("BLVM_MAX_USER_AGENT_LENGTH") {
             if let Ok(length) = val.parse::<usize>() {
                 config.network_limits.max_user_agent_length = length;
             }
         }
 
-        // Load validation config
-        if let Ok(val) = std::env::var("BLLVM_PROTOCOL_VALIDATION_MAX_BLOCK_SIZE") {
+        // Validation
+        if let Ok(val) = std::env::var("BLVM_MAX_BLOCK_SIZE") {
             if let Ok(size) = val.parse::<u32>() {
                 config.validation.max_block_size = size;
             }
         }
-        if let Ok(val) = std::env::var("BLLVM_PROTOCOL_VALIDATION_MAX_TX_SIZE") {
+        if let Ok(val) = std::env::var("BLVM_MAX_TX_SIZE") {
             if let Ok(size) = val.parse::<u32>() {
                 config.validation.max_tx_size = size;
             }
         }
-        if let Ok(val) = std::env::var("BLLVM_PROTOCOL_VALIDATION_MAX_TXS_PER_BLOCK") {
+        if let Ok(val) = std::env::var("BLVM_MAX_TXS_PER_BLOCK") {
             if let Ok(count) = val.parse::<usize>() {
                 config.validation.max_txs_per_block = count;
             }
         }
-        if let Ok(val) = std::env::var("BLLVM_PROTOCOL_VALIDATION_MAX_LOCATOR_HASHES") {
+        if let Ok(val) = std::env::var("BLVM_MAX_LOCATOR_HASHES") {
             if let Ok(count) = val.parse::<usize>() {
                 config.validation.max_locator_hashes = count;
             }
         }
 
-        // Load service flags
-        if let Ok(val) = std::env::var("BLLVM_PROTOCOL_SERVICE_FLAGS_NODE_FIBRE") {
+        // Service flags
+        if let Ok(val) = std::env::var("BLVM_SERVICE_FIBRE") {
             if let Ok(enabled) = val.parse::<bool>() {
                 config.service_flags.node_fibre = enabled;
             }
         }
-        if let Ok(val) = std::env::var("BLLVM_PROTOCOL_SERVICE_FLAGS_NODE_UTXO_COMMITMENTS") {
+        if let Ok(val) = std::env::var("BLVM_SERVICE_UTXO_COMMITMENTS") {
             if let Ok(enabled) = val.parse::<bool>() {
                 config.service_flags.node_utxo_commitments = enabled;
             }
         }
-        if let Ok(val) = std::env::var("BLLVM_PROTOCOL_SERVICE_FLAGS_NODE_BAN_LIST_SHARING") {
+        if let Ok(val) = std::env::var("BLVM_SERVICE_BAN_LIST_SHARING") {
             if let Ok(enabled) = val.parse::<bool>() {
                 config.service_flags.node_ban_list_sharing = enabled;
             }
         }
 
-        // Load features
-        if let Ok(val) = std::env::var("BLLVM_PROTOCOL_FEATURES_COMPACT_BLOCKS") {
+        // Features
+        if let Ok(val) = std::env::var("BLVM_FEATURE_COMPACT_BLOCKS") {
             if let Ok(enabled) = val.parse::<bool>() {
                 config.features.compact_blocks = enabled;
             }
         }
 
-        // Load Commons extensions
-        if let Ok(val) = std::env::var("BLLVM_PROTOCOL_COMMONS_UTXO_COMMITMENTS") {
+        // Commons extensions
+        if let Ok(val) = std::env::var("BLVM_UTXO_COMMITMENTS") {
             if let Ok(enabled) = val.parse::<bool>() {
                 config.commons.utxo_commitments = enabled;
             }

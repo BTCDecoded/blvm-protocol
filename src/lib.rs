@@ -29,6 +29,11 @@ pub use blvm_consensus::ConsensusProof;
 // Re-export smallvec for macro use when production feature is enabled
 #[cfg(feature = "production")]
 pub use smallvec;
+// Re-export lru and rayon for production caches and parallel validation
+#[cfg(feature = "production")]
+pub use lru;
+#[cfg(feature = "production")]
+pub use rayon;
 
 // Protocol-specific Result type
 pub use error::{ProtocolError, Result};
@@ -55,14 +60,10 @@ pub mod sigop {
 }
 
 #[cfg(feature = "utxo-commitments")]
-pub mod utxo_commitments {
-    pub use blvm_consensus::utxo_commitments::*;
-}
+pub mod utxo_commitments;
 
 // Spam filter is always available (not behind utxo-commitments feature)
-pub mod spam_filter {
-    pub use blvm_consensus::spam_filter::*;
-}
+pub mod spam_filter;
 pub mod serialization {
     pub use blvm_consensus::serialization::*;
 }
@@ -121,6 +122,7 @@ pub mod bip157; // BIP157: Client-side block filtering network protocol
 pub mod bip158; // BIP158: Compact block filters
 pub mod fibre;
 pub mod payment; // BIP70: Payment protocol (P2P variant) // FIBRE: Fast Internet Bitcoin Relay Engine protocol definitions
+pub mod time;
 
 /// Bitcoin Protocol Engine
 ///
@@ -304,19 +306,16 @@ impl BitcoinProtocolEngine {
             ProtocolVersion::Testnet3 => types::Network::Testnet,
             ProtocolVersion::Regtest => types::Network::Regtest,
         };
-        let network_time = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let (result, new_utxo_set, _undo_log) = blvm_consensus::block::connect_block(
-            block,
-            witnesses,
-            utxos.clone(),
-            height,
+        let network_time = crate::time::current_timestamp();
+        let context = blvm_consensus::block::BlockValidationContext::from_connect_block_ibd_args(
             recent_headers,
             network_time,
             network,
-        )?;
+            None,
+            None,
+        );
+        let (result, new_utxo_set, _undo_log) =
+            blvm_consensus::block::connect_block(block, witnesses, utxos.clone(), height, &context)?;
 
         Ok((result, new_utxo_set))
     }

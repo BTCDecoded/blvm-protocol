@@ -303,10 +303,7 @@ impl PaymentRequest {
     pub fn validate(&self) -> Result<(), Bip70Error> {
         // Check expiration
         if let Some(expires) = self.payment_details.expires {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
-                .as_secs();
+            let now = crate::time::current_timestamp();
             if now > expires {
                 return Err(Bip70Error::Expired);
             }
@@ -734,7 +731,7 @@ mod tests {
 
     #[test]
     fn test_payment_creation() {
-        let tx = vec![0x01, 0x00, 0x00, 0x00]; // Placeholder transaction
+        let tx = vec![0x01, 0x00, 0x00, 0x00]; // Arbitrary bytes for Payment::new structure test (not a valid tx)
         let payment = Payment::new(vec![tx.clone()]);
 
         assert_eq!(payment.transactions.len(), 1);

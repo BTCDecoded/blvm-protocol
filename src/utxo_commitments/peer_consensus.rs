@@ -1,0 +1,610 @@
+//! Peer Consensus Protocol
+//!
+//! Implements the N-of-M peer consensus model for UTXO set verification.
+//! Discovers diverse peers and finds consensus among them to verify UTXO commitments
+//! without trusting any single peer.
+
+#[cfg(feature = "utxo-commitments")]
+use blvm_consensus::types::{BlockHeader, Hash, Natural};
+#[cfg(feature = "utxo-commitments")]
+use blvm_spec_lock::spec_locked;
+#[cfg(feature = "utxo-commitments")]
+use crate::utxo_commitments::data_structures::{
+    UtxoCommitment, UtxoCommitmentError, UtxoCommitmentResult,
+};
+#[cfg(feature = "utxo-commitments")]
+use crate::utxo_commitments::network_integration::UtxoCommitmentsNetworkClient;
+#[cfg(feature = "utxo-commitments")]
+use crate::utxo_commitments::verification::{verify_header_chain, verify_supply};
+#[cfg(feature = "utxo-commitments")]
+use sparse_merkle_tree::MerkleProof;
+#[cfg(feature = "utxo-commitments")]
+use std::collections::{HashMap, HashSet};
+#[cfg(feature = "utxo-commitments")]
+use std::net::IpAddr;
+
+/// Peer information for diversity tracking
+#[derive(Debug, Clone)]
+pub struct PeerInfo {
+    pub address: IpAddr,
+    pub asn: Option<u32>,               // Autonomous System Number
+    pub country: Option<String>,        // Country code (ISO 3166-1 alpha-2)
+    pub implementation: Option<String>, // Node implementation
+    pub subnet: u32,                    // /16 subnet for diversity checks
+}
+
+impl PeerInfo {
+    /// Extract /16 subnet from IP address
+    pub fn extract_subnet(ip: IpAddr) -> u32 {
+        match ip {
+            IpAddr::V4(ipv4) => {
+                let octets = ipv4.octets();
+                ((octets[0] as u32) << 24) | ((octets[1] as u32) << 16)
+            }
+            IpAddr::V6(ipv6) => {
+                // For IPv6, use first 32 bits for subnet
+                let segments = ipv6.segments();
+                ((segments[0] as u32) << 16) | (segments[1] as u32)
+            }
+        }
+    }
+}
+
+/// Peer with UTXO commitment response
+#[derive(Debug, Clone)]
+pub struct PeerCommitment {
+    pub peer_info: PeerInfo,
+    pub commitment: UtxoCommitment,
+}
+
+/// Consensus result from peer queries
+#[derive(Debug, Clone)]
+pub struct ConsensusResult {
+    /// The consensus UTXO commitment (agreed upon by majority)
+    pub commitment: UtxoCommitment,
+    /// Number of peers that agreed (out of total queried)
+    pub agreement_count: usize,
+    pub total_peers: usize,
+    /// Agreement percentage (0.0 to 1.0)
+    pub agreement_ratio: f64,
+}
+
+/// Peer consensus configuration
+#[derive(Debug, Clone)]
+pub struct ConsensusConfig {
+    /// Minimum number of diverse peers required
+    pub min_peers: usize,
+    /// Target number of peers to query
+    pub target_peers: usize,
+    /// Consensus threshold (0.0 to 1.0, e.g., 0.8 = 80%)
+    pub consensus_threshold: f64,
+    /// Maximum peers per ASN
+    pub max_peers_per_asn: usize,
+    /// Block safety margin (blocks back from tip)
+    pub safety_margin: Natural,
+    /// Shuffle peers before diversity selection (eclipse resistance). Default: true.
+    /// Set to false for deterministic tests or formal verification.
+    pub shuffle_peers: bool,
+}
+
+impl Default for ConsensusConfig {
+    fn default() -> Self {
+        Self {
+            min_peers: 5,
+            target_peers: 10,
+            consensus_threshold: 0.8, // 80% agreement required
+            max_peers_per_asn: 2,
+            safety_margin: 2016, // ~2 weeks of blocks
+            shuffle_peers: true,
+        }
+    }
+}
+
+/// Peer consensus manager
+pub struct PeerConsensus {
+    pub config: ConsensusConfig,
+}
+
+impl PeerConsensus {
+    /// Create a new peer consensus manager
+    pub fn new(config: ConsensusConfig) -> Self {
+        Self { config }
+    }
+
+    /// Discover diverse peers
+    ///
+    /// Filters peers to ensure diversity across:
+    /// - ASNs (max N per ASN)
+    /// - Subnets (/16 for IPv4, /32 for IPv6)
+    /// - Geographic regions
+    /// - Bitcoin implementations
+    #[spec_locked("13.4")]
+    pub fn discover_diverse_peers(&self, all_peers: Vec<PeerInfo>) -> Vec<PeerInfo> {
+        use rand::seq::SliceRandom;
+
+        // Shuffle to prevent predictable peer selection (eclipse resistance)
+        let mut peers = all_peers;
+        if self.config.shuffle_peers {
+            peers.shuffle(&mut rand::thread_rng());
+        }
+
+        let mut diverse_peers = Vec::new();
+        let mut seen_asn: HashMap<u32, usize> = HashMap::new();
+        let mut seen_subnets: HashSet<u32> = HashSet::new();
+        let _seen_countries: HashSet<String> = HashSet::new();
+
+        for peer in peers {
+            // Check ASN limit
+            if let Some(asn) = peer.asn {
+                let asn_count = seen_asn.entry(asn).or_insert(0);
+                if *asn_count >= self.config.max_peers_per_asn {
+                    continue; // Skip - too many peers from this ASN
+                }
+                *asn_count += 1;
+            }
+
+            // Check subnet (no peers from same /16)
+            if seen_subnets.contains(&peer.subnet) {
+                continue; // Skip - duplicate subnet
+            }
+            seen_subnets.insert(peer.subnet);
+
+            // Add diverse peer
+            diverse_peers.push(peer);
+
+            // Stop when we have enough
+            if diverse_peers.len() >= self.config.target_peers {
+                break;
+            }
+        }
+
+        diverse_peers
+    }
+
+    /// Determine checkpoint height based on peer chain tips
+    ///
+    /// Uses median of peer tips minus safety margin to prevent deep reorgs.
+    ///
+    /// Mathematical invariants:
+    /// - Median is always between min(tips) and max(tips)
+    /// - Checkpoint height is always >= 0
+    /// - Checkpoint height <= median_tip
+    #[spec_locked("13.4")]
+    pub fn determine_checkpoint_height(&self, peer_tips: Vec<Natural>) -> Natural {
+        if peer_tips.is_empty() {
+            return 0;
+        }
+
+        // Sort to find median
+        let mut sorted_tips = peer_tips;
+        sorted_tips.sort();
+
+        // Runtime assertion: Verify sorted order
+        debug_assert!(
+            sorted_tips.windows(2).all(|w| w[0] <= w[1]),
+            "Tips must be sorted in ascending order"
+        );
+
+        let median_tip = if sorted_tips.len() % 2 == 0 {
+            // Even number: average of middle two
+            let mid = sorted_tips.len() / 2;
+            let lower = sorted_tips[mid - 1];
+            let upper = sorted_tips[mid];
+
+            // Runtime assertion: Verify median bounds
+            debug_assert!(
+                lower <= upper,
+                "Lower median value ({}) must be <= upper ({})",
+                lower,
+                upper
+            );
+
+            // Use checked arithmetic to prevent overflow
+            (lower + upper) / 2
+        } else {
+            // Odd number: middle value
+            sorted_tips[sorted_tips.len() / 2]
+        };
+
+        // Runtime assertion: Median is within bounds
+        if let (Some(&min_tip), Some(&max_tip)) = (sorted_tips.first(), sorted_tips.last()) {
+            debug_assert!(
+                median_tip >= min_tip && median_tip <= max_tip,
+                "Median ({}) must be between min ({}) and max ({})",
+                median_tip,
+                min_tip,
+                max_tip
+            );
+        }
+
+        // Apply safety margin with checked arithmetic
+        if median_tip > self.config.safety_margin {
+            let checkpoint = median_tip - self.config.safety_margin;
+
+            // Runtime assertion: Checkpoint is non-negative and <= median
+            debug_assert!(
+                checkpoint <= median_tip,
+                "Checkpoint ({}) must be <= median ({})",
+                checkpoint,
+                median_tip
+            );
+
+            checkpoint
+        } else {
+            0 // Genesis block
+        }
+    }
+
+    /// Request UTXO sets from multiple peers
+    ///
+    /// Sends GetUTXOSet messages via the provided network client and collects responses.
+    /// Returns list of peer commitments (peer + commitment pairs).
+    ///
+    /// The caller provides a list of `(PeerInfo, peer_id)` tuples where `peer_id` is an
+    /// opaque identifier understood only by the node's networking layer. This keeps the
+    /// consensus layer agnostic of concrete transport types or peer address formats.
+    pub async fn request_utxo_sets<C: UtxoCommitmentsNetworkClient>(
+        &self,
+        network_client: &C,
+        peers: &[(PeerInfo, String)],
+        checkpoint_height: Natural,
+        checkpoint_hash: Hash,
+    ) -> Vec<PeerCommitment> {
+        let mut results = Vec::new();
+
+        for (peer_info, peer_id) in peers {
+            match network_client
+                .request_utxo_set(peer_id, checkpoint_height, checkpoint_hash)
+                .await
+            {
+                Ok(commitment) => results.push(PeerCommitment {
+                    peer_info: peer_info.clone(),
+                    commitment,
+                }),
+                Err(_) => {
+                    // Per-peer failure; consensus threshold handles partial failures.
+                    continue;
+                }
+            }
+        }
+
+        results
+    }
+
+    /// Find consensus among peer responses
+    ///
+    /// Groups commitments by their values and finds the majority consensus.
+    /// Returns the consensus commitment if threshold is met.
+    #[spec_locked("11.4")]
+    pub fn find_consensus(
+        &self,
+        peer_commitments: Vec<PeerCommitment>,
+    ) -> UtxoCommitmentResult<ConsensusResult> {
+        let total_peers = peer_commitments.len();
+        if total_peers < self.config.min_peers {
+            return Err(UtxoCommitmentError::VerificationFailed(format!(
+                "Insufficient peers: got {}, need at least {}",
+                total_peers, self.config.min_peers
+            )));
+        }
+
+        // Group commitments by their values (merkle root + supply + count + height)
+        let mut commitment_groups: HashMap<(Hash, u64, u64, Natural), Vec<PeerCommitment>> =
+            HashMap::new();
+
+        for peer_commitment in peer_commitments {
+            let key = (
+                peer_commitment.commitment.merkle_root,
+                peer_commitment.commitment.total_supply,
+                peer_commitment.commitment.utxo_count,
+                peer_commitment.commitment.block_height,
+            );
+            commitment_groups
+                .entry(key)
+                .or_insert_with(Vec::new)
+                .push(peer_commitment);
+        }
+
+        // Find group with highest agreement
+        let mut best_group: Option<(&(Hash, u64, u64, Natural), Vec<PeerCommitment>)> = None;
+        let mut best_agreement_count = 0;
+
+        for (key, group) in commitment_groups.iter() {
+            let agreement_count = group.len();
+
+            if agreement_count > best_agreement_count {
+                best_agreement_count = agreement_count;
+                best_group = Some((key, group.clone()));
+            }
+        }
+
+        // Check if we found any consensus group
+        let (_, group) = match best_group {
+            Some(g) => g,
+            None => {
+                return Err(UtxoCommitmentError::VerificationFailed(
+                    "No consensus groups found".to_string(),
+                ));
+            }
+        };
+
+        // Check if consensus threshold is met using integer arithmetic to avoid floating-point precision issues
+        // Threshold check: agreement_count / total_peers >= consensus_threshold
+        // Equivalent to: agreement_count >= (total_peers * consensus_threshold).ceil()
+        //
+        // Mathematical invariant: required_agreement_count must satisfy:
+        // - required_agreement_count >= ceil(total_peers * threshold)
+        // - required_agreement_count <= total_peers
+        // - If agreement_count >= required_agreement_count, then agreement_count/total_peers >= threshold
+        let required_agreement_count =
+            ((total_peers as f64) * self.config.consensus_threshold).ceil() as usize;
+
+        // Runtime assertion: Verify mathematical invariants
+        debug_assert!(
+            required_agreement_count <= total_peers,
+            "Required agreement count ({}) cannot exceed total peers ({})",
+            required_agreement_count,
+            total_peers
+        );
+        debug_assert!(
+            required_agreement_count >= 1,
+            "Required agreement count must be at least 1"
+        );
+        debug_assert!(
+            best_agreement_count <= total_peers,
+            "Best agreement count ({}) cannot exceed total peers ({})",
+            best_agreement_count,
+            total_peers
+        );
+
+        if best_agreement_count < required_agreement_count {
+            let best_ratio = best_agreement_count as f64 / total_peers as f64;
+            return Err(UtxoCommitmentError::VerificationFailed(format!(
+                "No consensus: best agreement is {:.1}% ({} of {} peers), need {:.1}% (at least {} peers)",
+                best_ratio * 100.0,
+                best_agreement_count,
+                total_peers,
+                self.config.consensus_threshold * 100.0,
+                required_agreement_count
+            )));
+        }
+
+        // Return consensus result
+        let commitment = group[0].commitment.clone();
+        let agreement_count = group.len();
+        let agreement_ratio = agreement_count as f64 / total_peers as f64;
+
+        // Runtime assertion: Verify consensus result invariants
+        debug_assert!(
+            agreement_count >= required_agreement_count,
+            "Agreement count ({}) must meet threshold ({})",
+            agreement_count,
+            required_agreement_count
+        );
+        debug_assert!(
+            agreement_ratio >= self.config.consensus_threshold,
+            "Agreement ratio ({:.4}) must be >= threshold ({:.4})",
+            agreement_ratio,
+            self.config.consensus_threshold
+        );
+        debug_assert!(
+            agreement_count <= total_peers,
+            "Agreement count ({}) cannot exceed total peers ({})",
+            agreement_count,
+            total_peers
+        );
+        debug_assert!(
+            agreement_ratio >= 0.0 && agreement_ratio <= 1.0,
+            "Agreement ratio ({:.4}) must be in [0, 1]",
+            agreement_ratio
+        );
+
+        Ok(ConsensusResult {
+            commitment,
+            agreement_count,
+            total_peers,
+            agreement_ratio,
+        })
+    }
+
+    /// Verify consensus commitment against block headers
+    ///
+    /// Verifies that:
+    /// 1. Block header chain is valid (PoW verification)
+    /// 2. Commitment supply matches expected supply at height
+    /// 3. Commitment block hash matches actual block hash
+    #[spec_locked("11.4")]
+    pub fn verify_consensus_commitment(
+        &self,
+        consensus: &ConsensusResult,
+        header_chain: &[BlockHeader],
+    ) -> UtxoCommitmentResult<bool> {
+        // 1. Verify header chain (PoW)
+        verify_header_chain(header_chain)?;
+
+        // 2. Verify supply matches expected
+        verify_supply(&consensus.commitment)?;
+
+        // 3. Verify commitment block hash matches header chain
+        if consensus.commitment.block_height as usize >= header_chain.len() {
+            return Err(UtxoCommitmentError::VerificationFailed(format!(
+                "Commitment height {} exceeds header chain length {}",
+                consensus.commitment.block_height,
+                header_chain.len()
+            )));
+        }
+
+        let expected_header = &header_chain[consensus.commitment.block_height as usize];
+        let expected_hash = compute_block_hash(expected_header);
+
+        if consensus.commitment.block_hash != expected_hash {
+            return Err(UtxoCommitmentError::VerificationFailed(format!(
+                "Block hash mismatch: commitment has {:?}, header chain has {:?}",
+                consensus.commitment.block_hash, expected_hash
+            )));
+        }
+
+        Ok(true)
+    }
+
+    /// Verify UTXO proofs for critical UTXOs after consensus verification
+    ///
+    /// This function should be called after `verify_consensus_commitment()` succeeds
+    /// to cryptographically verify that specific UTXOs exist in the consensus commitment.
+    ///
+    /// This prevents coin freezing attacks where malicious peers provide commitments
+    /// with correct total supply but missing/modified individual UTXOs.
+    ///
+    /// # Arguments
+    /// * `consensus` - The verified consensus commitment
+    /// * `utxos_to_verify` - Vector of (outpoint, expected_utxo, proof) tuples to verify
+    ///
+    /// # Returns
+    /// `Ok(true)` if all proofs are valid, `Err` if any verification fails
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use blvm_protocol::utxo_commitments::{UtxoMerkleTree, peer_consensus::PeerConsensus};
+    ///
+    /// // After verify_consensus_commitment succeeds:
+    /// let utxos_to_verify = vec![
+    ///     (outpoint1, utxo1, proof1),
+    ///     (outpoint2, utxo2, proof2),
+    /// ];
+    ///
+    /// peer_consensus.verify_utxo_proofs(&consensus, utxos_to_verify)?;
+    /// ```
+    #[spec_locked("13.4")]
+    pub fn verify_utxo_proofs(
+        &self,
+        consensus: &ConsensusResult,
+        utxos_to_verify: Vec<(crate::types::OutPoint, crate::types::UTXO, MerkleProof)>,
+    ) -> UtxoCommitmentResult<bool> {
+        use crate::utxo_commitments::merkle_tree::UtxoMerkleTree;
+
+        // Sequential verification (baseline)
+        for (outpoint, expected_utxo, proof) in utxos_to_verify {
+            let is_valid = UtxoMerkleTree::verify_utxo_proof(
+                &consensus.commitment,
+                &outpoint,
+                &expected_utxo,
+                proof,
+            )?;
+
+            if !is_valid {
+                return Err(UtxoCommitmentError::VerificationFailed(format!(
+                    "UTXO proof verification failed for outpoint {:?} - possible attack",
+                    outpoint
+                )));
+            }
+        }
+
+        Ok(true)
+    }
+
+    /// Verify UTXO proofs in parallel (optimized for batch verification)
+    ///
+    /// This function performs parallel verification of multiple UTXO proofs,
+    /// which is more efficient when verifying many UTXOs at once.
+    ///
+    /// # Arguments
+    /// * `consensus` - The verified consensus commitment
+    /// * `utxos_to_verify` - Vector of (outpoint, expected_utxo, proof) tuples to verify
+    ///
+    /// # Returns
+    /// `Ok(true)` if all proofs are valid, `Err` if any verification fails
+    ///
+    /// # Performance
+    /// Uses parallel processing for better performance when verifying many proofs.
+    /// For small batches (< 10), sequential verification may be faster due to overhead.
+    #[cfg(feature = "parallel-verification")]
+    pub fn verify_utxo_proofs_parallel(
+        &self,
+        consensus: &ConsensusResult,
+        utxos_to_verify: Vec<(crate::types::OutPoint, crate::types::UTXO, MerkleProof)>,
+    ) -> UtxoCommitmentResult<bool> {
+        use crate::utxo_commitments::merkle_tree::UtxoMerkleTree;
+        use rayon::prelude::*;
+
+        // Parallel verification using rayon
+        let results: Vec<UtxoCommitmentResult<bool>> = utxos_to_verify
+            .into_par_iter()
+            .map(|(outpoint, expected_utxo, proof)| {
+                UtxoMerkleTree::verify_utxo_proof(
+                    &consensus.commitment,
+                    &outpoint,
+                    &expected_utxo,
+                    proof,
+                )
+            })
+            .collect();
+
+        // Check all results
+        for (i, result) in results.iter().enumerate() {
+            match result {
+                Ok(true) => continue,
+                Ok(false) | Err(_) => {
+                    return Err(UtxoCommitmentError::VerificationFailed(format!(
+                        "UTXO proof verification failed at index {} - possible attack",
+                        i
+                    )));
+                }
+            }
+        }
+
+        Ok(true)
+    }
+
+    /// Verify UTXO proofs in parallel (fallback for when rayon is not available)
+    ///
+    /// Falls back to sequential verification if parallel feature is not enabled.
+    pub fn verify_utxo_proofs_parallel_fallback(
+        &self,
+        consensus: &ConsensusResult,
+        utxos_to_verify: Vec<(crate::types::OutPoint, crate::types::UTXO, MerkleProof)>,
+    ) -> UtxoCommitmentResult<bool> {
+        // Use sequential verification as fallback
+        self.verify_utxo_proofs(consensus, utxos_to_verify)
+    }
+}
+
+/// Compute block header hash (double SHA256)
+fn compute_block_hash(header: &BlockHeader) -> Hash {
+    use sha2::{Digest, Sha256};
+
+    // Serialize block header
+    let mut bytes = Vec::with_capacity(80);
+    bytes.extend_from_slice(&header.version.to_le_bytes());
+    bytes.extend_from_slice(&header.prev_block_hash);
+    bytes.extend_from_slice(&header.merkle_root);
+    bytes.extend_from_slice(&header.timestamp.to_le_bytes());
+    bytes.extend_from_slice(&header.bits.to_le_bytes());
+    bytes.extend_from_slice(&header.nonce.to_le_bytes());
+
+    // Double SHA256
+    let first_hash = Sha256::digest(&bytes);
+    let second_hash = Sha256::digest(&first_hash);
+
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&second_hash);
+    hash
+}
+
+// ============================================================================
+// FORMAL VERIFICATION
+// ============================================================================
+
+/// Mathematical Specification for Peer Consensus:
+/// ∀ peers ∈ [PeerInfo], commitments ∈ [UtxoCommitment], threshold ∈ [0,1]:
+/// - find_consensus(commitments, threshold) = consensus ⟺
+///     |{c ∈ commitments | c = consensus}| / |commitments| ≥ threshold
+/// - discover_diverse_peers(peers) ⊆ peers (no new peers created)
+/// - verify_consensus_commitment(consensus, headers) verifies PoW + supply
+///
+/// Invariants:
+/// - Consensus requires threshold percentage agreement
+/// - Diverse peer discovery filters for diversity
+#[doc(hidden)]
+const _PEER_CONSENSUS_SPEC: () = ();
+
+// End of module

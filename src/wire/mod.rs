@@ -13,25 +13,12 @@ use crate::error::ProtocolError;
 use crate::network::NetworkMessage;
 use crate::ConsensusError;
 use crate::Result;
-use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::io::Read;
 use std::sync::Arc;
 
-/// Bitcoin P2P message header size (magic + command + length + checksum)
-pub const MESSAGE_HEADER_SIZE: usize = 4 + 12 + 4 + 4;
-
-/// Maximum message payload size (32 MB)
-pub const MAX_MESSAGE_PAYLOAD: usize = 32 * 1024 * 1024;
-
-/// Calculate checksum for message payload (first 4 bytes of double SHA256)
-pub fn calculate_checksum(payload: &[u8]) -> [u8; 4] {
-    let hash1 = Sha256::digest(payload);
-    let hash2 = Sha256::digest(hash1);
-    let mut checksum = [0u8; 4];
-    checksum.copy_from_slice(&hash2[..4]);
-    checksum
-}
+mod frame_header;
+pub use frame_header::{calculate_checksum, MAX_MESSAGE_PAYLOAD, MESSAGE_HEADER_SIZE};
 
 /// Serialize a network message to Bitcoin P2P wire format
 pub fn serialize_message(message: &NetworkMessage, magic_bytes: [u8; 4]) -> Result<Vec<u8>> {
