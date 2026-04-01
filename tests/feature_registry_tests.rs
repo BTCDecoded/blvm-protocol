@@ -2,6 +2,7 @@
 //!
 //! Tests for feature activation tracking and protocol version compatibility.
 
+use blvm_consensus::{SEGWIT_ACTIVATION_MAINNET, TAPROOT_ACTIVATION_MAINNET};
 use blvm_protocol::features::{
     ActivationMethod, FeatureActivation, FeatureContext, FeatureRegistry,
 };
@@ -11,7 +12,7 @@ use blvm_protocol::ProtocolVersion;
 fn create_segwit_activation() -> FeatureActivation {
     FeatureActivation {
         feature_name: "segwit".to_string(),
-        activation_height: Some(481824), // SegWit activation height
+        activation_height: Some(SEGWIT_ACTIVATION_MAINNET), // BIP141 / buried deployment (mainnet)
         activation_timestamp: Some(1503539857), // SegWit activation timestamp
         activation_method: ActivationMethod::BIP9,
         bip_number: Some(141),
@@ -22,7 +23,7 @@ fn create_segwit_activation() -> FeatureActivation {
 fn create_taproot_activation() -> FeatureActivation {
     FeatureActivation {
         feature_name: "taproot".to_string(),
-        activation_height: Some(709632), // Taproot activation height
+        activation_height: Some(TAPROOT_ACTIVATION_MAINNET), // BIP341 (mainnet)
         activation_timestamp: Some(1638316800), // Taproot activation timestamp
         activation_method: ActivationMethod::BIP9,
         bip_number: Some(341),
@@ -75,15 +76,17 @@ fn test_feature_activation_check_segwit() {
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
 
     // Before activation
-    let before_context = create_feature_context(&registry, 481823, 1503539856);
+    let before_context =
+        create_feature_context(&registry, SEGWIT_ACTIVATION_MAINNET - 1, 1503539856);
     assert!(!activation.is_active_at(before_context.height, before_context.timestamp));
 
     // At activation height
-    let at_context = create_feature_context(&registry, 481824, 1503539857);
+    let at_context = create_feature_context(&registry, SEGWIT_ACTIVATION_MAINNET, 1503539857);
     assert!(activation.is_active_at(at_context.height, at_context.timestamp));
 
     // After activation
-    let after_context = create_feature_context(&registry, 481825, 1503539858);
+    let after_context =
+        create_feature_context(&registry, SEGWIT_ACTIVATION_MAINNET + 1, 1503539858);
     assert!(activation.is_active_at(after_context.height, after_context.timestamp));
 }
 
@@ -94,11 +97,12 @@ fn test_feature_activation_check_taproot() {
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
 
     // Before activation
-    let before_context = create_feature_context(&registry, 709631, 1638316799);
+    let before_context =
+        create_feature_context(&registry, TAPROOT_ACTIVATION_MAINNET - 1, 1638316799);
     assert!(!activation.is_active_at(before_context.height, before_context.timestamp));
 
     // At activation
-    let at_context = create_feature_context(&registry, 709632, 1638316800);
+    let at_context = create_feature_context(&registry, TAPROOT_ACTIVATION_MAINNET, 1638316800);
     assert!(activation.is_active_at(at_context.height, at_context.timestamp));
 }
 
@@ -196,15 +200,17 @@ fn test_feature_activation_bip9() {
 
     // BIP9 activates if either height OR timestamp condition is met
     // Before both
-    let before = create_feature_context(&registry, 481823, 1503539856);
+    let before =
+        create_feature_context(&registry, SEGWIT_ACTIVATION_MAINNET - 1, 1503539856);
     assert!(!activation.is_active_at(before.height, before.timestamp));
 
     // At height but before timestamp
-    let height_met = create_feature_context(&registry, 481824, 1503539856);
+    let height_met = create_feature_context(&registry, SEGWIT_ACTIVATION_MAINNET, 1503539856);
     assert!(activation.is_active_at(height_met.height, height_met.timestamp));
 
     // At timestamp but before height
-    let timestamp_met = create_feature_context(&registry, 481823, 1503539857);
+    let timestamp_met =
+        create_feature_context(&registry, SEGWIT_ACTIVATION_MAINNET - 1, 1503539857);
     assert!(activation.is_active_at(timestamp_met.height, timestamp_met.timestamp));
 }
 

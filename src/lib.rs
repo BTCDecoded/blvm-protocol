@@ -25,6 +25,8 @@ pub use blvm_consensus::types::{
     TransactionInput, TransactionOutput, UtxoSet, ValidationResult, UTXO,
 };
 pub use blvm_consensus::ConsensusProof;
+/// Mainnet buried deployment heights (Core chainparams) for RPC / tooling without a direct `blvm-consensus` dep.
+pub use blvm_consensus::{SEGWIT_ACTIVATION_MAINNET, TAPROOT_ACTIVATION_MAINNET};
 
 // Re-export smallvec for macro use when production feature is enabled
 #[cfg(feature = "production")]
