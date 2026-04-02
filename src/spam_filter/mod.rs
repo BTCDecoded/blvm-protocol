@@ -21,8 +21,8 @@
 mod script_analyzer;
 
 use blvm_consensus::opcodes::*;
-use blvm_consensus::types::{ByteString, Transaction, UtxoSet};
 use blvm_consensus::segwit::Witness;
+use blvm_consensus::types::{ByteString, Transaction, UtxoSet};
 use script_analyzer::{ScriptType, TransactionType};
 use serde::{Deserialize, Serialize};
 
@@ -543,9 +543,7 @@ impl SpamFilter {
     /// P2TR format: OP_1 + PUSH_32_BYTES + 32-byte x-only pubkey = 34 bytes
     fn is_taproot_output(&self, script_pubkey: &ByteString) -> bool {
         // P2TR: OP_1 + PUSH_32_BYTES + 32-byte x-only pubkey = 34 bytes
-        script_pubkey.len() == 34
-            && script_pubkey[0] == OP_1
-            && script_pubkey[1] == PUSH_32_BYTES
+        script_pubkey.len() == 34 && script_pubkey[0] == OP_1 && script_pubkey[1] == PUSH_32_BYTES
     }
 
     /// Detect Taproot-specific spam patterns

@@ -17,11 +17,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-# Consensus layer - Use crates.io version by default
-# To use local path for development, create .cargo/config.toml with:
-# [build]
-# [replace]
-# "blvm-consensus:0.1.6" = { path = "../blvm-consensus" }
+# Consensus layer — path in monorepo; published versions: see README (crates.io).
 blvm-consensus = { path = "../blvm-consensus" }
 # Spec-lock for #[spec_locked] annotations (UTXO commitments 11.4)
 blvm-spec-lock = { path = "../blvm-spec-lock", default-features = false, optional = true }

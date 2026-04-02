@@ -10,8 +10,6 @@
 
 use crate::spam_filter::{SpamBreakdown, SpamFilter, SpamFilterConfig, SpamSummary, SpamType};
 #[cfg(feature = "utxo-commitments")]
-use blvm_consensus::types::{BlockHeader, Hash as HashType, Natural, OutPoint, Transaction, UtxoSet, UTXO};
-#[cfg(feature = "utxo-commitments")]
 use crate::utxo_commitments::data_structures::{
     UtxoCommitment, UtxoCommitmentError, UtxoCommitmentResult,
 };
@@ -21,6 +19,10 @@ use crate::utxo_commitments::merkle_tree::UtxoMerkleTree;
 use crate::utxo_commitments::network_integration::UtxoCommitmentsNetworkClient;
 #[cfg(feature = "utxo-commitments")]
 use crate::utxo_commitments::peer_consensus::{ConsensusConfig, PeerConsensus, PeerInfo};
+#[cfg(feature = "utxo-commitments")]
+use blvm_consensus::types::{
+    BlockHeader, Hash as HashType, Natural, OutPoint, Transaction, UtxoSet, UTXO,
+};
 #[cfg(feature = "utxo-commitments")]
 /// Initial sync manager
 pub struct InitialSync {
@@ -222,13 +224,14 @@ impl InitialSync {
                 )));
             }
 
-            let context = blvm_consensus::block::BlockValidationContext::from_connect_block_ibd_args(
-                recent_headers,
-                network_time,
-                network,
-                None,
-                None,
-            );
+            let context =
+                blvm_consensus::block::BlockValidationContext::from_connect_block_ibd_args(
+                    recent_headers,
+                    network_time,
+                    network,
+                    None,
+                    None,
+                );
             let (validation_result, new_utxo_set, _undo_log) = connect_block(
                 &full_block.block,
                 &full_block.witnesses,
@@ -244,7 +247,10 @@ impl InitialSync {
             })?;
 
             // Reject if validation failed
-            if !matches!(validation_result, blvm_consensus::types::ValidationResult::Valid) {
+            if !matches!(
+                validation_result,
+                blvm_consensus::types::ValidationResult::Valid
+            ) {
                 return Err(UtxoCommitmentError::VerificationFailed(format!(
                     "Block validation failed at height {}: {:?}",
                     height, validation_result

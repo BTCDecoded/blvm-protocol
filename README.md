@@ -1,5 +1,10 @@
 # Bitcoin Protocol Engine
 
+[![crates.io](https://img.shields.io/crates/v/blvm-protocol.svg)](https://crates.io/crates/blvm-protocol)
+[![docs.rs](https://docs.rs/blvm-protocol/badge.svg)](https://docs.rs/blvm-protocol)
+[![CI](https://github.com/BTCDecoded/blvm-protocol/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BTCDecoded/blvm-protocol/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 Bitcoin protocol abstraction layer supporting multiple variants and protocol evolution.
 
 > **For verified system status**: See [SYSTEM_STATUS.md](https://github.com/BTCDecoded/.github/blob/main/SYSTEM_STATUS.md) in the BTCDecoded organization repository.
@@ -337,6 +342,15 @@ Test suite includes:
 - Transaction count limits
 
 ## Dependencies
+
+**Monorepo vs crates.io:** This repo’s `Cargo.toml` uses **path** dependencies for `blvm-consensus` when built next to sibling repos. For a crates.io-only dependency:
+
+```toml
+[dependencies]
+blvm-protocol = "0.1.3"
+```
+
+`blvm-consensus` is pulled in transitively; ensure published versions match your crate’s `Cargo.toml` requirements.
 
 All dependencies are pinned to exact versions for security. See `Cargo.toml` for the complete list.
 

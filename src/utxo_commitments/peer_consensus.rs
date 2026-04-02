@@ -5,10 +5,6 @@
 //! without trusting any single peer.
 
 #[cfg(feature = "utxo-commitments")]
-use blvm_consensus::types::{BlockHeader, Hash, Natural};
-#[cfg(feature = "utxo-commitments")]
-use blvm_spec_lock::spec_locked;
-#[cfg(feature = "utxo-commitments")]
 use crate::utxo_commitments::data_structures::{
     UtxoCommitment, UtxoCommitmentError, UtxoCommitmentResult,
 };
@@ -16,6 +12,10 @@ use crate::utxo_commitments::data_structures::{
 use crate::utxo_commitments::network_integration::UtxoCommitmentsNetworkClient;
 #[cfg(feature = "utxo-commitments")]
 use crate::utxo_commitments::verification::{verify_header_chain, verify_supply};
+#[cfg(feature = "utxo-commitments")]
+use blvm_consensus::types::{BlockHeader, Hash, Natural};
+#[cfg(feature = "utxo-commitments")]
+use blvm_spec_lock::spec_locked;
 #[cfg(feature = "utxo-commitments")]
 use sparse_merkle_tree::MerkleProof;
 #[cfg(feature = "utxo-commitments")]

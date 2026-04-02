@@ -40,17 +40,26 @@ impl ScriptType {
         }
 
         // P2TR: OP_1 + PUSH_32_BYTES + 32-byte x-only pubkey = 34 bytes
-        if script_pubkey.len() == 34 && script_pubkey[0] == OP_1 && script_pubkey[1] == PUSH_32_BYTES {
+        if script_pubkey.len() == 34
+            && script_pubkey[0] == OP_1
+            && script_pubkey[1] == PUSH_32_BYTES
+        {
             return Self::P2TR;
         }
 
         // P2WPKH: OP_0 + PUSH_20_BYTES + 20-byte hash = 22 bytes
-        if script_pubkey.len() == 22 && script_pubkey[0] == OP_0 && script_pubkey[1] == PUSH_20_BYTES {
+        if script_pubkey.len() == 22
+            && script_pubkey[0] == OP_0
+            && script_pubkey[1] == PUSH_20_BYTES
+        {
             return Self::P2WPKH;
         }
 
         // P2WSH: OP_0 + PUSH_32_BYTES + 32-byte hash = 34 bytes
-        if script_pubkey.len() == 34 && script_pubkey[0] == OP_0 && script_pubkey[1] == PUSH_32_BYTES {
+        if script_pubkey.len() == 34
+            && script_pubkey[0] == OP_0
+            && script_pubkey[1] == PUSH_32_BYTES
+        {
             return Self::P2WSH;
         }
 

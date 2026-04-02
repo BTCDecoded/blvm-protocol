@@ -4,13 +4,13 @@
 //! Handles incremental updates (insert/remove) and proof generation.
 
 #[cfg(feature = "utxo-commitments")]
-use blvm_consensus::types::{Hash, Natural, OutPoint, UTXO};
-#[cfg(feature = "utxo-commitments")]
-use blvm_spec_lock::spec_locked;
-#[cfg(feature = "utxo-commitments")]
 use crate::utxo_commitments::data_structures::{
     UtxoCommitment, UtxoCommitmentError, UtxoCommitmentResult,
 };
+#[cfg(feature = "utxo-commitments")]
+use blvm_consensus::types::{Hash, Natural, OutPoint, UTXO};
+#[cfg(feature = "utxo-commitments")]
+use blvm_spec_lock::spec_locked;
 #[cfg(feature = "utxo-commitments")]
 use sha2::{Digest, Sha256};
 #[cfg(feature = "utxo-commitments")]

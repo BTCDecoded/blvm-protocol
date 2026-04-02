@@ -13,7 +13,7 @@ fn create_segwit_activation() -> FeatureActivation {
     FeatureActivation {
         feature_name: "segwit".to_string(),
         activation_height: Some(SEGWIT_ACTIVATION_MAINNET), // BIP141 / buried deployment (mainnet)
-        activation_timestamp: Some(1503539857), // SegWit activation timestamp
+        activation_timestamp: Some(1503539857),             // SegWit activation timestamp
         activation_method: ActivationMethod::BIP9,
         bip_number: Some(141),
     }
@@ -24,7 +24,7 @@ fn create_taproot_activation() -> FeatureActivation {
     FeatureActivation {
         feature_name: "taproot".to_string(),
         activation_height: Some(TAPROOT_ACTIVATION_MAINNET), // BIP341 (mainnet)
-        activation_timestamp: Some(1638316800), // Taproot activation timestamp
+        activation_timestamp: Some(1638316800),              // Taproot activation timestamp
         activation_method: ActivationMethod::BIP9,
         bip_number: Some(341),
     }
@@ -200,8 +200,7 @@ fn test_feature_activation_bip9() {
 
     // BIP9 activates if either height OR timestamp condition is met
     // Before both
-    let before =
-        create_feature_context(&registry, SEGWIT_ACTIVATION_MAINNET - 1, 1503539856);
+    let before = create_feature_context(&registry, SEGWIT_ACTIVATION_MAINNET - 1, 1503539856);
     assert!(!activation.is_active_at(before.height, before.timestamp));
 
     // At height but before timestamp

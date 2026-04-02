@@ -6,15 +6,15 @@
 //! - Peer consensus consistency
 
 #[cfg(feature = "utxo-commitments")]
+use crate::utxo_commitments::data_structures::{
+    UtxoCommitment, UtxoCommitmentError, UtxoCommitmentResult,
+};
+#[cfg(feature = "utxo-commitments")]
 use blvm_consensus::economic::total_supply;
 #[cfg(feature = "utxo-commitments")]
 use blvm_consensus::pow::check_proof_of_work;
 #[cfg(feature = "utxo-commitments")]
 use blvm_consensus::types::{BlockHeader, Hash, Natural};
-#[cfg(feature = "utxo-commitments")]
-use crate::utxo_commitments::data_structures::{
-    UtxoCommitment, UtxoCommitmentError, UtxoCommitmentResult,
-};
 #[cfg(feature = "utxo-commitments")]
 /// Verify that a UTXO commitment's supply matches expected Bitcoin supply
 ///

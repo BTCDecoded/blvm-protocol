@@ -6,11 +6,11 @@
 #[cfg(feature = "utxo-commitments")]
 use crate::spam_filter::{SpamFilter, SpamSummary};
 #[cfg(feature = "utxo-commitments")]
-use blvm_consensus::types::{BlockHeader, Hash as HashType, Natural, Transaction};
-#[cfg(feature = "utxo-commitments")]
 use crate::utxo_commitments::data_structures::{
     UtxoCommitment, UtxoCommitmentError, UtxoCommitmentResult,
 };
+#[cfg(feature = "utxo-commitments")]
+use blvm_consensus::types::{BlockHeader, Hash as HashType, Natural, Transaction};
 #[cfg(feature = "utxo-commitments")]
 /// Filtered block structure
 #[derive(Debug, Clone)]
