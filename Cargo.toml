@@ -17,10 +17,9 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-# Consensus layer — path in monorepo; published versions: see README (crates.io).
-blvm-consensus = { path = "../blvm-consensus" }
+blvm-consensus = { version = ">=0.1, <1" }
 # Spec-lock for #[spec_locked] annotations (UTXO commitments 11.4)
-blvm-spec-lock = { path = "../blvm-spec-lock", default-features = false, optional = true }
+blvm-spec-lock = { version = ">=0.1, <1", default-features = false, optional = true }
 
 # Serialization - EXACT VERSIONS for security
 serde = { version = "=1.0.228", features = ["derive"] }  # Updated for iroh 0.95 compatibility
@@ -60,6 +59,11 @@ rayon = { version = "1.10", optional = true }
 version = "1.11"
 optional = true
 features = ["serde"]
+
+# Local monorepo: sibling paths override the blvm-* version pins above.
+[patch.crates-io]
+blvm-consensus = { path = "../blvm-consensus" }
+blvm-spec-lock = { path = "../blvm-spec-lock" }
 
 [features]
 # Production performance optimizations (passed through from blvm-consensus)
