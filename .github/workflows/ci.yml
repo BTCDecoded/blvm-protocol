@@ -74,9 +74,9 @@ jobs:
         run: |
           CACHE_ROOT="/tmp/runner-cache"
           
-          # Generate cache keys from Cargo.lock hashes
-          DEPS_KEY=$(sha256sum Cargo.lock | cut -d' ' -f1)
-          CONSENSUS_DEPS_KEY=$(sha256sum ../blvm-consensus/Cargo.lock | cut -d' ' -f1)
+          # Generate cache keys from Cargo.toml (sibling libraries do not commit Cargo.lock)
+          DEPS_KEY=$(sha256sum Cargo.toml | cut -d' ' -f1)
+          CONSENSUS_DEPS_KEY=$(sha256sum ../blvm-consensus/Cargo.toml | cut -d' ' -f1)
           
           # Include toolchain version in cache key
           TOOLCHAIN=$(grep -E '^channel|rust-version' rust-toolchain.toml Cargo.toml 2>/dev/null | head -1 | sha256sum | cut -d' ' -f1 || echo "1.88.0")
