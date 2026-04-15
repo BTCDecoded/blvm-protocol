@@ -2,11 +2,10 @@
 //!
 //! Tests for protocol-specific validation rules.
 
-use blvm_consensus::types::OutPoint;
+use blvm_consensus::types::{OutPoint, UtxoSet};
 use blvm_consensus::{Block, BlockHeader, Transaction, TransactionInput, TransactionOutput};
 use blvm_protocol::validation::{ProtocolValidationContext, ProtocolValidationRules};
 use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
-use std::collections::HashMap;
 
 /// Test helper: Create a simple transaction
 fn create_simple_transaction() -> Transaction {
@@ -188,7 +187,7 @@ fn test_validate_block_with_protocol() {
     // Test validating a block with protocol rules
     let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
     let context = ProtocolValidationContext::new(ProtocolVersion::BitcoinV1, 0).unwrap();
-    let utxos = HashMap::new();
+    let utxos = UtxoSet::default();
 
     // Create a simple block
     let block = Block {

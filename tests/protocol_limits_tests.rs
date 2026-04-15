@@ -516,7 +516,7 @@ fn test_block_transaction_count_limit() {
     let mut peer_state = create_test_peer_state();
 
     // Create a minimal UTXO set for validation
-    let utxo_set = UtxoSet::new();
+    let utxo_set = UtxoSet::default();
 
     // Test at limit (10000 transactions) - should pass protocol limit check
     let transactions: Vec<blvm_consensus::Transaction> = (0..10000)

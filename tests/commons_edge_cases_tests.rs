@@ -259,12 +259,12 @@ fn test_filtered_block_large_transaction_lists() {
     };
 
     // Create many transactions (simulated)
-    // Note: Transaction uses Vec<TransactionInput> and Vec<TransactionOutput> (not Box<[T]>)
+    // Production consensus uses SmallVec for inputs/outputs; use tx_* macros to match.
     let transactions: Vec<Transaction> = (0..10000)
         .map(|_| Transaction {
             version: 1,
-            inputs: vec![],
-            outputs: vec![],
+            inputs: blvm_consensus::tx_inputs![],
+            outputs: blvm_consensus::tx_outputs![],
             lock_time: 0,
         })
         .collect();

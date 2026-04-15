@@ -2,10 +2,10 @@
 //!
 //! End-to-end tests for protocol engine functionality
 
-use blvm_consensus::types::{OutPoint, TransactionInput, TransactionOutput, UTXO};
+use blvm_consensus::types::{OutPoint, TransactionInput, TransactionOutput, UTXO, UtxoSet};
+use blvm_consensus::utxo_set_insert;
 use blvm_consensus::{Block, BlockHeader, Transaction};
 use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
-use std::collections::HashMap;
 
 #[test]
 fn test_end_to_end_blvm_protocol_initialization() {
@@ -28,7 +28,7 @@ fn test_end_to_end_blvm_protocol_initialization() {
 #[test]
 fn test_full_block_validation_workflow() {
     let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
-    let utxos = HashMap::new();
+    let utxos = UtxoSet::default();
 
     // Create a simple block with coinbase transaction
     let block = Block {
@@ -93,7 +93,7 @@ fn test_full_block_validation_workflow() {
 #[test]
 fn test_multi_block_chain_validation() {
     let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
-    let mut utxos = HashMap::new();
+    let mut utxos = UtxoSet::default();
 
     // Create first block (genesis)
     let block1 = Block {
@@ -155,7 +155,8 @@ fn test_multi_block_chain_validation() {
     assert!(result1.is_ok());
 
     // Add UTXO from first block
-    utxos.insert(
+    utxo_set_insert(
+        &mut utxos,
         OutPoint {
             hash: [0u8; 32],
             index: 0,
@@ -188,7 +189,8 @@ fn test_multi_block_chain_validation() {
                 0x00,
                 blvm_consensus::opcodes::OP_EQUALVERIFY,
                 blvm_consensus::opcodes::OP_CHECKSIG,
-            ],
+            ]
+            .into(),
             height: 0,
             is_coinbase: false,
         },
@@ -312,10 +314,11 @@ fn test_transaction_creation_and_validation_workflow() {
 #[test]
 fn test_utxo_tracking_across_transactions() {
     let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
-    let mut utxos = HashMap::new();
+    let mut utxos = UtxoSet::default();
 
     // Add initial UTXO
-    utxos.insert(
+    utxo_set_insert(
+        &mut utxos,
         OutPoint {
             hash: [0u8; 32],
             index: 0,
@@ -348,7 +351,8 @@ fn test_utxo_tracking_across_transactions() {
                 0x00,
                 blvm_consensus::opcodes::OP_EQUALVERIFY,
                 blvm_consensus::opcodes::OP_CHECKSIG,
-            ],
+            ]
+            .into(),
             height: 0,
             is_coinbase: false,
         },

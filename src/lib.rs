@@ -271,7 +271,7 @@ impl BitcoinProtocolEngine {
     ///     transactions: vec![].into_boxed_slice(),
     /// };
     /// let witnesses = vec![];
-    /// let utxos = UtxoSet::new();
+    /// let utxos = UtxoSet::default();
     ///
     /// let (result, new_utxo_set) = engine.validate_and_connect_block(
     ///     &block,

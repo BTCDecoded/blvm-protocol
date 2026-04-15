@@ -305,8 +305,6 @@ cargo test --features testnet
 cargo test --features utxo-commitments
 ```
 
-## Testing
-
 Test suite includes:
 - Network message processing tests
 - Protocol limits tests (DoS protection)
