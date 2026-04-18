@@ -1,6 +1,6 @@
 [package]
 name = "blvm-protocol"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2021"
 authors = ["Bitcoin Commons Team"]
 description = "Bitcoin Commons BLVM: Bitcoin protocol abstraction layer for multiple variants and evolution"
@@ -11,6 +11,9 @@ documentation = "https://docs.rs/blvm-protocol"
 keywords = ["bitcoin", "protocol", "blockchain", "network", "consensus"]
 categories = ["cryptography::cryptocurrencies", "network-programming"]
 rust-version = "1.82"
+
+# Vendored for #[spec_locked] (blvm-spec-lock): macro reads CARGO_MANIFEST_DIR/blvm-spec/*.
+include = ["Cargo.toml", "src/**", "blvm-spec/**"]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -34,7 +37,7 @@ thiserror = "=1.0.69"
 sha2 = "=0.10.9"
 ripemd = "=0.1.3"
 # crates.io secp256k1 0.28 (libsecp256k1). blvm-consensus uses blvm-secp256k1 by default.
-secp256k1 = { version = "0.28", default-features = true }
+secp256k1 = { version = "=0.28", default-features = true }
 hex = "=0.4"  # For hex encoding/decoding
 chacha20poly1305 = "=0.10.1"  # For BIP324 v2 encrypted transport
 aead = "=0.5.2"  # AEAD trait for ChaCha20Poly1305
@@ -48,15 +51,15 @@ bech32 = "=0.9"
 crc32fast = "=1.3"
 
 # UTXO commitments (sparse merkle tree, randomness)
-sparse-merkle-tree = { version = "0.6", optional = true }
+sparse-merkle-tree = { version = "=0.6", optional = true }
 rand = { version = "=0.8.5", optional = true }
 # LruCache for spam filter script type cache (production)
-lru = { version = "0.12", optional = true }
+lru = { version = "=0.12", optional = true }
 # Rayon for parallel UTXO proof verification
-rayon = { version = "1.10", optional = true }
+rayon = { version = "=1.10", optional = true }
 
 [dependencies.smallvec]
-version = "1.11"
+version = "=1.15.1"
 optional = true
 features = ["serde"]
 
@@ -85,8 +88,8 @@ parallel-verification = ["dep:rayon"]
 
 [dev-dependencies]
 tempfile = "=3.8.1"
-cargo-tarpaulin = "0.27"
-bytes = "1.11.1"  # RUSTSEC-2026-0007: force upgrade for cargo-tarpaulin transitive dep
+cargo-tarpaulin = "=0.27"
+bytes = "=1.11.1"  # RUSTSEC-2026-0007: force upgrade for cargo-tarpaulin transitive dep
 
 # Fast release: opt-level 2 for iteration (matches blvm/blvm-node/blvm-consensus)
 [profile.release-fast]
