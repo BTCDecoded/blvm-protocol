@@ -512,8 +512,17 @@ jobs:
               if [ "$VERSION_EXISTS" = "false" ]; then
                 # Save original Cargo.toml
                 cp Cargo.toml Cargo.toml.bak
-                # Temporarily update version for dry-run check
-                sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
+                # Temporarily update [package] version only (same as blvm-consensus: do not sed every
+                # top-level `version =` line — that corrupts e.g. [dependencies.smallvec] version pins).
+                awk -v ver="$VERSION" '
+                  /^\[package\]/ { in_package = 1; print; next }
+                  /^\[/ { in_package = 0 }
+                  in_package && /^version = / {
+                    print "version = \"" ver "\""
+                    next
+                  }
+                  { print }
+                ' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
                 DRY_RUN_OUTPUT=$(cargo publish --dry-run --allow-dirty 2>&1 || true)
                 # Restore original Cargo.toml
                 mv Cargo.toml.bak Cargo.toml
@@ -566,16 +575,25 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           CONSENSUS_VER="${{ steps.consensus-version.outputs.version }}"
           
-          # Update version
-          sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" Cargo.toml
+          # Update [package] version only (see blvm-consensus release job; naive sed breaks optional dep pins).
+          awk -v ver="$VERSION" '
+            /^\[package\]/ { in_package = 1; print; next }
+            /^\[/ { in_package = 0 }
+            in_package && /^version = / {
+              print "version = \"" ver "\""
+              next
+            }
+            { print }
+          ' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
           
           # Update blvm-consensus dependency to use crates.io version
           sed -i 's|blvm-consensus = {[^}]*}|blvm-consensus = "'"${CONSENSUS_VER}"'"|g' Cargo.toml
           
           echo "Updated Cargo.toml:"
-          echo "  version: ${VERSION}"
+          echo "  package version: ${VERSION}"
           echo "  blvm-consensus: ${CONSENSUS_VER}"
-          grep -E "^(version|blvm-consensus)" Cargo.toml
+          grep -A 12 '^\[package\]' Cargo.toml | grep '^version = ' | head -1
+          grep '^blvm-consensus = ' Cargo.toml | head -1
       
       - name: Check for crates.io token
         run: |
