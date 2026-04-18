@@ -201,19 +201,24 @@ impl ScriptType {
     ///
     /// Returns the recommended maximum witness size threshold based on script type.
     /// These values will be refined with real-world data collection.
+    ///
+    /// Derived from [`Self::expected_witness_size_range`] plus a per-type policy margin,
+    /// except for [`Self::MultiSig`] which uses the legacy n/m heuristic.
     pub fn recommended_threshold(&self) -> usize {
+        if let Self::MultiSig { n, m } = self {
+            let base = (*n as usize) * 73 + (*m as usize) * 33 + 50; // Signatures + pubkeys + overhead
+            return base + (base / 2); // Add 50% buffer
+        }
+
+        let (_min, _typical, soft_max) = self.expected_witness_size_range();
         match self {
-            Self::P2PKH | Self::P2SH => 0, // No witness
-            Self::P2WPKH => 150,           // 107 typical + 50% buffer
-            Self::P2WSH => 800,            // 300 typical + buffer for complex scripts
-            Self::P2TR => 100,             // 64 typical + buffer
-            Self::MultiSig { n, m } => {
-                // Calculate based on n-of-m
-                let base = (*n as usize) * 73 + (*m as usize) * 33 + 50; // Signatures + pubkeys + overhead
-                base + (base / 2) // Add 50% buffer
-            }
-            Self::PaymentChannel => 1500, // HTLC scripts can be large
-            Self::Unknown => 1000,        // Conservative default
+            Self::P2PKH | Self::P2SH => 0,
+            Self::P2WPKH => soft_max.saturating_add(43), // ~150 for typical 107-byte witness
+            Self::P2WSH => soft_max.saturating_add(300), // ~800 for max 500 in range
+            Self::P2TR => soft_max.saturating_add(36),   // ~100 for 64-byte Schnorr sig
+            Self::PaymentChannel => soft_max.saturating_add(500), // ~1500
+            Self::Unknown => soft_max,
+            Self::MultiSig { .. } => unreachable!("handled above"),
         }
     }
 }

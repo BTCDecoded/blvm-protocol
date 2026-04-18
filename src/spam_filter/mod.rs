@@ -23,7 +23,7 @@ mod script_analyzer;
 use blvm_consensus::opcodes::*;
 use blvm_consensus::segwit::Witness;
 use blvm_consensus::types::{ByteString, Transaction, UtxoSet};
-use script_analyzer::{ScriptType, TransactionType};
+use script_analyzer::{detect_input_script_type, ScriptType, TransactionType};
 use serde::{Deserialize, Serialize};
 
 /// Default dust threshold (546 satoshis = 0.00000546 BTC)
@@ -608,7 +608,7 @@ impl SpamFilter {
         &self,
         witness: &Witness,
         tx: &Transaction,
-        _input_index: usize,
+        input_index: usize,
     ) -> bool {
         let total_size = self.calculate_witness_size(witness);
 
@@ -617,18 +617,20 @@ impl SpamFilter {
             return total_size > self.config.max_witness_size;
         }
 
-        // Try to detect script type from the output being spent
-        // Note: This is simplified - full implementation would track which output is spent
-        // For now, check all outputs in the transaction
+        // Prefer script type from this input's scriptSig when we can infer it (SegWit often
+        // uses an empty scriptSig; see `detect_input_script_type`). Otherwise fall back to
+        // scanning outputs — a simplified heuristic until prevout mapping is available.
         let mut detected_script_type: Option<ScriptType> = None;
-
-        // Try to find the script type of the output being spent
-        // In a real implementation, we'd track prevout -> output mapping
-        for output in &tx.outputs {
-            let script_type = ScriptType::detect(&output.script_pubkey);
-            if script_type != ScriptType::Unknown {
-                detected_script_type = Some(script_type);
-                break; // Use first detected script type
+        if input_index < tx.inputs.len() {
+            detected_script_type = detect_input_script_type(&tx.inputs[input_index].script_sig);
+        }
+        if detected_script_type.is_none() {
+            for output in &tx.outputs {
+                let script_type = ScriptType::detect(&output.script_pubkey);
+                if script_type != ScriptType::Unknown {
+                    detected_script_type = Some(script_type);
+                    break;
+                }
             }
         }
 

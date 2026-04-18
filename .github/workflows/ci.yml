@@ -314,11 +314,17 @@ jobs:
       - name: Install Rust
         uses: BTCDecoded/rust-ci/install-rust-toolchain@main
       
+      # 0.22+ parses CVSS 4.0 in advisory-db; 0.21 fails loading the DB (e.g. cap-primitives RUSTSEC-2024-0445).
+      # --force + PATH: self-hosted runners may have an older system cargo-audit earlier on PATH than ~/.cargo/bin.
       - name: Install cargo-audit
-        run: cargo install cargo-audit --version 0.21.0 --locked
+        run: cargo install cargo-audit --version 0.22.1 --locked --force
       
       - name: Run security audit
-        run: cargo audit
+        run: |
+          export PATH="${HOME}/.cargo/bin:${PATH}"
+          command -v cargo-audit
+          cargo-audit --version
+          cargo audit
 
   build:
     name: Build
