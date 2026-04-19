@@ -363,24 +363,7 @@ jobs:
           EOF
 
       - name: Setup blvm-spec (PROTOCOL.md + ARCHITECTURE.md for verification)
-        run: |
-          set -euo pipefail
-          REPO_ROOT="${GITHUB_WORKSPACE}"
-          DEST="$(dirname "$REPO_ROOT")/blvm-spec"
-          REPO_URL="https://github.com/BTCDecoded/blvm-spec.git"
-          echo "Ensuring blvm-spec at: $DEST"
-          if [ -d "$DEST" ]; then
-            if [ ! -f "$DEST/THE_ORANGE_PAPER.md" ] && [ ! -f "$DEST/PROTOCOL.md" ]; then
-              echo "Removing incomplete blvm-spec at $DEST"
-              rm -rf "$DEST"
-            fi
-          fi
-          if [ -d "$DEST" ] && [ -n "$(ls -A "$DEST" 2>/dev/null || true)" ]; then
-            echo "blvm-spec already present at $DEST"
-            exit 0
-          fi
-          git clone --depth 1 "$REPO_URL" "$DEST"
-          echo "blvm-spec ready at $DEST"
+        uses: BTCDecoded/rust-ci/setup-blvm-spec@main
 
       - name: Cache
         uses: BTCDecoded/rust-ci/runner-cargo-cache@main
