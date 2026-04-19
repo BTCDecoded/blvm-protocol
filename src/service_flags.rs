@@ -51,6 +51,9 @@ pub mod commons {
 
     /// Node supports Governance message relay (can forward economic node messages to blvm-commons)
     pub const NODE_GOVERNANCE: u64 = 1 << 29;
+
+    /// Erlay (BIP330) transaction relay
+    pub const NODE_ERLAY: u64 = 1 << 30;
 }
 
 pub use commons::*;

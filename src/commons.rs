@@ -202,3 +202,53 @@ pub struct NodeStatusResponse {
     /// Last verified timestamp
     pub last_verified_at: Option<i64>,
 }
+
+/// EconomicNodeForkDecision message - Node's decision to adopt a governance ruleset
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EconomicNodeForkDecisionMessage {
+    /// Node ID (optional, can be looked up by public_key)
+    pub node_id: Option<i32>,
+    /// Public key of the node making the decision
+    pub public_key: String,
+    /// Ruleset ID being adopted
+    pub chosen_ruleset: String,
+    /// Reason for the fork decision
+    pub decision_reason: String,
+    /// Timestamp of the decision
+    pub timestamp: i64,
+    /// Cryptographic signature
+    pub signature: String,
+    /// Message ID for deduplication
+    pub message_id: String,
+}
+
+/// GetUTXOProof message - Request Merkle proof for a specific UTXO
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GetUTXOProofMessage {
+    /// Request ID for async request-response matching
+    pub request_id: u64,
+    /// OutPoint to request proof for (transaction hash + output index)
+    pub tx_hash: Hash,
+    pub output_index: u32,
+    /// Block height/hash for which to request proof (must match commitment)
+    pub block_height: u64,
+    pub block_hash: Hash,
+}
+
+/// UTXOProof message - Response with Merkle proof for a UTXO
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UTXOProofMessage {
+    /// Request ID (echo from GetUTXOProof for matching)
+    pub request_id: u64,
+    /// The transaction hash this proof is for
+    pub tx_hash: Hash,
+    /// The output index this proof is for
+    pub output_index: u32,
+    /// The UTXO data (for verification)
+    pub value: i64,
+    pub script_pubkey: Vec<u8>,
+    pub height: u64,
+    pub is_coinbase: bool,
+    /// The Merkle proof (serialized as bytes)
+    pub proof: Vec<u8>,
+}

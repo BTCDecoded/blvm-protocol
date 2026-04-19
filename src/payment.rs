@@ -18,6 +18,7 @@
 //! - Signed refund addresses prevent refund attacks
 //! - P2P routing preserves customer privacy (no direct merchant connection)
 
+use crate::Hash;
 use hex;
 use secp256k1::ecdsa::Signature;
 use secp256k1::{Message, Secp256k1};
@@ -677,6 +678,66 @@ impl PaymentProtocolServer {
 
         Ok(())
     }
+}
+
+// --- CTV covenant types (shared by P2P payment messages and node covenant engine; serde-stable) ---
+
+/// CTV covenant proof for payment commitment
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CovenantProof {
+    /// CTV template hash (32 bytes)
+    pub template_hash: Hash,
+    /// Transaction template structure (without signatures)
+    pub transaction_template: TransactionTemplate,
+    /// Payment request ID this proof commits to
+    pub payment_request_id: String,
+    /// Timestamp when proof was created
+    pub created_at: u64,
+    /// Optional cryptographic signature of the proof
+    pub signature: Option<Vec<u8>>,
+}
+
+/// Transaction template for CTV (without scriptSig)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TransactionTemplate {
+    pub version: u32,
+    pub inputs: Vec<TemplateInput>,
+    pub outputs: Vec<TemplateOutput>,
+    pub lock_time: u32,
+}
+
+/// Template input (CTV format: no scriptSig)
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemplateInput {
+    pub prevout_hash: Hash,
+    pub prevout_index: u32,
+    pub sequence: u32,
+}
+
+/// Template output
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TemplateOutput {
+    pub value: u64,
+    pub script_pubkey: Vec<u8>,
+}
+
+/// Settlement status for payment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SettlementStatus {
+    /// Payment proof created, not yet broadcast
+    ProofCreated,
+    /// Payment proof broadcast, transaction not yet in mempool
+    ProofBroadcast,
+    /// Transaction in mempool, waiting for confirmation
+    InMempool { tx_hash: Hash },
+    /// Settlement confirmed on-chain
+    Settled {
+        tx_hash: Hash,
+        block_hash: Hash,
+        confirmation_count: u32,
+    },
+    /// Payment failed or rejected
+    Failed { reason: String },
 }
 
 #[cfg(test)]

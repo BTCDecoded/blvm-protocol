@@ -4,6 +4,7 @@
 //! Protocol-specific limits and validation are handled here, with consensus
 //! validation delegated to the consensus layer.
 
+use crate::bip152::ShortTxId;
 use crate::error::ProtocolError;
 use crate::validation::ProtocolValidationContext;
 use crate::{BitcoinProtocolEngine, ProtocolConfig, Result};
@@ -11,6 +12,7 @@ use blvm_consensus::error::ConsensusError;
 use blvm_consensus::types::UtxoSet;
 use blvm_consensus::types::{Block, BlockHeader, Hash, Transaction, ValidationResult};
 use std::sync::Arc;
+use thiserror::Error;
 
 // Commons module is always available (ban list sharing doesn't require utxo-commitments)
 pub mod commons {
@@ -74,7 +76,7 @@ pub enum NetworkMessage {
 }
 
 /// Version message for initial handshake
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct VersionMessage {
     pub version: u32,
     pub services: u64,
@@ -87,8 +89,36 @@ pub struct VersionMessage {
     pub relay: bool,
 }
 
+/// Block P2P message: consensus block paired with its segwit witness stack.
+///
+/// The consensus [`Block`] carries transactions without witness data; witnesses are kept
+/// alongside so the node can round-trip the full segwit wire format without altering the
+/// consensus type.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct BlockMessage {
+    pub block: Block,
+    /// One `Vec<Witness>` per transaction, one `Witness` per input.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub witnesses: Vec<Vec<blvm_consensus::segwit::Witness>>,
+}
+
+/// Transaction P2P message (thin wrapper for dispatch).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TxMessage {
+    pub transaction: Transaction,
+}
+
+/// Compact block P2P message: decoded BIP152 compact block.
+///
+/// Holds the [`crate::bip152::CompactBlock`] abstraction used for efficient block relay.
+/// The node converts between this and the wire [`CmpctBlockMessage`] on ingress/egress.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CompactBlockMessage {
+    pub compact_block: crate::bip152::CompactBlock,
+}
+
 /// Address message containing peer addresses
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AddrMessage {
     pub addresses: Vec<NetworkAddress>,
 }
@@ -106,7 +136,7 @@ pub struct GetDataMessage {
 }
 
 /// GetHeaders message requesting block headers
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GetHeadersMessage {
     pub version: u32,
     pub block_locator_hashes: Vec<Hash>,
@@ -114,31 +144,31 @@ pub struct GetHeadersMessage {
 }
 
 /// Headers message containing block headers
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct HeadersMessage {
     pub headers: Vec<BlockHeader>,
 }
 
 /// Ping message for connection keepalive
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PingMessage {
     pub nonce: u64,
 }
 
 /// Pong message responding to ping
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PongMessage {
     pub nonce: u64,
 }
 
 /// FeeFilter message setting minimum fee rate
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct FeeFilterMessage {
     pub feerate: u64,
 }
 
 /// GetBlocks message requesting blocks by locator
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GetBlocksMessage {
     pub version: u32,
     pub block_locator_hashes: Vec<Hash>,
@@ -152,7 +182,7 @@ pub struct NotFoundMessage {
 }
 
 /// Reject message rejecting a message with reason
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RejectMessage {
     pub message: String,          // Command name of rejected message
     pub code: u8, // Rejection code (0x01=malformed, 0x10=invalid, 0x11=obsolete, 0x12=duplicate, 0x40=nonstandard, 0x41=dust, 0x42=insufficientfee, 0x43=checkpoint)
@@ -161,7 +191,7 @@ pub struct RejectMessage {
 }
 
 /// SendCmpct message - Negotiate compact block relay support (BIP152)
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct SendCmpctMessage {
     /// Compact block version (1 or 2)
     pub version: u64,
@@ -177,7 +207,7 @@ pub struct CmpctBlockMessage {
     /// Nonce for short transaction ID calculation (SipHash key derivation)
     pub nonce: u64,
     /// Short transaction IDs (6 bytes each)
-    pub short_ids: Vec<[u8; 6]>,
+    pub short_ids: Vec<ShortTxId>,
     /// Prefilled transactions (transactions that are likely missing)
     pub prefilled_txs: Vec<PrefilledTransaction>,
 }
@@ -193,8 +223,80 @@ pub struct PrefilledTransaction {
     pub witness: Option<Vec<blvm_consensus::segwit::Witness>>,
 }
 
+/// Error converting between [`crate::bip152::CompactBlock`] and wire [`CmpctBlockMessage`].
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum CompactBlockWireConvertError {
+    #[error("prefilled transaction index {0} does not fit in BIP152 u16 index")]
+    PrefilledIndexTooLarge(usize),
+    #[error("duplicate prefilled transaction index {0}")]
+    DuplicatePrefilledIndex(usize),
+}
+
+impl TryFrom<crate::bip152::CompactBlock> for CmpctBlockMessage {
+    type Error = CompactBlockWireConvertError;
+
+    /// Builds a cmpctblock-shaped message from the integration [`crate::bip152::CompactBlock`].
+    ///
+    /// Prefilled entries are **sorted by transaction index** (required for BIP152 diff-encoding on the wire).
+    /// Witness stacks are not represented on [`crate::bip152::CompactBlock`]; prefilled txs use `witness: None`.
+    fn try_from(mut value: crate::bip152::CompactBlock) -> std::result::Result<Self, Self::Error> {
+        value.prefilled_txs.sort_by_key(|(i, _)| *i);
+        let mut prefilled_txs = Vec::with_capacity(value.prefilled_txs.len());
+        let mut prev_idx: Option<usize> = None;
+        for (idx, tx) in value.prefilled_txs {
+            if prev_idx == Some(idx) {
+                return Err(CompactBlockWireConvertError::DuplicatePrefilledIndex(idx));
+            }
+            prev_idx = Some(idx);
+            let index = u16::try_from(idx)
+                .map_err(|_| CompactBlockWireConvertError::PrefilledIndexTooLarge(idx))?;
+            prefilled_txs.push(PrefilledTransaction {
+                index,
+                tx,
+                witness: None,
+            });
+        }
+        Ok(CmpctBlockMessage {
+            header: value.header,
+            nonce: value.nonce,
+            short_ids: value.short_ids,
+            prefilled_txs,
+        })
+    }
+}
+
+impl From<&CmpctBlockMessage> for crate::bip152::CompactBlock {
+    fn from(msg: &CmpctBlockMessage) -> Self {
+        Self {
+            header: msg.header.clone(),
+            nonce: msg.nonce,
+            short_ids: msg.short_ids.clone(),
+            prefilled_txs: msg
+                .prefilled_txs
+                .iter()
+                .map(|p| (usize::from(p.index), p.tx.clone()))
+                .collect(),
+        }
+    }
+}
+
+impl From<CmpctBlockMessage> for crate::bip152::CompactBlock {
+    fn from(msg: CmpctBlockMessage) -> Self {
+        Self {
+            header: msg.header,
+            nonce: msg.nonce,
+            short_ids: msg.short_ids,
+            prefilled_txs: msg
+                .prefilled_txs
+                .into_iter()
+                .map(|p| (usize::from(p.index), p.tx))
+                .collect(),
+        }
+    }
+}
+
 /// GetBlockTxn message - Request missing transactions from compact block (BIP152)
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GetBlockTxnMessage {
     /// Block hash for the compact block
     pub block_hash: Hash,
@@ -203,7 +305,7 @@ pub struct GetBlockTxnMessage {
 }
 
 /// BlockTxn message - Response with requested transactions (BIP152)
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct BlockTxnMessage {
     /// Block hash for the compact block
     pub block_hash: Hash,
@@ -214,7 +316,7 @@ pub struct BlockTxnMessage {
 }
 
 /// Network address structure (legacy format)
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct NetworkAddress {
     pub services: u64,
     pub ip: [u8; 16], // IPv6 address (IPv4 mapped to IPv6)
@@ -222,7 +324,7 @@ pub struct NetworkAddress {
 }
 
 /// BIP155: Address type for addrv2 message
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum AddressType {
     IPv4 = 1,
@@ -261,13 +363,13 @@ impl AddressType {
 }
 
 /// BIP155: Extended address message (addrv2)
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct AddrV2Message {
     pub addresses: Vec<NetworkAddressV2>,
 }
 
 /// BIP155: Extended network address structure
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct NetworkAddressV2 {
     pub time: u32,
     pub services: u64,

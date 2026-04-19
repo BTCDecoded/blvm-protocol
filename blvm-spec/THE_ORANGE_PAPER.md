@@ -69,10 +69,6 @@ cd "$BLVM_CONSENSUS_ROOT"
 
 `--strict` fails on any partial (requires full Z3 verification). Z3 is the default feature; use `--no-default-features` only if you cannot build with libclang.
 
-### 5.4 BIP Validation Rules
-
-Stub anchor for tooling that resolves `#[spec_locked("5.4")]` when this file is the only spec on the path. The full BIP rule set (including BIP54 and subsections such as 5.4.9) lives in [PROTOCOL.md](PROTOCOL.md).
-
 ## References
 
 - [PROTOCOL.md](PROTOCOL.md): Full protocol specification

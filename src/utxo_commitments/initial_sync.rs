@@ -224,14 +224,11 @@ impl InitialSync {
                 )));
             }
 
-            let context =
-                blvm_consensus::block::BlockValidationContext::from_connect_block_ibd_args(
-                    recent_headers,
-                    network_time,
-                    network,
-                    None,
-                    None,
-                );
+            let context = crate::block::block_validation_context_for_connect_ibd(
+                recent_headers,
+                network_time,
+                network,
+            );
             let (validation_result, new_utxo_set, _undo_log) = connect_block(
                 &full_block.block,
                 &full_block.witnesses,

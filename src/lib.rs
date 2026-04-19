@@ -16,17 +16,24 @@
 
 use serde::{Deserialize, Serialize};
 
-// Re-export commonly used types from blvm-consensus for convenience
+// Re-export commonly used types for convenience
 // This allows upper layers (like blvm-node) to depend only on blvm-protocol
-pub use blvm_consensus::config::NetworkMessageLimits;
 pub use blvm_consensus::error::{ConsensusError, Result as ConsensusResult};
 pub use blvm_consensus::types::{
     Block, BlockHeader, ByteString, Hash, Integer, Natural, OutPoint, Transaction,
-    TransactionInput, TransactionOutput, UtxoSet, ValidationResult, UTXO,
+    TransactionInput, TransactionOutput, UtxoSet, ValidationResult, Witness, UTXO,
 };
 pub use blvm_consensus::ConsensusProof;
-/// Mainnet buried deployment heights (Core chainparams) for RPC / tooling without a direct `blvm-consensus` dep.
-pub use blvm_consensus::{SEGWIT_ACTIVATION_MAINNET, TAPROOT_ACTIVATION_MAINNET};
+pub use blvm_primitives::config::NetworkMessageLimits;
+
+#[cfg(all(feature = "production", feature = "benchmarking"))]
+pub use blvm_consensus::config::{reset_assume_valid_height, set_assume_valid_height};
+/// Buried deployment heights (Core chainparams) for RPC / tooling without a direct `blvm-consensus` dep.
+pub use blvm_consensus::{
+    BIP112_CSV_ACTIVATION_MAINNET, BIP112_CSV_ACTIVATION_REGTEST, BIP112_CSV_ACTIVATION_TESTNET,
+    GENESIS_BLOCK_HASH_INTERNAL, SEGWIT_ACTIVATION_MAINNET, SEGWIT_ACTIVATION_TESTNET,
+    TAPROOT_ACTIVATION_MAINNET, TAPROOT_ACTIVATION_TESTNET,
+};
 
 // Re-export smallvec for macro use when production feature is enabled
 #[cfg(feature = "production")]
@@ -36,6 +43,15 @@ pub use smallvec;
 pub use lru;
 #[cfg(feature = "production")]
 pub use rayon;
+
+/// Forwards to `blvm_consensus::profile_log!` so upper layers avoid naming `blvm-consensus` directly.
+/// When the `profile` feature is off on consensus, the inner macro expands to a no-op.
+#[macro_export]
+macro_rules! profile_log {
+    ($($arg:tt)*) => {
+        ::blvm_consensus::profile_log!($($arg)*)
+    };
+}
 
 // Protocol-specific Result type
 pub use error::{ProtocolError, Result};
@@ -49,6 +65,24 @@ pub mod segwit {
 }
 pub mod block {
     pub use blvm_consensus::block::*;
+
+    use crate::types::{BlockHeader, Network};
+
+    /// Forwards to [`BlockValidationContext::from_connect_block_ibd_args`] with no BIP54 activation
+    /// override and no boundary timestamps. Does not invent time or headers; pass the same values
+    /// you would pass to the underlying constructor.
+    #[inline]
+    pub fn block_validation_context_for_connect_ibd<H: AsRef<BlockHeader>>(
+        recent_headers: Option<&[H]>,
+        network_time: u64,
+        network: Network,
+    ) -> BlockValidationContext {
+        blvm_consensus::block::block_validation_context_for_connect_ibd(
+            recent_headers,
+            network_time,
+            network,
+        )
+    }
 }
 pub mod mining {
     pub use blvm_consensus::mining::*;
@@ -56,6 +90,72 @@ pub mod mining {
 pub mod pow {
     pub use blvm_consensus::pow::*;
 }
+
+pub mod witness {
+    pub use blvm_consensus::witness::*;
+}
+
+pub mod crypto {
+    pub use blvm_consensus::crypto::*;
+}
+
+pub mod transaction {
+    pub use blvm_consensus::transaction::*;
+}
+
+/// Script interpreter (consensus). Exposed so benches/node avoid a direct `blvm-consensus` dep where possible.
+pub mod script {
+    pub use blvm_consensus::script::*;
+}
+
+/// Transaction sighash / txid helpers from consensus.
+pub mod transaction_hash {
+    pub use blvm_consensus::transaction_hash::*;
+}
+
+/// Production-only batch hashing, preallocation, and related optimization helpers from consensus.
+#[cfg(feature = "production")]
+pub mod optimizations {
+    pub use blvm_consensus::optimizations::*;
+}
+
+/// Consensus constants (`blvm-primitives` / Orange Paper symbols) — same as `blvm_consensus::constants`.
+pub mod constants {
+    pub use blvm_consensus::constants::*;
+}
+
+pub mod bip113 {
+    pub use blvm_consensus::bip113::*;
+}
+
+pub mod bip_validation {
+    pub use blvm_consensus::bip_validation::*;
+}
+
+pub mod utxo_overlay {
+    pub use blvm_consensus::utxo_overlay::*;
+}
+
+pub mod version_bits {
+    pub use blvm_consensus::version_bits::*;
+}
+
+pub mod activation {
+    pub use blvm_consensus::activation::*;
+}
+
+/// Consensus runtime configuration from `blvm-consensus` (distinct from this crate's [`config`] module).
+pub mod consensus_config {
+    pub use blvm_consensus::config::*;
+}
+
+#[cfg(feature = "test-utils")]
+pub mod test_utils {
+    pub use blvm_consensus::test_utils::*;
+}
+
+/// Script opcodes (re-exported from consensus / primitives) for callers that should not name `blvm-consensus` directly.
+pub use blvm_consensus::opcodes;
 
 pub mod sigop {
     pub use blvm_consensus::sigop::*;
@@ -71,6 +171,13 @@ pub mod serialization {
 }
 pub mod commons;
 pub mod network;
+/// Framed TCP P2P (mainnet magic, command allowlist supplied by the node). Not BIP324 v2 transport.
+pub mod node_tcp;
+
+pub use node_tcp::{ProtocolMessage, TcpFramedParser};
+pub mod p2p_commands;
+pub mod p2p_frame;
+pub mod p2p_framing;
 pub mod service_flags;
 pub mod varint;
 
@@ -80,12 +187,31 @@ pub mod v2_transport;
 
 // Re-export commonly used types for convenience
 pub use commons::{
-    BanListMessage, FilteredBlockMessage, GetBanListMessage, GetFilteredBlockMessage,
-    GetUTXOSetMessage, UTXOSetMessage,
+    BanListMessage,
+    EconomicNodeForkDecisionMessage,
+    // Governance / economic-node types
+    EconomicNodeRegistrationMessage,
+    EconomicNodeStatusMessage,
+    EconomicNodeVetoMessage,
+    // Filtered block types
+    FilterPreferences,
+    // Commons-only types kept in blvm-protocol for bridge layers
+    FilteredBlockMessage,
+    GetBanListMessage,
+    GetFilteredBlockMessage,
+    // UTXO proof types
+    GetUTXOProofMessage,
+    GetUTXOSetMessage,
+    NodeStatusResponse,
+    // UTXO commitment protocol types
+    UTXOCommitment,
+    UTXOProofMessage,
+    UTXOSetMessage,
 };
 pub use config::{
     ProtocolConfig, ProtocolFeaturesConfig, ProtocolValidationConfig, ServiceFlagsConfig,
 };
+pub use network::{BlockMessage, CompactBlockMessage, TxMessage};
 pub use service_flags::{commons as service_flags_commons, standard as service_flags_standard};
 // Wire format module - Bitcoin P2P wire protocol serialization
 pub mod wire;
@@ -120,6 +246,11 @@ pub mod variants;
 
 // Protocol-level BIP implementations
 pub mod address; // BIP173/350/351: Bech32/Bech32m address encoding
+#[cfg(feature = "ctv")]
+pub mod bip119 {
+    pub use blvm_consensus::bip119::*;
+}
+pub mod bip152; // BIP152: Compact block relay (wire types)
 pub mod bip157; // BIP157: Client-side block filtering network protocol
 pub mod bip158; // BIP158: Compact block filters
 pub mod fibre;
@@ -309,12 +440,10 @@ impl BitcoinProtocolEngine {
             ProtocolVersion::Regtest => types::Network::Regtest,
         };
         let network_time = crate::time::current_timestamp();
-        let context = blvm_consensus::block::BlockValidationContext::from_connect_block_ibd_args(
+        let context = crate::block::block_validation_context_for_connect_ibd(
             recent_headers,
             network_time,
             network,
-            None,
-            None,
         );
         let (result, new_utxo_set, _undo_log) = blvm_consensus::block::connect_block(
             block,

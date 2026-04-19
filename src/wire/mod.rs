@@ -428,7 +428,7 @@ pub fn deserialize_version(data: &[u8]) -> Result<crate::network::VersionMessage
 
 /// Serialize AddrMessage to Bitcoin wire format (legacy addr)
 /// Format: CompactSize(count) + [timestamp(4) + services(8) + addr(16) + port(2)]*
-fn serialize_addr(a: &crate::network::AddrMessage) -> Result<Vec<u8>> {
+pub fn serialize_addr(a: &crate::network::AddrMessage) -> Result<Vec<u8>> {
     use crate::varint::write_varint;
 
     let mut buf = Vec::new();
@@ -446,7 +446,7 @@ fn serialize_addr(a: &crate::network::AddrMessage) -> Result<Vec<u8>> {
     }
     Ok(buf)
 }
-fn deserialize_addr(data: &[u8]) -> Result<crate::network::AddrMessage> {
+pub fn deserialize_addr(data: &[u8]) -> Result<crate::network::AddrMessage> {
     use crate::varint::read_varint;
     use std::io::Read;
 
@@ -940,10 +940,10 @@ pub fn deserialize_block(data: &[u8]) -> Result<crate::Block> {
     Ok(block)
 }
 
-fn serialize_tx(tx: &crate::Transaction) -> Result<Vec<u8>> {
+pub fn serialize_tx(tx: &crate::Transaction) -> Result<Vec<u8>> {
     Ok(crate::serialization::serialize_transaction(tx))
 }
-fn deserialize_tx(data: &[u8]) -> Result<crate::Transaction> {
+pub fn deserialize_tx(data: &[u8]) -> Result<crate::Transaction> {
     crate::serialization::deserialize_transaction(data).map_err(|e| {
         ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
     })
@@ -990,10 +990,10 @@ pub fn deserialize_pong(data: &[u8]) -> Result<crate::network::PongMessage> {
 }
 
 /// Serialize FeeFilterMessage per BIP133: 8-byte feerate (LE)
-fn serialize_feefilter(f: &crate::network::FeeFilterMessage) -> Result<Vec<u8>> {
+pub fn serialize_feefilter(f: &crate::network::FeeFilterMessage) -> Result<Vec<u8>> {
     Ok(f.feerate.to_le_bytes().to_vec())
 }
-fn deserialize_feefilter(data: &[u8]) -> Result<crate::network::FeeFilterMessage> {
+pub fn deserialize_feefilter(data: &[u8]) -> Result<crate::network::FeeFilterMessage> {
     if data.len() < 8 {
         return Err(ProtocolError::Consensus(ConsensusError::Serialization(
             Cow::Owned("FeeFilter message too short".to_string()),
@@ -1006,7 +1006,7 @@ fn deserialize_feefilter(data: &[u8]) -> Result<crate::network::FeeFilterMessage
 }
 
 /// Serialize GetBlocksMessage - same structure as GetHeaders (version + locator + hash_stop)
-fn serialize_getblocks(gb: &crate::network::GetBlocksMessage) -> Result<Vec<u8>> {
+pub fn serialize_getblocks(gb: &crate::network::GetBlocksMessage) -> Result<Vec<u8>> {
     use crate::varint::write_varint;
 
     let mut buf = Vec::new();
@@ -1018,7 +1018,7 @@ fn serialize_getblocks(gb: &crate::network::GetBlocksMessage) -> Result<Vec<u8>>
     buf.extend_from_slice(&gb.hash_stop);
     Ok(buf)
 }
-fn deserialize_getblocks(data: &[u8]) -> Result<crate::network::GetBlocksMessage> {
+pub fn deserialize_getblocks(data: &[u8]) -> Result<crate::network::GetBlocksMessage> {
     use crate::varint::read_varint;
     use std::io::Read;
 
@@ -1121,7 +1121,7 @@ pub fn deserialize_notfound(data: &[u8]) -> Result<crate::network::NotFoundMessa
 }
 
 /// Serialize RejectMessage per BIP61: message(12) + ccode(1) + reason(var) + data(32 optional)
-fn serialize_reject(r: &crate::network::RejectMessage) -> Result<Vec<u8>> {
+pub fn serialize_reject(r: &crate::network::RejectMessage) -> Result<Vec<u8>> {
     use crate::varint::write_varint;
 
     let mut buf = Vec::with_capacity(12 + 1 + 9 + r.reason.len() + 32);
@@ -1144,7 +1144,7 @@ fn serialize_reject(r: &crate::network::RejectMessage) -> Result<Vec<u8>> {
     }
     Ok(buf)
 }
-fn deserialize_reject(data: &[u8]) -> Result<crate::network::RejectMessage> {
+pub fn deserialize_reject(data: &[u8]) -> Result<crate::network::RejectMessage> {
     use crate::varint::read_varint;
 
     if data.len() < 13 {
@@ -1184,13 +1184,13 @@ fn deserialize_reject(data: &[u8]) -> Result<crate::network::RejectMessage> {
 }
 
 /// BIP152: sendcmpct - 1 byte prefer_cmpct + 8 bytes version (LE)
-fn serialize_sendcmpct(sc: &crate::network::SendCmpctMessage) -> Result<Vec<u8>> {
+pub fn serialize_sendcmpct(sc: &crate::network::SendCmpctMessage) -> Result<Vec<u8>> {
     let mut buf = Vec::with_capacity(9);
     buf.push(sc.prefer_cmpct);
     buf.extend_from_slice(&sc.version.to_le_bytes());
     Ok(buf)
 }
-fn deserialize_sendcmpct(data: &[u8]) -> Result<crate::network::SendCmpctMessage> {
+pub fn deserialize_sendcmpct(data: &[u8]) -> Result<crate::network::SendCmpctMessage> {
     if data.len() < 9 {
         return Err(ProtocolError::Consensus(ConsensusError::Serialization(
             Cow::Owned("SendCmpct message too short".to_string()),
@@ -1205,7 +1205,7 @@ fn deserialize_sendcmpct(data: &[u8]) -> Result<crate::network::SendCmpctMessage
 }
 
 /// BIP152: cmpctblock - header(80) + nonce(8) + shortids(varint+6*count) + prefilled(varint+each: diff_index+tx)
-fn serialize_cmpctblock(cb: &crate::network::CmpctBlockMessage) -> Result<Vec<u8>> {
+pub fn serialize_cmpctblock(cb: &crate::network::CmpctBlockMessage) -> Result<Vec<u8>> {
     use crate::varint::write_varint;
 
     let mut buf = Vec::new();
@@ -1231,7 +1231,7 @@ fn serialize_cmpctblock(cb: &crate::network::CmpctBlockMessage) -> Result<Vec<u8
     }
     Ok(buf)
 }
-fn deserialize_cmpctblock(data: &[u8]) -> Result<crate::network::CmpctBlockMessage> {
+pub fn deserialize_cmpctblock(data: &[u8]) -> Result<crate::network::CmpctBlockMessage> {
     use crate::varint::read_varint;
     use std::io::Read;
 
@@ -1299,7 +1299,7 @@ fn deserialize_cmpctblock(data: &[u8]) -> Result<crate::network::CmpctBlockMessa
 }
 
 /// BIP152: getblocktxn - block_hash(32) + indexes(varint count + diff-encoded varints)
-fn serialize_getblocktxn(gbt: &crate::network::GetBlockTxnMessage) -> Result<Vec<u8>> {
+pub fn serialize_getblocktxn(gbt: &crate::network::GetBlockTxnMessage) -> Result<Vec<u8>> {
     use crate::varint::write_varint;
 
     let mut buf = Vec::new();
@@ -1318,7 +1318,7 @@ fn serialize_getblocktxn(gbt: &crate::network::GetBlockTxnMessage) -> Result<Vec
     }
     Ok(buf)
 }
-fn deserialize_getblocktxn(data: &[u8]) -> Result<crate::network::GetBlockTxnMessage> {
+pub fn deserialize_getblocktxn(data: &[u8]) -> Result<crate::network::GetBlockTxnMessage> {
     use crate::varint::read_varint;
 
     if data.len() < 32 {
@@ -1354,7 +1354,7 @@ fn deserialize_getblocktxn(data: &[u8]) -> Result<crate::network::GetBlockTxnMes
 }
 
 /// BIP152: blocktxn - block_hash(32) + count(varint) + transactions
-fn serialize_blocktxn(bt: &crate::network::BlockTxnMessage) -> Result<Vec<u8>> {
+pub fn serialize_blocktxn(bt: &crate::network::BlockTxnMessage) -> Result<Vec<u8>> {
     use crate::varint::write_varint;
 
     let mut buf = Vec::new();
@@ -1376,7 +1376,7 @@ fn serialize_blocktxn(bt: &crate::network::BlockTxnMessage) -> Result<Vec<u8>> {
     }
     Ok(buf)
 }
-fn deserialize_blocktxn(data: &[u8]) -> Result<crate::network::BlockTxnMessage> {
+pub fn deserialize_blocktxn(data: &[u8]) -> Result<crate::network::BlockTxnMessage> {
     use crate::varint::read_varint;
 
     if data.len() < 32 {

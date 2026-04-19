@@ -335,7 +335,9 @@ pub struct SpamFilterResult {
 #[derive(Clone)]
 pub struct SpamFilter {
     config: SpamFilterConfig,
+    /// Reserved for script-type LRU; wired incrementally in hot paths.
     #[cfg(feature = "production")]
+    #[allow(dead_code)]
     pub(crate) script_type_cache: std::sync::Arc<std::sync::RwLock<lru::LruCache<u64, bool>>>,
 }
 

@@ -326,6 +326,97 @@ jobs:
           cargo-audit --version
           cargo audit
 
+  verify:
+    name: Verify (spec-lock)
+    needs: setup
+    runs-on: [self-hosted, Linux, X64, builds]
+    timeout-minutes: 60
+    if: |
+      (github.event_name != 'push' || github.event.head_commit == null || 
+       (!contains(github.event.head_commit.message, '[skip ci]') &&
+        !contains(github.event.head_commit.message, '[ci skip]') &&
+        !contains(github.event.head_commit.message, '[no ci]'))) &&
+      (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Strip [patch.crates-io] for crates.io-only CI
+        uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
+
+      - name: Checkout consensus
+        uses: actions/checkout@v4
+        with:
+          repository: BTCDecoded/blvm-consensus
+          path: _temp-blvm-consensus
+
+      - name: Move consensus
+        run: |
+          if [ -d "../blvm-consensus" ]; then rm -rf ../blvm-consensus; fi
+          mv _temp-blvm-consensus ../blvm-consensus
+
+      - name: Setup local dependencies for build
+        run: |
+          mkdir -p .cargo
+          cat > .cargo/config.toml << EOF
+          [patch.crates-io]
+          blvm-consensus = { path = "../blvm-consensus" }
+          EOF
+
+      - name: Setup blvm-spec (PROTOCOL.md + ARCHITECTURE.md for verification)
+        uses: BTCDecoded/rust-ci/setup-blvm-spec@main
+
+      - name: Cache
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: bind-env
+          cache-key: ${{ needs.setup.outputs.cache-key }}
+
+      - name: Restore Cargo cache
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: restore
+
+      - name: Install Rust
+        uses: BTCDecoded/rust-ci/install-rust-toolchain@main
+
+      - name: Install spec-lock build deps (Z3 / clang)
+        run: |
+          if command -v apt-get >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq libz3-dev libclang-dev clang pkg-config
+          elif command -v pacman >/dev/null 2>&1; then
+            sudo pacman -Sy --noconfirm z3 llvm clang pkgconf
+          fi
+
+      - name: Install cargo-spec-lock from crates.io
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo install blvm-spec-lock --locked --features z3
+
+      - name: Run blvm-spec-lock verify
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          echo "🔒 Running blvm-spec-lock verification on blvm-protocol..."
+          SPEC_ARGS="--crate-path ."
+          if [ -f "../blvm-spec/PROTOCOL.md" ] && [ -f "../blvm-spec/ARCHITECTURE.md" ]; then
+            SPEC_ARGS="$SPEC_ARGS --spec-path ../blvm-spec/PROTOCOL.md ../blvm-spec/ARCHITECTURE.md"
+            echo "Using PROTOCOL.md + ARCHITECTURE.md for spec-derived contracts"
+          elif [ -f "../blvm-spec/THE_ORANGE_PAPER.md" ]; then
+            SPEC_ARGS="$SPEC_ARGS --spec-path ../blvm-spec/THE_ORANGE_PAPER.md"
+            echo "Using THE_ORANGE_PAPER.md for spec-derived contracts (fallback)"
+          else
+            echo "❌ No spec found at ../blvm-spec"
+            exit 1
+          fi
+          export SPEC_LOCK_STRICT=1
+          cargo-spec-lock verify $SPEC_ARGS 2>&1 | tee spec_lock_output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "❌ blvm-spec-lock verification failed"
+            exit $EXIT_CODE
+          fi
+          echo "✅ blvm-spec-lock verification passed"
+
   build:
     name: Build
     needs: 
@@ -335,6 +426,7 @@ jobs:
       - fmt
       - docs
       - security
+      - verify
     runs-on: [self-hosted, Linux, X64, builds]
     if: |
       always() &&
@@ -347,7 +439,8 @@ jobs:
       ((github.event_name == 'workflow_dispatch' && github.event.inputs.skip_tests == 'true') ||
        (needs.test.result == 'success' && needs.clippy.result == 'success' && 
         needs.fmt.result == 'success' && needs.docs.result == 'success' && 
-        needs.security.result == 'success'))
+        needs.security.result == 'success' &&
+        (needs.verify.result == 'success' || needs.verify.result == 'skipped')))
     steps:
       - uses: actions/checkout@v4
       
@@ -403,7 +496,7 @@ jobs:
 
   release:
     name: Release
-    needs: [build, test, clippy, fmt, docs, security]
+    needs: [build, test, clippy, fmt, docs, security, verify]
     runs-on: [self-hosted, Linux, X64, builds]
     if: |
       always() &&
@@ -418,7 +511,8 @@ jobs:
       ((github.event_name == 'workflow_dispatch' && github.event.inputs.skip_tests == 'true') ||
        (needs.test.result == 'success' && needs.clippy.result == 'success' && 
         needs.fmt.result == 'success' && needs.docs.result == 'success' && 
-        needs.security.result == 'success'))
+        needs.security.result == 'success' &&
+        (needs.verify.result == 'success' || needs.verify.result == 'skipped')))
     permissions:
       contents: write
       id-token: write

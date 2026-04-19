@@ -1,0 +1,67 @@
+//! Bitcoin P2P command names (payload type tags; 12-byte null-padded on the wire).
+
+/// Wire command strings. Use in parsers and serializers so command literals stay consistent.
+pub mod cmd {
+    pub const ADDR: &str = "addr";
+    pub const ADDRV2: &str = "addrv2";
+    pub const BANLIST: &str = "banlist";
+    pub const BLOCK: &str = "block";
+    pub const BLOCKTXN: &str = "blocktxn";
+    pub const CFCHECKPT: &str = "cfcheckpt";
+    pub const CFHEADERS: &str = "cfheaders";
+    pub const CFILTER: &str = "cfilter";
+    pub const CMPCTBLOCK: &str = "cmpctblock";
+    pub const ECONFORK: &str = "econfork";
+    pub const ECONREG: &str = "econreg";
+    pub const ECONSTATUS: &str = "econstatus";
+    pub const ECONVETO: &str = "econveto";
+    pub const FEEFILTER: &str = "feefilter";
+    pub const FILTEREDBLOCK: &str = "filteredblock";
+    pub const GETADDR: &str = "getaddr";
+    pub const GETBANLIST: &str = "getbanlist";
+    pub const GETBLOCKTXN: &str = "getblocktxn";
+    pub const GETCFCHECKPT: &str = "getcfcheckpt";
+    pub const GETCFHEADERS: &str = "getcfheaders";
+    pub const GETCFILTERS: &str = "getcfilters";
+    pub const GETDATA: &str = "getdata";
+    pub const GETFILTEREDBLOCK: &str = "getfilteredblock";
+    pub const GETHEADERS: &str = "getheaders";
+    pub const GETMODULE: &str = "getmodule";
+    pub const GETMODULEBYHASH: &str = "getmodulebyhash";
+    pub const GETMODULELIST: &str = "getmodulelist";
+    pub const GETPAYMENTREQUEST: &str = "getpaymentrequest";
+    pub const GETUTXOPROOF: &str = "getutxoproof";
+    pub const GETUTXOSET: &str = "getutxoset";
+    pub const GETBLOCKS: &str = "getblocks";
+    pub const HEADERS: &str = "headers";
+    pub const INV: &str = "inv";
+    pub const MESH: &str = "mesh";
+    pub const MEMPOOL: &str = "mempool";
+    pub const MODULE: &str = "module";
+    pub const MODULEBYHASH: &str = "modulebyhash";
+    pub const MODULEINV: &str = "moduleinv";
+    pub const MODULELIST: &str = "modulelist";
+    pub const NOTFOUND: &str = "notfound";
+    pub const PAYMENT: &str = "payment";
+    pub const PAYMENTACK: &str = "paymentack";
+    pub const PAYMENTPROOF: &str = "paymentproof";
+    pub const PAYMENTREQUEST: &str = "paymentrequest";
+    pub const PING: &str = "ping";
+    pub const PKGTXN: &str = "pkgtxn";
+    pub const PKGTXNREJECT: &str = "pkgtxnreject";
+    pub const PONG: &str = "pong";
+    pub const REQRECON: &str = "reqrecon";
+    pub const REQSKT: &str = "reqskt";
+    pub const REJECT: &str = "reject";
+    pub const SENDCMPCT: &str = "sendcmpct";
+    pub const SENDHEADERS: &str = "sendheaders";
+    pub const SENDPKGTXN: &str = "sendpkgtxn";
+    pub const SENDTXRCNCL: &str = "sendtxrcncl";
+    pub const SETTLEMENTNOTIFICATION: &str = "settlementnotification";
+    pub const SKETCH: &str = "sketch";
+    pub const TX: &str = "tx";
+    pub const UTXOPROOF: &str = "utxoproof";
+    pub const UTXOSET: &str = "utxoset";
+    pub const VERACK: &str = "verack";
+    pub const VERSION: &str = "version";
+}

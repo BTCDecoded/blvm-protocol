@@ -558,3 +558,126 @@ fn test_getblocktxn_empty_indices() {
     // Should return Ok (no transactions requested)
     assert!(matches!(response, NetworkResponse::Ok));
 }
+
+// ============================================================================
+// CompactBlock (bip152) <-> CmpctBlockMessage wire shape
+// ============================================================================
+
+#[test]
+fn test_compact_block_to_cmpctblock_sorts_prefilled() {
+    use blvm_protocol::bip152::CompactBlock;
+    use std::convert::TryFrom;
+
+    let tx = Transaction {
+        version: 1,
+        inputs: blvm_consensus::tx_inputs![TransactionInput {
+            prevout: blvm_consensus::types::OutPoint {
+                hash: [0u8; 32],
+                index: 0xffffffff,
+            },
+            script_sig: vec![0x01, 0x00],
+            sequence: 0xffffffff,
+        }],
+        outputs: blvm_consensus::tx_outputs![TransactionOutput {
+            value: 50_0000_0000,
+            script_pubkey: vec![blvm_consensus::opcodes::OP_1],
+        }],
+        lock_time: 0,
+    };
+
+    let header = BlockHeader {
+        version: 1,
+        prev_block_hash: [0u8; 32],
+        merkle_root: [1u8; 32],
+        timestamp: 1231006505,
+        bits: 0x1d00ffff,
+        nonce: 0,
+    };
+
+    let cb = CompactBlock {
+        header: header.clone(),
+        nonce: 42,
+        short_ids: vec![],
+        prefilled_txs: vec![(2, tx.clone()), (0, tx.clone())],
+    };
+
+    let cmpct = CmpctBlockMessage::try_from(cb).unwrap();
+    assert_eq!(cmpct.prefilled_txs[0].index, 0);
+    assert_eq!(cmpct.prefilled_txs[1].index, 2);
+    assert_eq!(cmpct.nonce, 42);
+
+    let back = CompactBlock::from(&cmpct);
+    assert_eq!(back.header, header);
+    assert_eq!(back.nonce, 42);
+    assert_eq!(back.prefilled_txs.len(), 2);
+    assert_eq!(back.prefilled_txs[0].0, 0);
+    assert_eq!(back.prefilled_txs[1].0, 2);
+}
+
+#[test]
+fn test_compact_block_duplicate_prefilled_rejected() {
+    use blvm_protocol::bip152::CompactBlock;
+    use blvm_protocol::network::CompactBlockWireConvertError;
+    use std::convert::TryFrom;
+
+    let tx = Transaction {
+        version: 1,
+        inputs: blvm_consensus::tx_inputs![],
+        outputs: blvm_consensus::tx_outputs![],
+        lock_time: 0,
+    };
+
+    let cb = CompactBlock {
+        header: BlockHeader {
+            version: 1,
+            prev_block_hash: [0u8; 32],
+            merkle_root: [1u8; 32],
+            timestamp: 1,
+            bits: 0x1d00ffff,
+            nonce: 0,
+        },
+        nonce: 0,
+        short_ids: vec![],
+        prefilled_txs: vec![(1, tx.clone()), (1, tx)],
+    };
+
+    let err = CmpctBlockMessage::try_from(cb).unwrap_err();
+    assert!(matches!(
+        err,
+        CompactBlockWireConvertError::DuplicatePrefilledIndex(1)
+    ));
+}
+
+#[test]
+fn test_compact_block_prefilled_index_u16_overflow() {
+    use blvm_protocol::bip152::CompactBlock;
+    use blvm_protocol::network::CompactBlockWireConvertError;
+    use std::convert::TryFrom;
+
+    let tx = Transaction {
+        version: 1,
+        inputs: blvm_consensus::tx_inputs![],
+        outputs: blvm_consensus::tx_outputs![],
+        lock_time: 0,
+    };
+
+    let cb = CompactBlock {
+        header: BlockHeader {
+            version: 1,
+            prev_block_hash: [0u8; 32],
+            merkle_root: [1u8; 32],
+            timestamp: 1,
+            bits: 0x1d00ffff,
+            nonce: 0,
+        },
+        nonce: 0,
+        short_ids: vec![],
+        prefilled_txs: vec![(65536, tx)],
+    };
+
+    let err = CmpctBlockMessage::try_from(cb).unwrap_err();
+    assert!(matches!(
+        err,
+        CompactBlockWireConvertError::PrefilledIndexTooLarge(65536)
+    ));
+}

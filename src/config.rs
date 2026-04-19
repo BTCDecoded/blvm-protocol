@@ -5,10 +5,15 @@
 //! complement blvm-consensus configuration by focusing on protocol abstraction
 //! rather than consensus validation.
 //!
-//! Network message limits (addr, inv, headers, user_agent) are imported from
-//! blvm-consensus to avoid duplication. Use .cargo/config.toml for local development.
+//! Operational limits and sub-configs shared with consensus live in
+//! [`blvm_primitives::config`]. [`ConsensusConfig`](crate::consensus_config::ConsensusConfig)
+//! remains in `blvm-consensus`.
 
-use crate::NetworkMessageLimits;
+pub use blvm_primitives::config::{
+    AdvancedConfig, BlockValidationConfig, DebugConfig, FeatureFlagsConfig, MempoolConfig,
+    NetworkMessageLimits, PerformanceConfig, UtxoCommitmentConfig,
+};
+
 use crate::ProtocolVersion;
 use serde::{Deserialize, Serialize};
 
