@@ -77,10 +77,12 @@ pub mod block {
         network_time: u64,
         network: Network,
     ) -> BlockValidationContext {
-        blvm_consensus::block::block_validation_context_for_connect_ibd(
+        BlockValidationContext::from_connect_block_ibd_args(
             recent_headers,
             network_time,
             network,
+            None,
+            None,
         )
     }
 }
