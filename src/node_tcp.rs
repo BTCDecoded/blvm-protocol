@@ -639,7 +639,7 @@ impl TcpFramedParser {
 
         let (command, payload) =
             crate::p2p_frame::parse_p2p_frame(data, BITCOIN_P2P_MAGIC_MAINNET_LE, |c| {
-                allowed_commands.iter().any(|&cmd| cmd == c)
+                allowed_commands.contains(&c)
             })
             .map_err(|e| anyhow::anyhow!("{}", e))?;
 

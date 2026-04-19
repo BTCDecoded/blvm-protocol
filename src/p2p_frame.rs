@@ -21,11 +21,11 @@ pub fn bitcoin_p2p_payload_checksum(payload: &[u8]) -> [u8; 4] {
 /// Parse the 24-byte header and verify checksum; returns command name and payload slice.
 ///
 /// `command_allowed` should return true for commands this node/process accepts (e.g. allowlist).
-pub fn parse_p2p_frame<'a>(
-    data: &'a [u8],
+pub fn parse_p2p_frame(
+    data: &[u8],
     expected_magic_le: u32,
     command_allowed: impl Fn(&str) -> bool,
-) -> Result<(&'a str, &'a [u8])> {
+) -> Result<(&str, &[u8])> {
     if data.len() < 24 {
         return Err(ProtocolError::InvalidMessage(Cow::Owned(format!(
             "Message too short: {} bytes",
@@ -42,8 +42,7 @@ pub fn parse_p2p_frame<'a>(
     let magic = u32::from_le_bytes([data[0], data[1], data[2], data[3]]);
     if magic != expected_magic_le {
         return Err(ProtocolError::InvalidMessage(Cow::Owned(format!(
-            "Invalid magic number 0x{:08x}",
-            magic
+            "Invalid magic number 0x{magic:08x}"
         ))));
     }
 
@@ -55,8 +54,7 @@ pub fn parse_p2p_frame<'a>(
 
     if !command_allowed(command) {
         return Err(ProtocolError::InvalidMessage(Cow::Owned(format!(
-            "Unknown command: {}",
-            command
+            "Unknown command: {command}"
         ))));
     }
 
@@ -75,7 +73,7 @@ pub fn parse_p2p_frame<'a>(
     let payload = &data[24..24 + payload_length];
     let checksum = &data[20..24];
     let expected = bitcoin_p2p_payload_checksum(payload);
-    if checksum != &expected {
+    if checksum != expected {
         return Err(ProtocolError::InvalidMessage(Cow::Borrowed(
             "Invalid checksum",
         )));
@@ -132,6 +130,6 @@ mod tests {
         let frame = build_p2p_frame(BITCOIN_MAGIC_MAINNET, "weird", &[]).unwrap();
         let magic_le = u32::from_le_bytes(BITCOIN_MAGIC_MAINNET);
         let err = parse_p2p_frame(&frame, magic_le, |c| c == "ping").unwrap_err();
-        assert!(format!("{}", err).contains("Unknown command"));
+        assert!(format!("{err}").contains("Unknown command"));
     }
 }

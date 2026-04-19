@@ -8,12 +8,12 @@ use blvm_protocol::config::{
 };
 use blvm_protocol::{service_flags, ProtocolVersion};
 
-/// `blvm_protocol::config` re-exports primitives; defaults must match `blvm_consensus::config`.
+/// [`MempoolConfig`] comes from [`blvm_primitives::config`]; defaults must match that crate.
 #[test]
-fn test_shared_config_defaults_match_consensus() {
+fn test_mempool_config_default_matches_primitives() {
     assert_eq!(
         MempoolConfig::default(),
-        blvm_consensus::config::MempoolConfig::default()
+        blvm_primitives::config::MempoolConfig::default()
     );
 }
 
