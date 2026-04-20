@@ -5,11 +5,11 @@
 //! complement blvm-consensus configuration by focusing on protocol abstraction
 //! rather than consensus validation.
 //!
-//! Operational limits and sub-configs shared with consensus live in
-//! [`blvm_primitives::config`]. [`ConsensusConfig`](crate::consensus_config::ConsensusConfig)
-//! remains in `blvm-consensus`.
+//! Operational limits and sub-configs align with [`blvm_consensus::config`] (which builds on
+//! `blvm-primitives` for foundational types). [`ConsensusConfig`](crate::consensus_config::ConsensusConfig)
+//! remains the full consensus aggregate in `blvm-consensus`.
 
-pub use blvm_primitives::config::{
+pub use blvm_consensus::config::{
     AdvancedConfig, BlockValidationConfig, DebugConfig, FeatureFlagsConfig, MempoolConfig,
     NetworkMessageLimits, PerformanceConfig, UtxoCommitmentConfig,
 };

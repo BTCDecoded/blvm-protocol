@@ -629,9 +629,12 @@ impl UtxoMerkleTree {
 
 #[cfg(feature = "utxo-commitments")]
 impl Default for UtxoMerkleTree {
+    /// Prefer [`UtxoMerkleTree::new`] in code that can handle allocation failure.
+    ///
+    /// `Default` panics if the underlying sparse Merkle tree cannot be constructed (e.g. severe
+    /// memory pressure). This matches “default must be infallible” call sites but is not ideal for
+    /// untrusted or resource-constrained environments.
     fn default() -> Self {
-        // Default::default() should never panic, but new() can fail.
-        // If it fails, it's a critical system error (likely memory issue).
         Self::new().unwrap_or_else(|e| {
             panic!(
                 "Failed to create default UtxoMerkleTree: {:?}. This indicates a critical system error.",

@@ -49,7 +49,7 @@ pub mod commons {
     /// Node supports Ban List Sharing
     pub const NODE_BAN_LIST_SHARING: u64 = 1 << 28;
 
-    /// Node supports Governance message relay (can forward economic node messages to blvm-commons)
+    /// Node supports governance-related P2P capability (advertised via Version.services)
     pub const NODE_GOVERNANCE: u64 = 1 << 29;
 
     /// Erlay (BIP330) transaction relay

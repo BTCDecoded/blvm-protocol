@@ -11,10 +11,6 @@ pub mod cmd {
     pub const CFHEADERS: &str = "cfheaders";
     pub const CFILTER: &str = "cfilter";
     pub const CMPCTBLOCK: &str = "cmpctblock";
-    pub const ECONFORK: &str = "econfork";
-    pub const ECONREG: &str = "econreg";
-    pub const ECONSTATUS: &str = "econstatus";
-    pub const ECONVETO: &str = "econveto";
     pub const FEEFILTER: &str = "feefilter";
     pub const FILTEREDBLOCK: &str = "filteredblock";
     pub const GETADDR: &str = "getaddr";

@@ -24,7 +24,7 @@ pub use blvm_consensus::types::{
     TransactionInput, TransactionOutput, UtxoSet, ValidationResult, Witness, UTXO,
 };
 pub use blvm_consensus::ConsensusProof;
-pub use blvm_primitives::config::NetworkMessageLimits;
+pub use blvm_consensus::config::NetworkMessageLimits;
 
 #[cfg(all(feature = "production", feature = "benchmarking"))]
 pub use blvm_consensus::config::{reset_assume_valid_height, set_assume_valid_height};
@@ -190,11 +190,6 @@ pub mod v2_transport;
 // Re-export commonly used types for convenience
 pub use commons::{
     BanListMessage,
-    EconomicNodeForkDecisionMessage,
-    // Governance / economic-node types
-    EconomicNodeRegistrationMessage,
-    EconomicNodeStatusMessage,
-    EconomicNodeVetoMessage,
     // Filtered block types
     FilterPreferences,
     // Commons-only types kept in blvm-protocol for bridge layers
@@ -204,7 +199,6 @@ pub use commons::{
     // UTXO proof types
     GetUTXOProofMessage,
     GetUTXOSetMessage,
-    NodeStatusResponse,
     // UTXO commitment protocol types
     UTXOCommitment,
     UTXOProofMessage,

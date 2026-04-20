@@ -3,7 +3,7 @@
 //! This module provides script type detection to enable adaptive witness size thresholds
 //! based on the script type (P2PKH, P2SH, P2WPKH, P2WSH, P2TR, MultiSig, etc.).
 //!
-//! Reference: BIP-XXX Technical Improvement Plan - Category 1.1
+//! Heuristic thresholds are tuned for witness-size–based relay policy (not a consensus BIP).
 
 use blvm_consensus::opcodes::*;
 use blvm_consensus::types::ByteString;

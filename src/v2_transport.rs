@@ -19,6 +19,10 @@ use std::borrow::Cow;
 
 /// BIP324 v2 transport encryption state
 pub struct V2Transport {
+    /// Send key material (updated on rekey per BIP324 FSChaCha20Poly1305)
+    send_key: [u8; 32],
+    /// Receive key material (updated on rekey)
+    recv_key: [u8; 32],
     /// Send cipher (encrypt outgoing messages)
     send_cipher: ChaCha20Poly1305,
     /// Receive cipher (decrypt incoming messages)
@@ -43,6 +47,26 @@ pub enum V2Handshake {
     },
 }
 
+/// BIP324: rekey after this many AEAD operations per direction (`REKEY_INTERVAL`).
+const REKEY_INTERVAL: u64 = 224;
+
+fn rekey_derive_next_key(key: &[u8; 32], rekey_epoch: u64) -> Result<[u8; 32]> {
+    let mut rekey_nonce = [0u8; 12];
+    rekey_nonce[0..4].copy_from_slice(&[0xff, 0xff, 0xff, 0xff]);
+    rekey_nonce[4..12].copy_from_slice(&rekey_epoch.to_le_bytes());
+    let cipher = ChaCha20Poly1305::new(Key::from_slice(key));
+    let ct = cipher
+        .encrypt(Nonce::from_slice(&rekey_nonce), b"", &[0u8; 32])
+        .map_err(|e| {
+            ProtocolError::Consensus(blvm_consensus::error::ConsensusError::Serialization(
+                Cow::Owned(format!("BIP324 rekey encrypt failed: {e}")),
+            ))
+        })?;
+    let mut new_key = [0u8; 32];
+    new_key.copy_from_slice(&ct[..32]);
+    Ok(new_key)
+}
+
 impl V2Transport {
     /// Create a new v2 transport with established keys
     pub fn new(send_key: [u8; 32], recv_key: [u8; 32]) -> Self {
@@ -50,6 +74,8 @@ impl V2Transport {
         let recv_cipher = ChaCha20Poly1305::new(&Key::from_slice(&recv_key));
 
         Self {
+            send_key,
+            recv_key,
             send_cipher,
             recv_cipher,
             send_nonce: 0,
@@ -75,10 +101,11 @@ impl V2Transport {
         // Increment nonce counter
         self.send_nonce += 1;
 
-        // Check if rekeying is needed (every 224 packets per BIP324)
-        if self.send_nonce % 224 == 0 {
-            // Rekeying would happen here (not implemented in initial version)
-            // This requires deriving new keys from existing keys
+        // BIP324 FSChaCha20Poly1305: rekey every REKEY_INTERVAL packets
+        if self.send_nonce.is_multiple_of(REKEY_INTERVAL) {
+            let rekey_epoch = (self.send_nonce / REKEY_INTERVAL) - 1;
+            self.send_key = rekey_derive_next_key(&self.send_key, rekey_epoch)?;
+            self.send_cipher = ChaCha20Poly1305::new(Key::from_slice(&self.send_key));
         }
 
         // Build packet: [tag(16)][length(3)][ignored(1)][payload(var)]
@@ -166,9 +193,10 @@ impl V2Transport {
         // Increment nonce counter
         self.recv_nonce += 1;
 
-        // Check if rekeying is needed (every 224 packets per BIP324)
-        if self.recv_nonce % 224 == 0 {
-            // Rekeying would happen here (not implemented in initial version)
+        if self.recv_nonce.is_multiple_of(REKEY_INTERVAL) {
+            let rekey_epoch = (self.recv_nonce / REKEY_INTERVAL) - 1;
+            self.recv_key = rekey_derive_next_key(&self.recv_key, rekey_epoch)?;
+            self.recv_cipher = ChaCha20Poly1305::new(Key::from_slice(&self.recv_key));
         }
 
         Ok(plaintext)
@@ -392,6 +420,19 @@ mod tests {
         let decrypted = transport.decrypt(&encrypted).unwrap();
 
         assert_eq!(plaintext, decrypted.as_slice());
+    }
+
+    #[test]
+    fn test_v2_transport_rekey_round_trip() {
+        let key = [0x11; 32];
+        let mut enc = V2Transport::new(key, key);
+        let mut dec = V2Transport::new(key, key);
+        for i in 0..300 {
+            let pt = format!("msg{i}").into_bytes();
+            let pkt = enc.encrypt(&pt).unwrap();
+            let out = dec.decrypt(&pkt).unwrap();
+            assert_eq!(pt, out, "round-trip failed at i={i}");
+        }
     }
 
     #[test]

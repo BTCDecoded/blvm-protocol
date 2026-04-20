@@ -3,16 +3,16 @@
 //! Tests for protocol configuration system.
 
 use blvm_protocol::config::{
-    CommonsExtensionsConfig, CompactBlockConfig, FeeRateConfig, MempoolConfig, ProtocolConfig,
+    CommonsExtensionsConfig, CompactBlockConfig, FeeRateConfig, ProtocolConfig,
     ProtocolFeaturesConfig, ProtocolValidationConfig, ServiceFlagsConfig,
 };
 use blvm_protocol::{service_flags, ProtocolVersion};
 
-/// [`MempoolConfig`] comes from [`blvm_primitives::config`]; defaults must match that crate.
+/// Protocol re-exports [`MempoolConfig`] from consensus; defaults must stay aligned with primitives.
 #[test]
 fn test_mempool_config_default_matches_primitives() {
     assert_eq!(
-        MempoolConfig::default(),
+        blvm_consensus::config::MempoolConfig::default(),
         blvm_primitives::config::MempoolConfig::default()
     );
 }

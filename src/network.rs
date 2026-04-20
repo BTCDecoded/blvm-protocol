@@ -69,10 +69,6 @@ pub enum NetworkMessage {
     FilteredBlock(commons::FilteredBlockMessage),
     GetBanList(commons::GetBanListMessage),
     BanList(commons::BanListMessage),
-    // Governance/Commons Economic Node messages
-    EconomicNodeRegistration(commons::EconomicNodeRegistrationMessage),
-    EconomicNodeVeto(commons::EconomicNodeVetoMessage),
-    EconomicNodeStatus(commons::EconomicNodeStatusMessage),
 }
 
 /// Version message for initial handshake
@@ -635,9 +631,6 @@ pub fn process_network_message(
         NetworkMessage::FilteredBlock(filtered) => process_filteredblock_message(filtered),
         NetworkMessage::GetBanList(getbanlist) => process_getbanlist_message(getbanlist),
         NetworkMessage::BanList(banlist) => process_banlist_message(banlist),
-        NetworkMessage::EconomicNodeRegistration(_) => Ok(NetworkResponse::Ok),
-        NetworkMessage::EconomicNodeVeto(_) => Ok(NetworkResponse::Ok),
-        NetworkMessage::EconomicNodeStatus(_) => Ok(NetworkResponse::Ok),
     }
 }
 

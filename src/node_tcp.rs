@@ -100,13 +100,8 @@ pub enum ProtocolMessage {
     // Ban List Sharing
     GetBanList(GetBanListMessage),
     BanList(BanListMessage),
-    // Governance/Commons Economic Node messages
-    EconomicNodeRegistration(EconomicNodeRegistrationMessage),
-    EconomicNodeVeto(EconomicNodeVetoMessage),
     // Mesh networking packets (payment-gated routing)
     MeshPacket(Vec<u8>), // Serialized mesh packet (handled by mesh module)
-    EconomicNodeStatus(EconomicNodeStatusMessage),
-    EconomicNodeForkDecision(EconomicNodeForkDecisionMessage),
     // Address relay
     GetAddr,
     Addr(AddrMessage),
@@ -136,10 +131,9 @@ pub use crate::network::NetworkAddress;
 // Pull shared types from blvm-protocol (single source of truth — field-identical to the
 // former local definitions, so bincode wire format is preserved verbatim).
 pub use crate::{
-    BlockMessage, CompactBlockMessage, EconomicNodeForkDecisionMessage,
-    EconomicNodeRegistrationMessage, EconomicNodeStatusMessage, EconomicNodeVetoMessage,
-    FilterPreferences, GetFilteredBlockMessage, GetUTXOProofMessage, GetUTXOSetMessage,
-    NodeStatusResponse, TxMessage, UTXOCommitment, UTXOProofMessage, UTXOSetMessage,
+    BlockMessage, CompactBlockMessage, FilterPreferences, GetFilteredBlockMessage,
+    GetUTXOProofMessage, GetUTXOSetMessage, TxMessage, UTXOCommitment, UTXOProofMessage,
+    UTXOSetMessage,
 };
 
 /// Version message
@@ -809,19 +803,6 @@ impl TcpFramedParser {
             // Ban List Sharing
             cmd::GETBANLIST => Ok(ProtocolMessage::GetBanList(bincode::deserialize(payload)?)),
             cmd::BANLIST => Ok(ProtocolMessage::BanList(bincode::deserialize(payload)?)),
-            // Governance messages
-            cmd::ECONREG => Ok(ProtocolMessage::EconomicNodeRegistration(
-                bincode::deserialize(payload)?,
-            )),
-            cmd::ECONVETO => Ok(ProtocolMessage::EconomicNodeVeto(bincode::deserialize(
-                payload,
-            )?)),
-            cmd::ECONSTATUS => Ok(ProtocolMessage::EconomicNodeStatus(bincode::deserialize(
-                payload,
-            )?)),
-            cmd::ECONFORK => Ok(ProtocolMessage::EconomicNodeForkDecision(
-                bincode::deserialize(payload)?,
-            )),
             cmd::GETADDR => Ok(ProtocolMessage::GetAddr),
             cmd::ADDR => {
                 let wire_msg = crate::wire::deserialize_addr(payload)
@@ -1000,15 +981,6 @@ impl TcpFramedParser {
             // Ban List Sharing
             ProtocolMessage::GetBanList(msg) => (cmd::GETBANLIST, bincode::serialize(msg)?),
             ProtocolMessage::BanList(msg) => (cmd::BANLIST, bincode::serialize(msg)?),
-            // Governance messages
-            ProtocolMessage::EconomicNodeRegistration(msg) => {
-                (cmd::ECONREG, bincode::serialize(msg)?)
-            }
-            ProtocolMessage::EconomicNodeVeto(msg) => (cmd::ECONVETO, bincode::serialize(msg)?),
-            ProtocolMessage::EconomicNodeStatus(msg) => (cmd::ECONSTATUS, bincode::serialize(msg)?),
-            ProtocolMessage::EconomicNodeForkDecision(msg) => {
-                (cmd::ECONFORK, bincode::serialize(msg)?)
-            }
             // Address relay
             ProtocolMessage::GetAddr => (cmd::GETADDR, vec![]),
             ProtocolMessage::Addr(msg) => (
@@ -1091,6 +1063,3 @@ pub struct BanEntry {
     pub reason: Option<String>,
 }
 
-// Governance/Commons Economic Node messages are re-exported from blvm-protocol::commons above.
-// (EconomicNodeRegistrationMessage, EconomicNodeVetoMessage, EconomicNodeStatusMessage,
-//  NodeStatusResponse, EconomicNodeForkDecisionMessage)
