@@ -417,6 +417,112 @@ jobs:
           fi
           echo "✅ blvm-spec-lock verification passed"
 
+  fuzz:
+    name: Fuzz (shard ${{ matrix.shard }}/4)
+    needs: [setup, test]
+    runs-on: [self-hosted, Linux, X64, builds]
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        shard: [0, 1, 2, 3]
+    if: |
+      (github.event_name != 'push' || github.event.head_commit == null || 
+       (!contains(github.event.head_commit.message, '[skip ci]') &&
+        !contains(github.event.head_commit.message, '[ci skip]') &&
+        !contains(github.event.head_commit.message, '[no ci]'))) &&
+      (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Strip [patch.crates-io] for crates.io-only CI
+        uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
+
+      - name: Checkout blvm-primitives (sibling for fuzz [patch.crates-io])
+        uses: actions/checkout@v4
+        with:
+          repository: BTCDecoded/blvm-primitives
+          path: _temp-blvm-primitives
+      - name: Checkout blvm-secp256k1 (sibling for fuzz [patch.crates-io])
+        uses: actions/checkout@v4
+        with:
+          repository: BTCDecoded/blvm-secp256k1
+          path: _temp-blvm-secp256k1
+      - name: Move sibling crates next to repo root
+        run: |
+          for name in blvm-primitives blvm-secp256k1; do
+            if [ -d "../${name}" ]; then rm -rf "../${name}"; fi
+          done
+          mv _temp-blvm-primitives ../blvm-primitives
+          mv _temp-blvm-secp256k1 ../blvm-secp256k1
+
+      - name: Cache
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: bind-env
+          cache-key: ${{ needs.setup.outputs.cache-key }}
+
+      - name: Restore Cargo cache
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: restore
+
+      - name: Install Rust
+        uses: BTCDecoded/rust-ci/install-rust-toolchain@main
+
+      - name: Install nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo install cargo-fuzz
+
+      - name: Initialize corpus dirs
+        working-directory: fuzz
+        run: |
+          chmod +x init_corpus.sh
+          ./init_corpus.sh
+
+      - name: Build all fuzz binaries (once per shard job)
+        working-directory: fuzz
+        env:
+          RUSTFLAGS: "-Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4"
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo +nightly fuzz build
+
+      - name: Run cargo-fuzz (TARGETS.md shard for parallel CI)
+        working-directory: fuzz
+        env:
+          RUSTFLAGS: "-Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4"
+          FUZZ_MAX_TOTAL_TIME: "18"
+          FUZZ_MAX_LEN: "65536"
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          mapfile -t bins < <(grep -v '^#' TARGETS.md | grep -v '^$' || true)
+          shard=${{ matrix.shard }}
+          shards=4
+          idx=0
+          for t in "${bins[@]}"; do
+            if (( idx % shards != shard )); then
+              ((idx++)) || true
+              continue
+            fi
+            ((idx++)) || true
+            echo "=== shard $shard: cargo-fuzz run $t ==="
+            timeout 120 cargo +nightly fuzz run "$t" -- \
+              -max_total_time="${FUZZ_MAX_TOTAL_TIME}" \
+              -timeout=8 \
+              -max_len="${FUZZ_MAX_LEN}" \
+              -rss_limit_mb=4096
+          done
+
+      - name: Save Cargo cache
+        if: always()
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: save
+
   build:
     name: Build
     needs: 
@@ -427,6 +533,7 @@ jobs:
       - docs
       - security
       - verify
+      - fuzz
     runs-on: [self-hosted, Linux, X64, builds]
     if: |
       always() &&
@@ -440,7 +547,8 @@ jobs:
        (needs.test.result == 'success' && needs.clippy.result == 'success' && 
         needs.fmt.result == 'success' && needs.docs.result == 'success' && 
         needs.security.result == 'success' &&
-        (needs.verify.result == 'success' || needs.verify.result == 'skipped')))
+        (needs.verify.result == 'success' || needs.verify.result == 'skipped') &&
+        (needs.fuzz.result == 'success' || needs.fuzz.result == 'skipped')))
     steps:
       - uses: actions/checkout@v4
       

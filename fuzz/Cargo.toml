@@ -1,0 +1,622 @@
+[package]
+name = "blvm-protocol-fuzz"
+version = "0.0.0"
+authors = ["Bitcoin Commons Team"]
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[lib]
+name = "blvm_protocol_fuzz"
+path = "src/lib.rs"
+
+[dependencies]
+bincode = "=1.3.3"
+blvm-consensus = { path = "../../blvm-consensus", features = ["utxo-commitments", "ctv"] }
+blvm-protocol = { path = "..", features = ["utxo-commitments", "bip324"] }
+libfuzzer-sys = "0.4"
+
+[patch.crates-io]
+blvm-primitives = { path = "../../blvm-primitives" }
+blvm-secp256k1 = { path = "../../blvm-secp256k1" }
+
+[profile.release]
+opt-level = 3
+
+[[bin]]
+name = "protocol_address_decode_str"
+path = "fuzz_targets/protocol_address_decode_str.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_bip152"
+path = "fuzz_targets/protocol_bip152.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_bip155_addrv2_stress"
+path = "fuzz_targets/protocol_bip155_addrv2_stress.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_bip158_match_only"
+path = "fuzz_targets/protocol_bip158_match_only.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_bip324_handshake"
+path = "fuzz_targets/protocol_bip324_handshake.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_bip324_transport"
+path = "fuzz_targets/protocol_bip324_transport.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_bip70_payment"
+path = "fuzz_targets/protocol_bip70_payment.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_block_filters"
+path = "fuzz_targets/protocol_block_filters.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_cmd_banlist"
+path = "fuzz_targets/protocol_cmd_banlist.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_cmd_econreg"
+path = "fuzz_targets/protocol_cmd_econreg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_cmd_econstatus"
+path = "fuzz_targets/protocol_cmd_econstatus.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_cmd_econveto"
+path = "fuzz_targets/protocol_cmd_econveto.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_cmd_getbanlist"
+path = "fuzz_targets/protocol_cmd_getbanlist.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_commons_banlist_bincode"
+path = "fuzz_targets/protocol_commons_banlist_bincode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_commons_getbanlist_bincode"
+path = "fuzz_targets/protocol_commons_getbanlist_bincode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_consensus_block_txs"
+path = "fuzz_targets/protocol_consensus_block_txs.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_consensus_connect_block"
+path = "fuzz_targets/protocol_consensus_connect_block.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_consensus_tx_check"
+path = "fuzz_targets/protocol_consensus_tx_check.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_diff_deser_block_then_check_txs"
+path = "fuzz_targets/protocol_diff_deser_block_then_check_txs.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_diff_deser_tx_check"
+path = "fuzz_targets/protocol_diff_deser_tx_check.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_edge_checksum_mismatch"
+path = "fuzz_targets/protocol_edge_checksum_mismatch.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_edge_empty_body"
+path = "fuzz_targets/protocol_edge_empty_body.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_edge_oversize_length"
+path = "fuzz_targets/protocol_edge_oversize_length.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_edge_truncated_frame"
+path = "fuzz_targets/protocol_edge_truncated_frame.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_engine_validate_block"
+path = "fuzz_targets/protocol_engine_validate_block.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_engine_validate_transaction"
+path = "fuzz_targets/protocol_engine_validate_transaction.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_fibre_chunk_deserialize"
+path = "fuzz_targets/protocol_fibre_chunk_deserialize.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_fibre_chunk_roundtrip"
+path = "fuzz_targets/protocol_fibre_chunk_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_misc_time_and_params"
+path = "fuzz_targets/protocol_misc_time_and_params.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_network_and_wire"
+path = "fuzz_targets/protocol_network_and_wire.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_network_version_payload"
+path = "fuzz_targets/protocol_network_version_payload.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_p2p_decode"
+path = "fuzz_targets/protocol_p2p_decode.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_service_flags_bitmask"
+path = "fuzz_targets/protocol_service_flags_bitmask.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_spam_filter_tx"
+path = "fuzz_targets/protocol_spam_filter_tx.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_spam_input_type"
+path = "fuzz_targets/protocol_spam_input_type.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_spam_script_type"
+path = "fuzz_targets/protocol_spam_script_type.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_utxo_commitment_from_bytes"
+path = "fuzz_targets/protocol_utxo_commitment_from_bytes.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_utxo_commitment_roundtrip"
+path = "fuzz_targets/protocol_utxo_commitment_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_utxo_filteredblock_msg"
+path = "fuzz_targets/protocol_utxo_filteredblock_msg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_utxo_getfilteredblock_msg"
+path = "fuzz_targets/protocol_utxo_getfilteredblock_msg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_utxo_getutxoset_msg"
+path = "fuzz_targets/protocol_utxo_getutxoset_msg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_utxo_proof_wire_roundtrip"
+path = "fuzz_targets/protocol_utxo_proof_wire_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_utxo_utxoset_msg"
+path = "fuzz_targets/protocol_utxo_utxoset_msg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_utxo_verify_commitment_block_hash"
+path = "fuzz_targets/protocol_utxo_verify_commitment_block_hash.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_utxo_verify_forward_consistency"
+path = "fuzz_targets/protocol_utxo_verify_forward_consistency.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_utxo_verify_header_chain"
+path = "fuzz_targets/protocol_utxo_verify_header_chain.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_utxo_verify_supply"
+path = "fuzz_targets/protocol_utxo_verify_supply.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_v2_decrypt_only"
+path = "fuzz_targets/protocol_v2_decrypt_only.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_v2_encrypt_only"
+path = "fuzz_targets/protocol_v2_encrypt_only.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_v2_handshake_initiator_step"
+path = "fuzz_targets/protocol_v2_handshake_initiator_step.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_v2_handshake_responder_step"
+path = "fuzz_targets/protocol_v2_handshake_responder_step.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_varint_read_only"
+path = "fuzz_targets/protocol_varint_read_only.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_varint_roundtrip_strict"
+path = "fuzz_targets/protocol_varint_roundtrip_strict.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_varint_rw"
+path = "fuzz_targets/protocol_varint_rw.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_varint_write_only"
+path = "fuzz_targets/protocol_varint_write_only.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_addr"
+path = "fuzz_targets/protocol_wire_addr.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_addrv2"
+path = "fuzz_targets/protocol_wire_addrv2.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_block"
+path = "fuzz_targets/protocol_wire_block.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_blocktxn"
+path = "fuzz_targets/protocol_wire_blocktxn.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_checksum"
+path = "fuzz_targets/protocol_wire_checksum.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_cmpctblock"
+path = "fuzz_targets/protocol_wire_cmpctblock.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_deserialize_message"
+path = "fuzz_targets/protocol_wire_deserialize_message.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_deserialize_payloads"
+path = "fuzz_targets/protocol_wire_deserialize_payloads.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_feefilter"
+path = "fuzz_targets/protocol_wire_feefilter.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_getblocks"
+path = "fuzz_targets/protocol_wire_getblocks.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_getblocktxn"
+path = "fuzz_targets/protocol_wire_getblocktxn.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_getdata"
+path = "fuzz_targets/protocol_wire_getdata.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_getheaders"
+path = "fuzz_targets/protocol_wire_getheaders.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_headers"
+path = "fuzz_targets/protocol_wire_headers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_inv"
+path = "fuzz_targets/protocol_wire_inv.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_multiple_messages"
+path = "fuzz_targets/protocol_wire_multiple_messages.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_notfound"
+path = "fuzz_targets/protocol_wire_notfound.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_ping"
+path = "fuzz_targets/protocol_wire_ping.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_pong"
+path = "fuzz_targets/protocol_wire_pong.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_reject"
+path = "fuzz_targets/protocol_wire_reject.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_rt_addrv2"
+path = "fuzz_targets/protocol_wire_rt_addrv2.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_rt_block_msg"
+path = "fuzz_targets/protocol_wire_rt_block_msg.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_rt_cmpctblock"
+path = "fuzz_targets/protocol_wire_rt_cmpctblock.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_rt_headers"
+path = "fuzz_targets/protocol_wire_rt_headers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_rt_inv"
+path = "fuzz_targets/protocol_wire_rt_inv.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_rt_version"
+path = "fuzz_targets/protocol_wire_rt_version.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_sendcmpct"
+path = "fuzz_targets/protocol_wire_sendcmpct.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_serialize_roundtrip"
+path = "fuzz_targets/protocol_wire_serialize_roundtrip.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_tx"
+path = "fuzz_targets/protocol_wire_tx.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "protocol_wire_version"
+path = "fuzz_targets/protocol_wire_version.rs"
+test = false
+doc = false
+bench = false
+

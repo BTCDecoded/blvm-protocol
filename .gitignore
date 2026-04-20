@@ -1,5 +1,10 @@
 # Rust build artifacts
 /target/
+# cargo-fuzz: per-crate lock + build tree + libFuzzer outputs (see blvm-consensus for same convention)
+fuzz/target/
+fuzz/Cargo.lock
+fuzz/artifacts/
+fuzz/corpus/
 **/*.rs.bk
 *.pdb
 **/*.rmeta

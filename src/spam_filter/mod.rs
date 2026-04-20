@@ -20,10 +20,12 @@
 
 mod script_analyzer;
 
+pub use script_analyzer::{detect_input_script_type, ScriptType};
+
 use blvm_consensus::opcodes::*;
 use blvm_consensus::segwit::Witness;
 use blvm_consensus::types::{ByteString, Transaction, UtxoSet};
-use script_analyzer::{detect_input_script_type, ScriptType, TransactionType};
+use script_analyzer::TransactionType;
 use serde::{Deserialize, Serialize};
 
 /// Default dust threshold (546 satoshis = 0.00000546 BTC)
