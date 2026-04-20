@@ -8,12 +8,18 @@ use blvm_protocol::config::{
 };
 use blvm_protocol::{service_flags, ProtocolVersion};
 
-/// Protocol re-exports [`MempoolConfig`] from consensus; defaults must stay aligned with primitives.
+/// [`MempoolConfig`] comes from consensus (which re-exports primitives in-tree). On crates.io the
+/// resolver can treat consensus vs primitives as separate nominal types; compare JSON defaults so
+/// this test compiles and still checks field alignment.
 #[test]
 fn test_mempool_config_default_matches_primitives() {
+    let consensus = blvm_consensus::config::MempoolConfig::default();
+    let primitives = blvm_primitives::config::MempoolConfig::default();
+    let vc = serde_json::to_value(&consensus).expect("serialize consensus MempoolConfig");
+    let vp = serde_json::to_value(&primitives).expect("serialize primitives MempoolConfig");
     assert_eq!(
-        blvm_consensus::config::MempoolConfig::default(),
-        blvm_primitives::config::MempoolConfig::default()
+        vc, vp,
+        "MempoolConfig::default() must match between blvm-consensus and blvm-primitives"
     );
 }
 

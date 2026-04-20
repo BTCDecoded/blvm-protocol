@@ -147,13 +147,12 @@ jobs:
       
       - name: Run tests with coverage
         run: |
-          # Install tarpaulin
-          cargo install cargo-tarpaulin --version 0.27.0
+          if ! command -v cargo-tarpaulin >/dev/null 2>&1; then
+            cargo install cargo-tarpaulin --version 0.27.0 --locked
+          fi
           
-          # Run tests with coverage in one step
-          # Use --lib --bins --tests to ensure all test types run
-          # Use --skip-clean to reuse cached build artifacts, --timeout to prevent hangs
-          cargo tarpaulin --lib --bins --tests --out xml --output-dir coverage --skip-clean --timeout 120
+          # Library crate: no [[bin]] targets — omit --bins (avoids "no targets matched" noise).
+          cargo tarpaulin --lib --tests --out xml --output-dir coverage --skip-clean --timeout 120
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
