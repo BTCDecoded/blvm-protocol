@@ -101,22 +101,23 @@ pub fn verify_commitment_block_hash(
     Ok(true)
 }
 
-/// Compute block header hash (double SHA256)
+/// Compute block header hash (double SHA256) — 80-byte Bitcoin wire format.
+///
+/// Casts each field to its on-wire width (version/timestamp/bits/nonce = u32 LE)
+/// matching `blvm_consensus::pow::serialize_header`.
 fn compute_block_hash(header: &BlockHeader) -> Hash {
     use sha2::{Digest, Sha256};
 
-    // Serialize block header (version, prev_block_hash, merkle_root, timestamp, bits, nonce)
-    let mut bytes = Vec::with_capacity(80);
-    bytes.extend_from_slice(&header.version.to_le_bytes());
-    bytes.extend_from_slice(&header.prev_block_hash);
-    bytes.extend_from_slice(&header.merkle_root);
-    bytes.extend_from_slice(&header.timestamp.to_le_bytes());
-    bytes.extend_from_slice(&header.bits.to_le_bytes());
-    bytes.extend_from_slice(&header.nonce.to_le_bytes());
+    let mut bytes = [0u8; 80];
+    bytes[0..4].copy_from_slice(&(header.version as u32).to_le_bytes());
+    bytes[4..36].copy_from_slice(&header.prev_block_hash);
+    bytes[36..68].copy_from_slice(&header.merkle_root);
+    bytes[68..72].copy_from_slice(&(header.timestamp as u32).to_le_bytes());
+    bytes[72..76].copy_from_slice(&(header.bits as u32).to_le_bytes());
+    bytes[76..80].copy_from_slice(&(header.nonce as u32).to_le_bytes());
 
-    // Double SHA256
-    let first_hash = Sha256::digest(&bytes);
-    let second_hash = Sha256::digest(&first_hash);
+    let first_hash = Sha256::digest(bytes);
+    let second_hash = Sha256::digest(first_hash);
 
     let mut hash = [0u8; 32];
     hash.copy_from_slice(&second_hash);

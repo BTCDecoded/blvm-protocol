@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 /// Cryptographic commitment to the UTXO set state at a specific block height.
 /// Contains the Merkle root hash of the UTXO set and metadata for verification.
 ///
-/// Size: 84 bytes (constant)
+/// Size: 88 bytes on the wire (32 + 8 + 8 + 8 + 32).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct UtxoCommitment {
     /// Merkle root of the UTXO set
@@ -52,7 +52,7 @@ impl UtxoCommitment {
 
     /// Serialize commitment to bytes
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(84);
+        let mut bytes = Vec::with_capacity(88);
         bytes.extend_from_slice(&self.merkle_root);
         bytes.extend_from_slice(&self.total_supply.to_be_bytes());
         bytes.extend_from_slice(&self.utxo_count.to_be_bytes());
@@ -63,7 +63,7 @@ impl UtxoCommitment {
 
     /// Deserialize commitment from bytes
     pub fn from_bytes(data: &[u8]) -> Result<Self, UtxoCommitmentError> {
-        if data.len() != 84 {
+        if data.len() != 88 {
             return Err(UtxoCommitmentError::InvalidSize(data.len()));
         }
 
@@ -143,7 +143,7 @@ impl std::fmt::Display for UtxoCommitmentError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             UtxoCommitmentError::InvalidSize(size) => {
-                write!(f, "Invalid commitment size: {} (expected 84)", size)
+                write!(f, "Invalid commitment size: {} (expected 88)", size)
             }
             UtxoCommitmentError::MerkleTreeError(msg) => {
                 write!(f, "Merkle tree error: {}", msg)
@@ -175,7 +175,7 @@ pub type UtxoCommitmentResult<T> = Result<T, UtxoCommitmentError>;
 
 /// Mathematical Specification for UTXO Commitment:
 /// ∀ commitment ∈ UtxoCommitment:
-/// - to_bytes() → Vec<u8] where |bytes| = 84
+/// - to_bytes() → Vec<u8] where |bytes| = 88
 /// - from_bytes(to_bytes(commitment)) = commitment (round-trip)
 /// - verify_supply(expected) = true ⟺ commitment.total_supply = expected
 ///

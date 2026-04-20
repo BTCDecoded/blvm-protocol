@@ -69,7 +69,7 @@ mod tests {
     fn test_integration_batch_verification() {
         // Create UTXO tree with multiple UTXOs
         let mut tree = UtxoMerkleTree::new().unwrap();
-        let mut utxos_to_verify = Vec::new();
+        let mut inserted = Vec::new();
 
         // Add 10 UTXOs
         for i in 0..10 {
@@ -85,15 +85,18 @@ mod tests {
             };
 
             tree.insert(outpoint.clone(), utxo.clone()).unwrap();
+            inserted.push((outpoint, utxo));
+        }
 
-            // Generate proof
+        // Generate commitment FIRST, then generate proofs against the final tree
+        let block_hash = [99; 32];
+        let commitment = tree.generate_commitment(block_hash, 0);
+
+        let mut utxos_to_verify = Vec::new();
+        for (outpoint, utxo) in inserted {
             let proof = tree.generate_proof(&outpoint).unwrap();
             utxos_to_verify.push((outpoint, utxo, proof));
         }
-
-        // Generate commitment
-        let block_hash = [99; 32];
-        let commitment = tree.generate_commitment(block_hash, 0);
 
         // Create consensus result
         let consensus = ConsensusResult {
@@ -302,7 +305,7 @@ mod tests {
     fn test_integration_large_utxo_set() {
         // Test with larger UTXO set to ensure scalability
         let mut tree = UtxoMerkleTree::new().unwrap();
-        let mut utxos_to_verify = Vec::new();
+        let mut all_inserted = Vec::new();
 
         // Add 100 UTXOs
         for i in 0..100 {
@@ -324,20 +327,20 @@ mod tests {
 
             tree.insert(outpoint.clone(), utxo.clone()).unwrap();
 
-            // Generate proof for every 10th UTXO
+            // Track every 10th UTXO for later proof generation
             if i % 10 == 0 {
-                let proof = tree.generate_proof(&outpoint).unwrap();
-                utxos_to_verify.push((outpoint, utxo, proof));
+                all_inserted.push((outpoint, utxo));
             }
         }
 
+        // Generate commitment after all insertions, then generate proofs
         let commitment = tree.generate_commitment([99; 32], 0);
 
         // Verify all proofs
-        for (outpoint, utxo, proof) in &utxos_to_verify {
+        for (outpoint, utxo) in &all_inserted {
+            let proof = tree.generate_proof(outpoint).unwrap();
             let is_valid =
-                UtxoMerkleTree::verify_utxo_proof(&commitment, outpoint, utxo, proof.clone())
-                    .unwrap();
+                UtxoMerkleTree::verify_utxo_proof(&commitment, outpoint, utxo, proof).unwrap();
             assert!(is_valid, "Proof should be valid for UTXO at index");
         }
     }

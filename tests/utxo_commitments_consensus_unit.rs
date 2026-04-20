@@ -128,7 +128,7 @@ mod tests {
         let commitment = UtxoCommitment::new([1; 32], 1000, 5, 100, [2; 32]);
 
         let bytes = commitment.to_bytes();
-        assert_eq!(bytes.len(), 84);
+        assert_eq!(bytes.len(), 88);
 
         let deserialized = UtxoCommitment::from_bytes(&bytes).unwrap();
         assert_eq!(deserialized.merkle_root, commitment.merkle_root);
@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn test_verifyconsensuscommitment_orange_paper_genesis() {
         use blvm_consensus::constants::{
-            GENESIS_BLOCK_HASH, GENESIS_BLOCK_MERKLE_ROOT, GENESIS_BLOCK_NONCE,
+            GENESIS_BLOCK_HASH_INTERNAL, GENESIS_BLOCK_MERKLE_ROOT, GENESIS_BLOCK_NONCE,
             GENESIS_BLOCK_TIMESTAMP,
         };
         use blvm_consensus::types::BlockHeader;
@@ -205,7 +205,7 @@ mod tests {
             5000000000, // 50 BTC = expected supply at height 0
             1,
             0, // block_height
-            GENESIS_BLOCK_HASH,
+            GENESIS_BLOCK_HASH_INTERNAL,
         );
 
         let result = (verify_supply(&valid_commitment).is_ok()
@@ -217,6 +217,7 @@ mod tests {
 
     #[test]
     fn test_verifyconsensuscommitment_orange_paper_invalid_cases() {
+        use blvm_consensus::economic::total_supply;
         use blvm_consensus::types::BlockHeader;
         use blvm_protocol::utxo_commitments::verification::{
             verify_commitment_block_hash, verify_header_chain, verify_supply,
@@ -240,8 +241,9 @@ mod tests {
         assert!(verify_supply(&bad_supply).is_err());
 
         // Height out of bounds: commitment says height 5 but we only have 1 header (height 0)
-        let height_oob = UtxoCommitment::new([0; 32], 5000000000, 1, 5, [0; 32]);
-        assert!(verify_supply(&height_oob).is_ok()); // supply at h=5 is valid
+        let supply_at_5 = total_supply(5) as u64;
+        let height_oob = UtxoCommitment::new([0; 32], supply_at_5, 1, 5, [0; 32]);
+        assert!(verify_supply(&height_oob).is_ok()); // supply matches economic total at h=5
         assert!(verify_commitment_block_hash(&height_oob, &header).is_err()); // block_hash [0;32] != hash(header)
     }
 

@@ -6,10 +6,10 @@ use blvm_protocol::utxo_commitments::data_structures::UtxoCommitment;
 use blvm_protocol::utxo_commitments::verification::verify_commitment_block_hash;
 use libfuzzer_sys::fuzz_target;
 fuzz_target!(|data: &[u8]| {
-    if data.len() < 80 + 84 { return; }
+    if data.len() < 80 + 88 { return; }
     let mut v = data[80..].to_vec();
-    while v.len() < 84 { v.push(0); }
-    v.truncate(84);
+    while v.len() < 88 { v.push(0); }
+    v.truncate(88);
     let Ok(c) = UtxoCommitment::from_bytes(&v) else { return; };
     let chunk = &data[..80];
     let version = i32::from_le_bytes(chunk[0..4].try_into().unwrap()) as i64;
