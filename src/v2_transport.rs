@@ -56,7 +56,7 @@ fn rekey_derive_next_key(key: &[u8; 32], rekey_epoch: u64) -> Result<[u8; 32]> {
     rekey_nonce[4..12].copy_from_slice(&rekey_epoch.to_le_bytes());
     let cipher = ChaCha20Poly1305::new(Key::from_slice(key));
     let ct = cipher
-        .encrypt(Nonce::from_slice(&rekey_nonce), b"", &[0u8; 32])
+        .encrypt(Nonce::from_slice(&rekey_nonce), [0u8; 32].as_slice())
         .map_err(|e| {
             ProtocolError::Consensus(blvm_consensus::error::ConsensusError::Serialization(
                 Cow::Owned(format!("BIP324 rekey encrypt failed: {e}")),

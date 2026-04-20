@@ -165,8 +165,8 @@ fn test_feature_context_creation() {
 
     let context = registry.create_context(500_000, 1_500_000_000);
 
-    // Context should be created
-    assert!(context.active_features().len() >= 0);
+    // Context should be created (feature list is valid)
+    let _ = context.active_features().len();
 }
 
 #[test]

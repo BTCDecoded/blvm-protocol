@@ -5,7 +5,9 @@
 //! - Filtered Blocks (GetFilteredBlock, FilteredBlock)
 //! - Ban List Sharing (GetBanList, BanList)
 
-use blvm_consensus::{BlockHeader, Hash, Transaction};
+use blvm_consensus::{BlockHeader, Transaction};
+#[cfg(feature = "utxo-commitments")]
+use blvm_primitives::{TransactionInput, TransactionOutput};
 use blvm_protocol::commons::{BanEntry, BanListMessage, GetBanListMessage};
 #[cfg(feature = "utxo-commitments")]
 use blvm_protocol::commons::{

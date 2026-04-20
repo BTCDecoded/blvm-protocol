@@ -907,7 +907,7 @@ pub fn deserialize_headers(data: &[u8]) -> Result<crate::network::HeadersMessage
     Ok(crate::network::HeadersMessage { headers })
 }
 
-fn serialize_block(b: &crate::Block) -> Result<Vec<u8>> {
+pub fn serialize_block(b: &crate::Block) -> Result<Vec<u8>> {
     use crate::serialization::serialize_block_with_witnesses;
 
     // NetworkMessage::Block only has Arc<Block>; no witnesses. Use empty witnesses and

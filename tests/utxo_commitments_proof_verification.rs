@@ -27,7 +27,7 @@ mod tests {
         };
         let utxo1 = UTXO {
             value: 1000,
-            script_pubkey: vec![0x51], // OP_1
+            script_pubkey: vec![0x51].into(), // OP_1
             height: 0,
             is_coinbase: false,
         };
@@ -38,7 +38,7 @@ mod tests {
         };
         let utxo2 = UTXO {
             value: 2000,
-            script_pubkey: vec![0x52], // OP_2
+            script_pubkey: vec![0x52].into(), // OP_2
             height: 0,
             is_coinbase: false,
         };
@@ -79,7 +79,7 @@ mod tests {
             };
             let utxo = UTXO {
                 value: (i + 1) * 1000,
-                script_pubkey: vec![0x51 + (i as u8)],
+                script_pubkey: vec![0x51 + (i as u8)].into(),
                 height: 0,
                 is_coinbase: false,
             };
@@ -123,7 +123,7 @@ mod tests {
         };
         let utxo = UTXO {
             value: 5000,
-            script_pubkey: vec![0x51],
+            script_pubkey: vec![0x51].into(),
             height: 0,
             is_coinbase: false,
         };
@@ -140,7 +140,7 @@ mod tests {
         };
         let utxo_b = UTXO {
             value: 5000, // Same value, different UTXO
-            script_pubkey: vec![0x52],
+            script_pubkey: vec![0x52].into(),
             height: 0,
             is_coinbase: false,
         };
@@ -173,7 +173,7 @@ mod tests {
         };
         let utxo_correct = UTXO {
             value: 5000,
-            script_pubkey: vec![0x51],
+            script_pubkey: vec![0x51].into(),
             height: 0,
             is_coinbase: false,
         };
@@ -188,7 +188,7 @@ mod tests {
         // Try to verify with modified UTXO (different value)
         let utxo_modified = UTXO {
             value: 1000, // Modified value
-            script_pubkey: vec![0x51],
+            script_pubkey: vec![0x51].into(),
             height: 0,
             is_coinbase: false,
         };
@@ -219,7 +219,7 @@ mod tests {
         };
         let utxo1 = UTXO {
             value: 1000,
-            script_pubkey: vec![0x51],
+            script_pubkey: vec![0x51].into(),
             height: 0,
             is_coinbase: false,
         };
@@ -230,7 +230,7 @@ mod tests {
         };
         let utxo2 = UTXO {
             value: 2000,
-            script_pubkey: vec![0x52],
+            script_pubkey: vec![0x52].into(),
             height: 0,
             is_coinbase: false,
         };
@@ -273,7 +273,7 @@ mod tests {
         };
         let utxo = UTXO {
             value: 1000,
-            script_pubkey: vec![0x51],
+            script_pubkey: vec![0x51].into(),
             height: 0,
             is_coinbase: false,
         };
@@ -317,7 +317,7 @@ mod tests {
             };
             let utxo = UTXO {
                 value: (i + 1) * 100,
-                script_pubkey: vec![0x51; (i % 20 + 1)],
+                script_pubkey: vec![0x51; (i % 20 + 1) as usize].into(),
                 height: 0,
                 is_coinbase: false,
             };

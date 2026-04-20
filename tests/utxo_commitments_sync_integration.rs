@@ -14,6 +14,7 @@ mod tests {
         BlockHeader, ByteString, Hash, Natural, OutPoint, Transaction, TransactionInput,
         TransactionOutput, UTXO,
     };
+    use blvm_protocol::spam_filter::{SpamFilter, SpamFilterConfig};
     use blvm_protocol::utxo_commitments::*;
 
     /// Create a test UTXO
@@ -144,9 +145,9 @@ mod tests {
                 value: 50000,
                 script_pubkey: {
                     // OP_RETURN with large data (spam pattern)
-                    let mut script = vec![0x6a].into(); // OP_RETURN
+                    let mut script: Vec<u8> = vec![0x6a]; // OP_RETURN
                     script.extend(vec![0x00; 100]); // Large data
-                    script
+                    script.into()
                 },
             }]
             .into(),
@@ -155,7 +156,7 @@ mod tests {
 
         // Process the spam transaction
         let (spam_summary, _root) = initial_sync
-            .process_filtered_block(&mut utxo_tree, 101, &[spam_tx])
+            .process_filtered_block(&mut utxo_tree, 101, &[spam_tx.clone()])
             .unwrap();
 
         // Verify spam was detected

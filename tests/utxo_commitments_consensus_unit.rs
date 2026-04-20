@@ -69,6 +69,7 @@ mod tests {
             value: 1000,
             script_pubkey: vec![].into(),
             height: 0,
+            is_coinbase: false,
         };
 
         tree.insert(outpoint, utxo).unwrap();
@@ -148,6 +149,7 @@ mod tests {
             value: 1000,
             script_pubkey: vec![].into(),
             height: 0,
+            is_coinbase: false,
         };
 
         tree.insert(outpoint.clone(), utxo).unwrap();
@@ -194,7 +196,7 @@ mod tests {
             merkle_root: GENESIS_BLOCK_MERKLE_ROOT,
             timestamp: GENESIS_BLOCK_TIMESTAMP as u64,
             bits: 0x1d00ffff,
-            nonce: GENESIS_BLOCK_NONCE,
+            nonce: u64::from(GENESIS_BLOCK_NONCE),
         };
 
         // Valid commitment: genesis hash, correct supply at height 0
@@ -252,7 +254,7 @@ mod tests {
         };
         let utxo = UTXO {
             value: 1000,
-            script_pubkey: vec![0x51], // OP_1
+            script_pubkey: vec![0x51].into(), // OP_1
             height: 0,
             is_coinbase: false,
         };

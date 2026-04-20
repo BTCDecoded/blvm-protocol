@@ -1062,4 +1062,3 @@ pub struct BanEntry {
     /// Reason for ban (optional)
     pub reason: Option<String>,
 }
-
