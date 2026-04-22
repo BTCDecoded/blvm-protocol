@@ -39,9 +39,6 @@ const COMMANDS: &[&str] = &[
     "filteredblock",
     "getbanlist",
     "banlist",
-    "econreg",
-    "econveto",
-    "econstatus",
 ];
 
 fn build_frame(cmd: &str, payload: &[u8]) -> Vec<u8> {

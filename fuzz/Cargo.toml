@@ -89,27 +89,6 @@ doc = false
 bench = false
 
 [[bin]]
-name = "protocol_cmd_econreg"
-path = "fuzz_targets/protocol_cmd_econreg.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "protocol_cmd_econstatus"
-path = "fuzz_targets/protocol_cmd_econstatus.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "protocol_cmd_econveto"
-path = "fuzz_targets/protocol_cmd_econveto.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
 name = "protocol_cmd_getbanlist"
 path = "fuzz_targets/protocol_cmd_getbanlist.rs"
 test = false

@@ -12,8 +12,9 @@ keywords = ["bitcoin", "protocol", "blockchain", "network", "consensus"]
 categories = ["cryptography::cryptocurrencies", "network-programming"]
 rust-version = "1.82"
 
-# Vendored for #[spec_locked] (blvm-spec-lock): macro reads CARGO_MANIFEST_DIR/blvm-spec/*.
-include = ["Cargo.toml", "src/**", "blvm-spec/**"]
+# Spec lives in blvm-spec repo; #[spec_locked] is a no-op marker at compile time when spec
+# is not present. Verification runs via `cargo-spec-lock verify` in CI (see verify job).
+include = ["Cargo.toml", "src/**"]
 
 [package.metadata.docs.rs]
 all-features = true

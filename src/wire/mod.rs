@@ -1141,15 +1141,35 @@ pub fn deserialize_reject(data: &[u8]) -> Result<crate::network::RejectMessage> 
         .to_string();
     let code = data[12];
     let mut cursor = std::io::Cursor::new(&data[13..]);
-    let reason_len = read_varint(&mut cursor)? as usize;
-    let pos = 13 + cursor.position() as usize;
-    if data.len() < pos + reason_len {
+    let reason_len_u64 = read_varint(&mut cursor)?;
+    let pos: usize = 13_usize
+        .saturating_add(cursor.position() as usize);
+    if reason_len_u64 > (data.len() as u64).saturating_sub(pos as u64) {
         return Err(ProtocolError::Consensus(ConsensusError::Serialization(
             Cow::Owned("Reject reason truncated".to_string()),
         )));
     }
-    let reason = String::from_utf8_lossy(&data[pos..pos + reason_len]).to_string();
-    let pos = pos + reason_len;
+    let reason_len: usize = reason_len_u64
+        .try_into()
+        .map_err(|_| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+                "Reject reason length out of range".to_string(),
+            )))
+        })?;
+    let end = pos
+        .checked_add(reason_len)
+        .ok_or_else(|| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+                "Reject reason length out of range".to_string(),
+            )))
+        })?;
+    if end > data.len() {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("Reject reason truncated".to_string()),
+        )));
+    }
+    let reason = String::from_utf8_lossy(&data[pos..end]).to_string();
+    let pos = end;
     let extra_data = if data.len() >= pos + 32 {
         Some({
             let mut h = [0u8; 32];
@@ -1219,6 +1239,10 @@ pub fn deserialize_cmpctblock(data: &[u8]) -> Result<crate::network::CmpctBlockM
     use crate::varint::read_varint;
     use std::io::Read;
 
+    /// BIP152 wire sanity bound (aligns with `getblocktxn` and inventory caps in this module).
+    const MAX_CMPCT_SHORTIDS: u64 = 50_000;
+    const MAX_CMPCT_PREFILLED: u64 = 50_000;
+
     if data.len() < 80 + 8 {
         return Err(ProtocolError::Consensus(ConsensusError::Serialization(
             Cow::Owned("CmpctBlock message too short".to_string()),
@@ -1231,7 +1255,32 @@ pub fn deserialize_cmpctblock(data: &[u8]) -> Result<crate::network::CmpctBlockM
         data[80], data[81], data[82], data[83], data[84], data[85], data[86], data[87],
     ]);
     let mut cursor = std::io::Cursor::new(&data[88..]);
-    let shortids_len = read_varint(&mut cursor)? as usize;
+    let shortids_len_u64 = read_varint(&mut cursor)?;
+    if shortids_len_u64 > MAX_CMPCT_SHORTIDS {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("CmpctBlock too many shortids".to_string()),
+        )));
+    }
+    let shortids_len: usize = shortids_len_u64
+        .try_into()
+        .map_err(|_| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+                "CmpctBlock shortid count out of range".to_string(),
+            )))
+        })?;
+    let rem_after_count = data.len().saturating_sub(88 + cursor.position() as usize);
+    let need_shortids = shortids_len
+        .checked_mul(6)
+        .ok_or_else(|| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+                "CmpctBlock shortid size overflow".to_string(),
+            )))
+        })?;
+    if need_shortids > rem_after_count {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("CmpctBlock shortids truncated".to_string()),
+        )));
+    }
     let mut short_ids = Vec::with_capacity(shortids_len);
     for _ in 0..shortids_len {
         let mut sid = [0u8; 6];
@@ -1242,13 +1291,42 @@ pub fn deserialize_cmpctblock(data: &[u8]) -> Result<crate::network::CmpctBlockM
         })?;
         short_ids.push(sid);
     }
-    let prefilled_len = read_varint(&mut cursor)? as usize;
+    let prefilled_len_u64 = read_varint(&mut cursor)?;
+    if prefilled_len_u64 > MAX_CMPCT_PREFILLED {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned("CmpctBlock too many prefilled txs".to_string()),
+        )));
+    }
+    let prefilled_len: usize = prefilled_len_u64
+        .try_into()
+        .map_err(|_| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+                "CmpctBlock prefilled count out of range".to_string(),
+            )))
+        })?;
     let mut prefilled_txs = Vec::with_capacity(prefilled_len);
     let mut last_index: i64 = -1;
     let mut pos;
     for _ in 0..prefilled_len {
         let diff = read_varint(&mut cursor)? as i64;
-        let index = last_index + diff + 1;
+        if diff < 0 {
+            return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+                Cow::Owned("CmpctBlock prefilled index diff invalid".to_string()),
+            )));
+        }
+        let index = last_index
+            .checked_add(diff)
+            .and_then(|v| v.checked_add(1))
+            .ok_or_else(|| {
+                ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+                    "CmpctBlock prefilled index overflow".to_string(),
+                )))
+            })?;
+        if index > 0xffff {
+            return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+                Cow::Owned("CmpctBlock prefilled index too large".to_string()),
+            )));
+        }
         last_index = index;
         pos = cursor.position() as usize;
         let slice = &data[88..];
@@ -1323,10 +1401,22 @@ pub fn deserialize_getblocktxn(data: &[u8]) -> Result<crate::network::GetBlockTx
     let mut last: i64 = -1;
     for _ in 0..count {
         let diff = read_varint(&mut cursor)? as i64;
-        last = last + diff + 1;
+        if diff < 0 {
+            return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+                Cow::Owned("GetBlockTxn index diff invalid".to_string()),
+            )));
+        }
+        last = last
+            .checked_add(diff)
+            .and_then(|v| v.checked_add(1))
+            .ok_or_else(|| {
+                ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+                    "GetBlockTxn index overflow".to_string(),
+                )))
+            })?;
         if last > 0xffff {
             return Err(ProtocolError::Consensus(ConsensusError::Serialization(
-                Cow::Owned("GetBlockTxn index overflow".to_string()),
+                Cow::Owned("GetBlockTxn index too large".to_string()),
             )));
         }
         indices.push(last as u16);

@@ -9,9 +9,6 @@ protocol_bip324_transport
 protocol_bip70_payment
 protocol_block_filters
 protocol_cmd_banlist
-protocol_cmd_econreg
-protocol_cmd_econstatus
-protocol_cmd_econveto
 protocol_cmd_getbanlist
 protocol_commons_banlist_bincode
 protocol_commons_getbanlist_bincode

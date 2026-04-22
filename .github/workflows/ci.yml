@@ -109,6 +109,8 @@ jobs:
        (!contains(github.event.head_commit.message, '[skip ci]') &&
         !contains(github.event.head_commit.message, '[ci skip]') &&
         !contains(github.event.head_commit.message, '[no ci]'))) &&
+      (github.event_name != 'push' || github.event.head_commit == null || 
+       !contains(github.event.head_commit.message, '[skip_tests]')) &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true')
     steps:
       - uses: actions/checkout@v4
@@ -180,6 +182,8 @@ jobs:
        (!contains(github.event.head_commit.message, '[skip ci]') &&
         !contains(github.event.head_commit.message, '[ci skip]') &&
         !contains(github.event.head_commit.message, '[no ci]'))) &&
+      (github.event_name != 'push' || github.event.head_commit == null || 
+       !contains(github.event.head_commit.message, '[skip_tests]')) &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true')
     steps:
       - uses: actions/checkout@v4
@@ -239,6 +243,8 @@ jobs:
        (!contains(github.event.head_commit.message, '[skip ci]') &&
         !contains(github.event.head_commit.message, '[ci skip]') &&
         !contains(github.event.head_commit.message, '[no ci]'))) &&
+      (github.event_name != 'push' || github.event.head_commit == null || 
+       !contains(github.event.head_commit.message, '[skip_tests]')) &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true')
     steps:
       - uses: actions/checkout@v4
@@ -266,6 +272,8 @@ jobs:
        (!contains(github.event.head_commit.message, '[skip ci]') &&
         !contains(github.event.head_commit.message, '[ci skip]') &&
         !contains(github.event.head_commit.message, '[no ci]'))) &&
+      (github.event_name != 'push' || github.event.head_commit == null || 
+       !contains(github.event.head_commit.message, '[skip_docs]')) &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true')
     steps:
       - uses: actions/checkout@v4
@@ -288,10 +296,7 @@ jobs:
       - name: Install Rust
         uses: BTCDecoded/rust-ci/install-rust-toolchain@main
       
-      - name: Build docs
-        run: cargo doc --no-deps
-      
-      - name: Check docs
+      - name: Docs
         run: cargo doc --no-deps --document-private-items
 
   security:
@@ -303,6 +308,8 @@ jobs:
        (!contains(github.event.head_commit.message, '[skip ci]') &&
         !contains(github.event.head_commit.message, '[ci skip]') &&
         !contains(github.event.head_commit.message, '[no ci]'))) &&
+      (github.event_name != 'push' || github.event.head_commit == null || 
+       !contains(github.event.head_commit.message, '[skip_tests]')) &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true')
     steps:
       - uses: actions/checkout@v4
@@ -335,6 +342,8 @@ jobs:
        (!contains(github.event.head_commit.message, '[skip ci]') &&
         !contains(github.event.head_commit.message, '[ci skip]') &&
         !contains(github.event.head_commit.message, '[no ci]'))) &&
+      (github.event_name != 'push' || github.event.head_commit == null || 
+       !contains(github.event.head_commit.message, '[skip_verify]')) &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true')
     steps:
       - uses: actions/checkout@v4
@@ -416,21 +425,19 @@ jobs:
           fi
           echo "✅ blvm-spec-lock verification passed"
 
-  fuzz:
-    name: Fuzz (shard ${{ matrix.shard }}/4)
-    needs: [setup, test]
+  # Fuzz is skippable via commit message `[skip_fuzz]` on push (skips fuzz-build + all fuzz shards; build still runs).
+  fuzz-build:
+    name: Fuzz (build once)
+    needs: [setup]
     runs-on: [self-hosted, Linux, X64, builds]
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      max-parallel: 4
-      matrix:
-        shard: [0, 1, 2, 3]
+    timeout-minutes: 60
     if: |
       (github.event_name != 'push' || github.event.head_commit == null || 
        (!contains(github.event.head_commit.message, '[skip ci]') &&
         !contains(github.event.head_commit.message, '[ci skip]') &&
         !contains(github.event.head_commit.message, '[no ci]'))) &&
+      (github.event_name != 'push' || github.event.head_commit == null || 
+       !contains(github.event.head_commit.message, '[skip_fuzz]')) &&
       (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true')
     steps:
       - uses: actions/checkout@v4
@@ -438,6 +445,11 @@ jobs:
       - name: Strip [patch.crates-io] for crates.io-only CI
         uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
 
+      - name: "Checkout blvm-consensus (sibling path ../../blvm-consensus for fuzz/Cargo.toml)"
+        uses: actions/checkout@v4
+        with:
+          repository: BTCDecoded/blvm-consensus
+          path: _temp-blvm-consensus
       - name: Checkout blvm-primitives (sibling for fuzz [patch.crates-io])
         uses: actions/checkout@v4
         with:
@@ -450,9 +462,10 @@ jobs:
           path: _temp-blvm-secp256k1
       - name: Move sibling crates next to repo root
         run: |
-          for name in blvm-primitives blvm-secp256k1; do
+          for name in blvm-consensus blvm-primitives blvm-secp256k1; do
             if [ -d "../${name}" ]; then rm -rf "../${name}"; fi
           done
+          mv _temp-blvm-consensus ../blvm-consensus
           mv _temp-blvm-primitives ../blvm-primitives
           mv _temp-blvm-secp256k1 ../blvm-secp256k1
 
@@ -473,6 +486,7 @@ jobs:
       - name: Install nightly and cargo-fuzz
         run: |
           rustup toolchain install nightly
+          rustup component add rustfmt --toolchain nightly 2>/dev/null || true
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo install cargo-fuzz
 
@@ -482,25 +496,75 @@ jobs:
           chmod +x init_corpus.sh
           ./init_corpus.sh
 
-      - name: Build all fuzz binaries (once per shard job)
+      # Do not set RUSTFLAGS here: cargo-fuzz already injects sancov + ASAN; duplicating
+      # -Cpasses=sancov-module breaks the link step (sancov ctors discarded with --gc-sections).
+      - name: Build all fuzz binaries (once per workflow)
         working-directory: fuzz
-        env:
-          RUSTFLAGS: "-Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4"
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo +nightly fuzz build
 
-      - name: Run cargo-fuzz (TARGETS.md shard for parallel CI)
+      - name: Save Cargo cache
+        if: always()
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: save
+
+      - name: Stash fuzz target for shard jobs
+        run: |
+          STASH="/tmp/gh-fuzz-blvm-protocol/${GITHUB_RUN_ID}"
+          rm -rf "$STASH"
+          mkdir -p "$STASH"
+          cp -a fuzz/target "$STASH/"
+
+  fuzz:
+    name: Fuzz (shard ${{ matrix.shard }}/8)
+    needs: [setup, fuzz-build]
+    runs-on: [self-hosted, Linux, X64, builds]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    if: |
+      (github.event_name != 'push' || github.event.head_commit == null || 
+       (!contains(github.event.head_commit.message, '[skip ci]') &&
+        !contains(github.event.head_commit.message, '[ci skip]') &&
+        !contains(github.event.head_commit.message, '[no ci]'))) &&
+      (github.event_name != 'push' || github.event.head_commit == null || 
+       !contains(github.event.head_commit.message, '[skip_fuzz]')) &&
+      (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true')
+    steps:
+      - uses: actions/checkout@v4
+
+      # Shards only execute prebuilt libFuzzer binaries from fuzz-build (no Cargo/rustup).
+      # `cargo fuzz run` re-invokes Cargo, re-locks, and races rustup on shared runners.
+
+      - name: Initialize corpus dirs
+        working-directory: fuzz
+        run: |
+          chmod +x init_corpus.sh
+          ./init_corpus.sh
+
+      - name: Restore fuzz target from shared stash
+        run: |
+          STASH="/tmp/gh-fuzz-blvm-protocol/${GITHUB_RUN_ID}"
+          if [ ! -d "$STASH/target" ]; then
+            echo "Expected $STASH/target from fuzz-build (same GITHUB_RUN_ID, shared /tmp on runner pool)"
+            exit 1
+          fi
+          rm -rf fuzz/target
+          cp -a "$STASH/target" fuzz/target
+
+      - name: Run libFuzzer binaries (TARGETS.md shard)
         working-directory: fuzz
         env:
-          RUSTFLAGS: "-Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4"
-          FUZZ_MAX_TOTAL_TIME: "18"
-          FUZZ_MAX_LEN: "65536"
+          ASAN_OPTIONS: detect_odr_violation=0
         run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
           mapfile -t bins < <(grep -v '^#' TARGETS.md | grep -v '^$' || true)
           shard=${{ matrix.shard }}
-          shards=4
+          shards=8
           idx=0
           for t in "${bins[@]}"; do
             if (( idx % shards != shard )); then
@@ -508,19 +572,17 @@ jobs:
               continue
             fi
             ((idx++)) || true
-            echo "=== shard $shard: cargo-fuzz run $t ==="
-            timeout 120 cargo +nightly fuzz run "$t" -- \
-              -max_total_time="${FUZZ_MAX_TOTAL_TIME}" \
-              -timeout=8 \
-              -max_len="${FUZZ_MAX_LEN}" \
-              -rss_limit_mb=4096
+            echo "=== shard $shard/$shards: $t ==="
+            bin="$PWD/target/x86_64-unknown-linux-gnu/release/$t"
+            if [ ! -x "$bin" ]; then
+              echo "missing executable $bin"
+              exit 1
+            fi
+            timeout 210 "$bin" "corpus/$t" -- \
+              -max_total_time=120 \
+              -timeout=10 \
+              -max_len=100000
           done
-
-      - name: Save Cargo cache
-        if: always()
-        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
-        with:
-          operation: save
 
   build:
     name: Build
@@ -532,6 +594,7 @@ jobs:
       - docs
       - security
       - verify
+      - fuzz-build
       - fuzz
     runs-on: [self-hosted, Linux, X64, builds]
     if: |
@@ -543,11 +606,14 @@ jobs:
         !contains(github.event.head_commit.message, '[ci skip]') &&
         !contains(github.event.head_commit.message, '[no ci]'))) &&
       ((github.event_name == 'workflow_dispatch' && github.event.inputs.skip_tests == 'true') ||
-       (needs.test.result == 'success' && needs.clippy.result == 'success' && 
-        needs.fmt.result == 'success' && needs.docs.result == 'success' && 
-        needs.security.result == 'success' &&
+       ((needs.test.result == 'success' || needs.test.result == 'skipped') &&
+        (needs.clippy.result == 'success' || needs.clippy.result == 'skipped') &&
+        (needs.fmt.result == 'success' || needs.fmt.result == 'skipped') &&
+        (needs.docs.result == 'success' || needs.docs.result == 'skipped') &&
+        (needs.security.result == 'success' || needs.security.result == 'skipped') &&
         (needs.verify.result == 'success' || needs.verify.result == 'skipped') &&
-        (needs.fuzz.result == 'success' || needs.fuzz.result == 'skipped')))
+        ((needs.fuzz-build.result == 'success' && needs.fuzz.result == 'success') ||
+         (needs.fuzz-build.result == 'skipped' && needs.fuzz.result == 'skipped'))))
     steps:
       - uses: actions/checkout@v4
       
@@ -603,7 +669,7 @@ jobs:
 
   release:
     name: Release
-    needs: [build, test, clippy, fmt, docs, security, verify]
+    needs: [build, test, clippy, fmt, docs, security, verify, fuzz-build, fuzz]
     runs-on: [self-hosted, Linux, X64, builds]
     if: |
       always() &&
@@ -616,10 +682,14 @@ jobs:
         !contains(github.event.head_commit.message, '[no ci]') &&
         !contains(github.event.head_commit.message, '[skip release]'))) &&
       ((github.event_name == 'workflow_dispatch' && github.event.inputs.skip_tests == 'true') ||
-       (needs.test.result == 'success' && needs.clippy.result == 'success' && 
-        needs.fmt.result == 'success' && needs.docs.result == 'success' && 
-        needs.security.result == 'success' &&
-        (needs.verify.result == 'success' || needs.verify.result == 'skipped')))
+       ((needs.test.result == 'success' || needs.test.result == 'skipped') &&
+        (needs.clippy.result == 'success' || needs.clippy.result == 'skipped') &&
+        (needs.fmt.result == 'success' || needs.fmt.result == 'skipped') &&
+        (needs.docs.result == 'success' || needs.docs.result == 'skipped') &&
+        (needs.security.result == 'success' || needs.security.result == 'skipped') &&
+        (needs.verify.result == 'success' || needs.verify.result == 'skipped') &&
+        ((needs.fuzz-build.result == 'success' && needs.fuzz.result == 'success') ||
+         (needs.fuzz-build.result == 'skipped' && needs.fuzz.result == 'skipped'))))
     permissions:
       contents: write
       id-token: write

@@ -325,7 +325,24 @@ impl UtxoMerkleTree {
         let mut pos = 0;
         let leaves_len = u32::from_le_bytes(bytes[pos..pos + 4].try_into().unwrap()) as usize;
         pos += 4;
-        if bytes.len() < pos + leaves_len * 32 {
+        // `leaves_len` digest-sized leaves, then 4 bytes for `path_len` (untrusted / malicious wire).
+        let min_after_header = match leaves_len.checked_mul(32).and_then(|b| b.checked_add(4)) {
+            Some(n) => n,
+            None => {
+                return Err(UtxoCommitmentError::MerkleTreeError(
+                    "invalid proof: leaves count overflow".to_string(),
+                ));
+            }
+        };
+        let end = match pos.checked_add(min_after_header) {
+            Some(e) => e,
+            None => {
+                return Err(UtxoCommitmentError::MerkleTreeError(
+                    "invalid proof: size overflow".to_string(),
+                ));
+            }
+        };
+        if end > bytes.len() {
             return Err(UtxoCommitmentError::MerkleTreeError(
                 "proof truncated at leaves_bitmap".to_string(),
             ));
@@ -339,6 +356,13 @@ impl UtxoMerkleTree {
         }
         let path_len = u32::from_le_bytes(bytes[pos..pos + 4].try_into().unwrap()) as usize;
         pos += 4;
+        // Each path entry is at least 33 bytes (tag + 32-byte H256 for Value).
+        let max_path = (bytes.len().saturating_sub(pos)) / 33;
+        if path_len > max_path {
+            return Err(UtxoCommitmentError::MerkleTreeError(
+                "proof truncated or path count impossible for input size".to_string(),
+            ));
+        }
         let mut merkle_path = Vec::with_capacity(path_len);
         for _ in 0..path_len {
             if pos >= bytes.len() {
@@ -652,6 +676,24 @@ pub struct UtxoMerkleTree;
 impl UtxoMerkleTree {
     pub fn new() -> Result<Self, String> {
         Err("UTXO commitments feature not enabled".to_string())
+    }
+}
+
+#[cfg(all(test, feature = "utxo-commitments"))]
+mod deserialize_proof_from_wire_tests {
+    use super::UtxoMerkleTree;
+
+    /// 39 B: `leaves_len=1` + 32 B leaf, only 3 B left; must not index `path_len` past end.
+    #[test]
+    fn wire_proof_rejects_without_space_for_path_length() {
+        const DATA: [u8; 39] = [
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x0a, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        assert!(UtxoMerkleTree::deserialize_proof_from_wire(&DATA).is_err());
     }
 }
 
