@@ -14,10 +14,16 @@ path = "src/lib.rs"
 
 [dependencies]
 bincode = "=1.3.3"
-# Fuzz the in-tree crate; blvm-consensus matches blvm-protocol root Cargo.toml (crates.io).
+# Fuzz the in-tree crate; blvm-consensus matches blvm-protocol root (crates.io version pin).
+# [patch.crates-io] mirrors ../Cargo.toml for local monorepo; CI strip removes it.
 blvm-consensus = { version = ">=0.1, <1", features = ["utxo-commitments", "ctv"] }
 blvm-protocol = { path = "..", features = ["utxo-commitments", "bip324"] }
 libfuzzer-sys = "0.4"
+
+[patch.crates-io]
+blvm-consensus = { path = "../../blvm-consensus" }
+blvm-primitives = { path = "../../blvm-primitives" }
+blvm-spec-lock = { path = "../../blvm-spec-lock" }
 
 [profile.release]
 opt-level = 3
