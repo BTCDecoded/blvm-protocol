@@ -1142,27 +1142,22 @@ pub fn deserialize_reject(data: &[u8]) -> Result<crate::network::RejectMessage> 
     let code = data[12];
     let mut cursor = std::io::Cursor::new(&data[13..]);
     let reason_len_u64 = read_varint(&mut cursor)?;
-    let pos: usize = 13_usize
-        .saturating_add(cursor.position() as usize);
+    let pos: usize = 13_usize.saturating_add(cursor.position() as usize);
     if reason_len_u64 > (data.len() as u64).saturating_sub(pos as u64) {
         return Err(ProtocolError::Consensus(ConsensusError::Serialization(
             Cow::Owned("Reject reason truncated".to_string()),
         )));
     }
-    let reason_len: usize = reason_len_u64
-        .try_into()
-        .map_err(|_| {
-            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
-                "Reject reason length out of range".to_string(),
-            )))
-        })?;
-    let end = pos
-        .checked_add(reason_len)
-        .ok_or_else(|| {
-            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
-                "Reject reason length out of range".to_string(),
-            )))
-        })?;
+    let reason_len: usize = reason_len_u64.try_into().map_err(|_| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+            "Reject reason length out of range".to_string(),
+        )))
+    })?;
+    let end = pos.checked_add(reason_len).ok_or_else(|| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+            "Reject reason length out of range".to_string(),
+        )))
+    })?;
     if end > data.len() {
         return Err(ProtocolError::Consensus(ConsensusError::Serialization(
             Cow::Owned("Reject reason truncated".to_string()),
@@ -1261,21 +1256,17 @@ pub fn deserialize_cmpctblock(data: &[u8]) -> Result<crate::network::CmpctBlockM
             Cow::Owned("CmpctBlock too many shortids".to_string()),
         )));
     }
-    let shortids_len: usize = shortids_len_u64
-        .try_into()
-        .map_err(|_| {
-            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
-                "CmpctBlock shortid count out of range".to_string(),
-            )))
-        })?;
+    let shortids_len: usize = shortids_len_u64.try_into().map_err(|_| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+            "CmpctBlock shortid count out of range".to_string(),
+        )))
+    })?;
     let rem_after_count = data.len().saturating_sub(88 + cursor.position() as usize);
-    let need_shortids = shortids_len
-        .checked_mul(6)
-        .ok_or_else(|| {
-            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
-                "CmpctBlock shortid size overflow".to_string(),
-            )))
-        })?;
+    let need_shortids = shortids_len.checked_mul(6).ok_or_else(|| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+            "CmpctBlock shortid size overflow".to_string(),
+        )))
+    })?;
     if need_shortids > rem_after_count {
         return Err(ProtocolError::Consensus(ConsensusError::Serialization(
             Cow::Owned("CmpctBlock shortids truncated".to_string()),
@@ -1297,13 +1288,11 @@ pub fn deserialize_cmpctblock(data: &[u8]) -> Result<crate::network::CmpctBlockM
             Cow::Owned("CmpctBlock too many prefilled txs".to_string()),
         )));
     }
-    let prefilled_len: usize = prefilled_len_u64
-        .try_into()
-        .map_err(|_| {
-            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
-                "CmpctBlock prefilled count out of range".to_string(),
-            )))
-        })?;
+    let prefilled_len: usize = prefilled_len_u64.try_into().map_err(|_| {
+        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(
+            "CmpctBlock prefilled count out of range".to_string(),
+        )))
+    })?;
     let mut prefilled_txs = Vec::with_capacity(prefilled_len);
     let mut last_index: i64 = -1;
     let mut pos;

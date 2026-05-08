@@ -184,7 +184,10 @@ pub mod service_flags;
 pub mod varint;
 
 // BIP324: v2 encrypted transport
-#[cfg(all(feature = "bip324", any(target_arch = "x86_64", target_arch = "aarch64")))]
+#[cfg(all(
+    feature = "bip324",
+    any(target_arch = "x86_64", target_arch = "aarch64")
+))]
 pub mod v2_transport;
 
 // Re-export commonly used types for convenience

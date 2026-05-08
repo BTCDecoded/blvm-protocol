@@ -174,11 +174,12 @@ impl PaymentACK {
             .ok_or_else(|| Bip70Error::SignatureError("No signature".to_string()))?;
         let mut ack = self.clone();
         ack.signature = None;
-        let serialized = bincode::serialize(&ack)
-            .map_err(|e| Bip70Error::SerializationError(e.to_string()))?;
+        let serialized =
+            bincode::serialize(&ack).map_err(|e| Bip70Error::SerializationError(e.to_string()))?;
         let hash: [u8; 32] = Sha256::digest(&serialized).into();
-        verify_sig(sig, merchant_pubkey, &hash)
-            .map_err(|_| Bip70Error::SignatureError("PaymentACK signature verification failed".to_string()))
+        verify_sig(sig, merchant_pubkey, &hash).map_err(|_| {
+            Bip70Error::SignatureError("PaymentACK signature verification failed".to_string())
+        })
     }
 }
 
@@ -573,8 +574,9 @@ impl PaymentProtocolServer {
         let serialized = bincode::serialize(&signed_refund.address)
             .map_err(|e| Bip70Error::SerializationError(e.to_string()))?;
         let hash: [u8; 32] = Sha256::digest(&serialized).into();
-        verify_sig(&signed_refund.signature, merchant_pubkey, &hash)
-            .map_err(|_| Bip70Error::SignatureError("Refund address signature verification failed".to_string()))
+        verify_sig(&signed_refund.signature, merchant_pubkey, &hash).map_err(|_| {
+            Bip70Error::SignatureError("Refund address signature verification failed".to_string())
+        })
     }
 }
 
