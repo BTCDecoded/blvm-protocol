@@ -20,7 +20,7 @@ pub mod commons {
 }
 
 // BIP324: v2 encrypted transport
-#[cfg(feature = "bip324")]
+#[cfg(all(feature = "bip324", any(target_arch = "x86_64", target_arch = "aarch64")))]
 pub mod v2_transport {
     pub use crate::v2_transport::*;
 }
@@ -470,10 +470,10 @@ pub struct PeerState {
     pub min_fee_rate: Option<u64>,
     /// BIP324: v2 encrypted transport state (if enabled)
     /// Note: V2Transport is not Clone, so we use Option<Box<V2Transport>> for storage
-    #[cfg(feature = "bip324")]
+    #[cfg(all(feature = "bip324", any(target_arch = "x86_64", target_arch = "aarch64")))]
     pub v2_transport: Option<std::sync::Arc<crate::v2_transport::V2Transport>>,
     /// BIP324: Whether v2 transport handshake is in progress
-    #[cfg(feature = "bip324")]
+    #[cfg(all(feature = "bip324", any(target_arch = "x86_64", target_arch = "aarch64")))]
     pub v2_handshake: Option<std::sync::Arc<crate::v2_transport::V2Handshake>>,
 }
 
@@ -489,22 +489,22 @@ impl PeerState {
             ping_nonce: None,
             last_pong: None,
             min_fee_rate: None,
-            #[cfg(feature = "bip324")]
+            #[cfg(all(feature = "bip324", any(target_arch = "x86_64", target_arch = "aarch64")))]
             v2_transport: None,
-            #[cfg(feature = "bip324")]
+            #[cfg(all(feature = "bip324", any(target_arch = "x86_64", target_arch = "aarch64")))]
             v2_handshake: None,
         }
     }
 
     /// Check if peer supports BIP324 v2 encrypted transport
-    #[cfg(feature = "bip324")]
+    #[cfg(all(feature = "bip324", any(target_arch = "x86_64", target_arch = "aarch64")))]
     pub fn supports_v2_transport(&self) -> bool {
         use crate::service_flags::{has_flag, standard};
         has_flag(self.services, standard::NODE_V2_TRANSPORT)
     }
 
     /// Check if v2 transport is active
-    #[cfg(feature = "bip324")]
+    #[cfg(all(feature = "bip324", any(target_arch = "x86_64", target_arch = "aarch64")))]
     pub fn is_v2_transport_active(&self) -> bool {
         self.v2_transport.is_some()
     }
@@ -660,7 +660,7 @@ fn process_version_message(
     peer_state.start_height = version.start_height;
 
     // BIP324: Check if peer supports v2 transport and we should negotiate it
-    #[cfg(feature = "bip324")]
+    #[cfg(all(feature = "bip324", any(target_arch = "x86_64", target_arch = "aarch64")))]
     {
         use crate::service_flags::{has_flag, standard};
         let peer_supports_v2 = has_flag(version.services, standard::NODE_V2_TRANSPORT);
