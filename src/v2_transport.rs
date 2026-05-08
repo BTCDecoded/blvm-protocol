@@ -5,15 +5,12 @@
 
 use crate::error::ProtocolError;
 use crate::Result;
+use blvm_secp256k1::ellswift::{ellswift_create, ellswift_xdh};
 use chacha20poly1305::{
     aead::{Aead, AeadCore, KeyInit},
     ChaCha20Poly1305, Key, Nonce,
 };
 use getrandom::getrandom;
-use secp256k1::{
-    ellswift::{ElligatorSwift, ElligatorSwiftSharedSecret},
-    PublicKey, Scalar, Secp256k1, SecretKey, XOnlyPublicKey,
-};
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 
@@ -37,13 +34,13 @@ pub struct V2Transport {
 pub enum V2Handshake {
     /// Initiator handshake (client connecting)
     Initiator {
-        private_key: SecretKey,
-        ellswift: ElligatorSwift, // Store our ElligatorSwift encoding
+        private_key: [u8; 32],
+        ellswift: [u8; 64],
     },
     /// Responder handshake (server accepting)
     Responder {
-        private_key: SecretKey,
-        initiator_ellswift: Option<ElligatorSwift>, // Store peer's ElligatorSwift
+        private_key: [u8; 32],
+        initiator_ellswift: Option<[u8; 64]>,
     },
 }
 
@@ -206,24 +203,16 @@ impl V2Transport {
 impl V2Handshake {
     /// Create a new initiator handshake
     pub fn new_initiator() -> (Vec<u8>, Self) {
-        let secp = Secp256k1::new();
-        // Generate random 32 bytes for secret key
         let mut key_bytes = [0u8; 32];
         getrandom(&mut key_bytes).expect("Failed to generate random bytes");
-        let private_key = SecretKey::from_slice(&key_bytes).expect("Failed to generate secret key");
-
-        // Generate random aux_rand for ElligatorSwift encoding
         let mut aux_rand = [0u8; 32];
         getrandom(&mut aux_rand).expect("Failed to generate aux_rand");
-
-        // Create ElligatorSwift encoding from secret key (BIP324-compatible)
-        let ellswift = ElligatorSwift::from_seckey(&secp, private_key, Some(aux_rand));
-        let encoded = ellswift.to_array();
-
+        let ellswift = ellswift_create(&key_bytes, Some(&aux_rand))
+            .expect("Failed to create ElligatorSwift encoding");
         (
-            encoded.to_vec(),
+            ellswift.to_vec(),
             Self::Initiator {
-                private_key,
+                private_key: key_bytes,
                 ellswift,
             },
         )
@@ -231,13 +220,10 @@ impl V2Handshake {
 
     /// Create a new responder handshake
     pub fn new_responder() -> Self {
-        // Generate random 32 bytes for secret key
         let mut key_bytes = [0u8; 32];
         getrandom(&mut key_bytes).expect("Failed to generate random bytes");
-        let private_key = SecretKey::from_slice(&key_bytes).expect("Failed to generate secret key");
-
         Self::Responder {
-            private_key,
+            private_key: key_bytes,
             initiator_ellswift: None,
         }
     }
@@ -255,13 +241,9 @@ impl V2Handshake {
             ));
         }
 
-        // Decode initiator's ElligatorSwift encoding
-        let mut initiator_msg_array = [0u8; 64];
-        initiator_msg_array.copy_from_slice(initiator_msg);
-        let initiator_ellswift = elligator_swift_decode(&initiator_msg_array);
+        let mut initiator_ell64 = [0u8; 64];
+        initiator_ell64.copy_from_slice(initiator_msg);
 
-        // Generate responder's ElligatorSwift encoding
-        let secp = Secp256k1::new();
         let responder_private = match self {
             Self::Responder { private_key, .. } => *private_key,
             _ => {
@@ -273,47 +255,34 @@ impl V2Handshake {
             }
         };
 
-        // Generate random aux_rand for ElligatorSwift encoding
         let mut aux_rand = [0u8; 32];
         getrandom(&mut aux_rand).expect("Failed to generate aux_rand");
 
-        // Create ElligatorSwift encoding from secret key (BIP324-compatible)
-        let responder_ellswift =
-            ElligatorSwift::from_seckey(&secp, responder_private, Some(aux_rand));
-        let responder_ellswift_bytes = responder_ellswift.to_array();
+        let responder_ell64 = ellswift_create(&responder_private, Some(&aux_rand))
+            .expect("Failed to create ElligatorSwift encoding");
 
-        // Perform X-only ECDH using ElligatorSwift shared secret (BIP324-compatible)
-        // Use secp256k1's built-in shared_secret computation with ElligatorSwift objects
-        use secp256k1::ellswift::ElligatorSwiftParty;
+        // X-only ECDH: responder is party B (party = true).
+        let shared_x = ellswift_xdh(
+            &initiator_ell64,
+            &responder_ell64,
+            &responder_private,
+            true, // B = responder
+        )
+        .expect("ElligatorSwift ECDH failed");
 
-        // Compute shared secret using ElligatorSwift::shared_secret (BIP324-compatible)
-        let shared_secret = ElligatorSwift::shared_secret(
-            initiator_ellswift,
-            responder_ellswift,
-            responder_private,
-            ElligatorSwiftParty::B, // Responder is party B
-            None,                   // No additional data for BIP324
-        );
-
-        let shared_x = shared_secret.to_secret_bytes();
-
-        // Derive keys using HKDF
         let send_key = hkdf_sha256(&shared_x, b"bitcoin_v2_shared_secret_send");
         let recv_key = hkdf_sha256(&shared_x, b"bitcoin_v2_shared_secret_recv");
-
-        // Create transport
         let transport = V2Transport::new(send_key, recv_key);
 
-        // Update handshake state
         if let Self::Responder {
             initiator_ellswift: ref mut iell,
             ..
         } = self
         {
-            *iell = Some(initiator_ellswift);
+            *iell = Some(initiator_ell64);
         }
 
-        Ok((responder_ellswift_bytes.to_vec(), transport))
+        Ok((responder_ell64.to_vec(), transport))
     }
 
     /// Complete handshake (initiator side)
@@ -326,22 +295,14 @@ impl V2Handshake {
             ));
         }
 
-        // Decode responder's ElligatorSwift encoding
-        let mut responder_msg_array = [0u8; 64];
-        responder_msg_array.copy_from_slice(responder_msg);
-        let responder_ellswift = elligator_swift_decode(&responder_msg_array);
+        let mut responder_ell64 = [0u8; 64];
+        responder_ell64.copy_from_slice(responder_msg);
 
-        // Perform X-only ECDH using ElligatorSwift shared secret (BIP324-compatible)
-        // Use secp256k1's built-in shared_secret computation with ElligatorSwift objects
-        use secp256k1::ellswift::ElligatorSwiftParty;
-        let (private_key, initiator_ellswift) = match self {
+        let (private_key, initiator_ell64) = match self {
             Self::Initiator {
                 private_key,
                 ellswift,
-                ..
-            } => {
-                (private_key, ellswift) // ellswift is Copy, private_key is not
-            }
+            } => (private_key, ellswift),
             _ => {
                 return Err(ProtocolError::Consensus(
                     blvm_consensus::error::ConsensusError::Serialization(Cow::Owned(
@@ -351,52 +312,24 @@ impl V2Handshake {
             }
         };
 
-        // Compute shared secret using ElligatorSwift::shared_secret (BIP324-compatible)
-        let shared_secret = ElligatorSwift::shared_secret(
-            initiator_ellswift,
-            responder_ellswift,
-            private_key,
-            ElligatorSwiftParty::A, // Initiator is party A
-            None,                   // No additional data for BIP324
-        );
+        // X-only ECDH: initiator is party A (party = false).
+        let shared_x = ellswift_xdh(
+            &initiator_ell64,
+            &responder_ell64,
+            &private_key,
+            false, // A = initiator
+        )
+        .expect("ElligatorSwift ECDH failed");
 
-        let shared_x = shared_secret.to_secret_bytes();
-
-        // Derive keys using HKDF
         let send_key = hkdf_sha256(&shared_x, b"bitcoin_v2_shared_secret_send");
         let recv_key = hkdf_sha256(&shared_x, b"bitcoin_v2_shared_secret_recv");
-
-        // Create transport
         Ok(V2Transport::new(send_key, recv_key))
     }
 }
 
-/// ElligatorSwift encoding (BIP324)
-/// Encodes a secp256k1 public key to 64 bytes using secp256k1's ElligatorSwift implementation
-fn elligator_swift_encode(pubkey: &PublicKey) -> [u8; 64] {
-    // Use secp256k1's built-in ElligatorSwift encoding
-    let ellswift = ElligatorSwift::from_pubkey(*pubkey);
-    ellswift.to_array()
-}
-
-/// ElligatorSwift decoding (BIP324)
-/// Decodes 64 bytes to an ElligatorSwift object (not directly to PublicKey)
-///
-/// Note: For BIP324, we work with ElligatorSwift objects directly in the handshake.
-/// The shared secret computation uses ElligatorSwift objects, not raw public keys.
-fn elligator_swift_decode(encoded: &[u8; 64]) -> ElligatorSwift {
-    ElligatorSwift::from_array(*encoded)
-}
-
-// Note: xonly_ecdh function removed - we now use ElligatorSwiftSharedSecret directly
-// in the handshake functions, which is the proper BIP324 approach using secp256k1's library.
-
-/// HKDF-SHA256 key derivation (BIP324)
-/// Uses the hkdf library for proper HMAC-SHA256-based key derivation
+/// HKDF-SHA256 key derivation (BIP324).
 fn hkdf_sha256(ikm: &[u8], info: &[u8]) -> [u8; 32] {
     use hkdf::Hkdf;
-
-    // BIP324 uses HKDF with empty salt and info parameter
     let hk = Hkdf::<sha2::Sha256>::new(None, ikm);
     let mut okm = [0u8; 32];
     hk.expand(info, &mut okm)
@@ -437,15 +370,13 @@ mod tests {
 
     #[test]
     fn test_elligator_swift_encode_decode() {
-        let secp = Secp256k1::new();
-        let private_key = SecretKey::from_slice(&[0x01; 32]).unwrap();
-        let public_key = PublicKey::from_secret_key(&secp, &private_key);
-
-        let encoded = elligator_swift_encode(&public_key);
-        let decoded_ellswift = elligator_swift_decode(&encoded);
-
-        // Verify encoding/decoding works (ElligatorSwift objects should match)
-        let re_encoded = decoded_ellswift.to_array();
-        assert_eq!(encoded, re_encoded);
+        use blvm_secp256k1::ellswift::{ellswift_create, ellswift_xdh};
+        // Create from a known secret key (no randomness for determinism).
+        let seckey = [0x01u8; 32];
+        let ell = ellswift_create(&seckey, None).expect("valid key");
+        assert_eq!(ell.len(), 64);
+        // Verify XDH with itself is consistent (reflexive sanity check).
+        let shared = ellswift_xdh(&ell, &ell, &seckey, false);
+        assert!(shared.is_some(), "XDH should not fail on valid inputs");
     }
 }
