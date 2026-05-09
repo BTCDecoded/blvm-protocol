@@ -102,9 +102,6 @@ dandelion = []
 protocol-verification = ["dep:blvm-spec-lock"]
 
 [dev-dependencies]
-tempfile = "=3.8.1"
-cargo-tarpaulin = "=0.27"
-bytes = "=1.11.1"  # RUSTSEC-2026-0007: force upgrade for cargo-tarpaulin transitive dep
 blvm-primitives = { version = ">=0.1, <1", default-features = false }
 
 # Fast release: opt-level 2 for iteration (matches blvm/blvm-node/blvm-consensus)
