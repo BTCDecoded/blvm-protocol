@@ -108,13 +108,18 @@ jobs:
       - name: Install Rust
         uses: BTCDecoded/rust-ci/install-rust-toolchain@main
 
-      - name: Run tests
-        # CARGO_BUILD_JOBS=1 limits link parallelism (biggest RSS spike).
-        # --test-threads=1 serialises test execution.
-        # Together they prevent blank OOM kills on shared self-hosted runners.
+      - name: Compile tests (no-run)
+        # Separate compile from execute so CI shows which phase fails.
+        # Clippy only checks --lib --bins; test code may have its own errors.
         env:
           CARGO_BUILD_JOBS: '1'
-        run: cargo test --lib --tests -- --test-threads=1
+        run: cargo test --lib --tests --no-run
+
+      - name: Run tests
+        env:
+          CARGO_BUILD_JOBS: '1'
+          RUST_BACKTRACE: full
+        run: cargo test --lib --tests -- --test-threads=1 --nocapture
       
       - name: Save Cargo cache
         if: always()
