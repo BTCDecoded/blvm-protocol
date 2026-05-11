@@ -37,7 +37,6 @@ jobs:
         !contains(github.event.head_commit.message, '[no ci]')))
     outputs:
       cache-key: ${{ steps.setup-cache.outputs.cache-key }}
-      consensus-cache-key: ${{ steps.setup-cache.outputs.consensus-cache-key }}
     steps:
       - name: Disk check
         uses: BTCDecoded/rust-ci/runner-disk-guard@main
@@ -47,54 +46,30 @@ jobs:
 
       - name: Strip [patch.crates-io] for crates.io-only CI
         uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
-      - name: Checkout consensus
-        uses: actions/checkout@v4
-        with:
-          repository: BTCDecoded/blvm-consensus
-          path: _temp-blvm-consensus
-      
-      - name: Move consensus
-        run: |
-          if [ -d "../blvm-consensus" ]; then rm -rf ../blvm-consensus; fi
-          mv _temp-blvm-consensus ../blvm-consensus
-      
-      - name: Setup local dependencies for build
-        run: |
-          mkdir -p .cargo
-          cat > .cargo/config.toml << EOF
-          [patch.crates-io]
-          blvm-consensus = { path = "../blvm-consensus" }
-          EOF
-          echo "✅ Created .cargo/config.toml for local dependency builds"
-      
+
       - name: Cache
         id: setup-cache
         run: |
           CACHE_ROOT="/tmp/runner-cache"
           
-          # Generate cache keys from Cargo.toml (sibling libraries do not commit Cargo.lock)
+          # Generate cache key from Cargo.toml (sibling libraries do not commit Cargo.lock)
           DEPS_KEY=$(sha256sum Cargo.toml | cut -d' ' -f1)
-          CONSENSUS_DEPS_KEY=$(sha256sum ../blvm-consensus/Cargo.toml | cut -d' ' -f1)
           
           # Include toolchain version in cache key
           TOOLCHAIN=$(grep -E '^channel|rust-version' rust-toolchain.toml Cargo.toml 2>/dev/null | head -1 | sha256sum | cut -d' ' -f1 || echo "1.88.0")
           
           CACHE_KEY="${DEPS_KEY}-${TOOLCHAIN}"
-          CONSENSUS_CACHE_KEY="${CONSENSUS_DEPS_KEY}-${TOOLCHAIN}"
           
           # Set up cache directories
           CARGO_CACHE_DIR="$CACHE_ROOT/cargo/$CACHE_KEY"
           TARGET_CACHE_DIR="$CACHE_ROOT/target/$CACHE_KEY"
-          CONSENSUS_TARGET_DIR="$CACHE_ROOT/blvm-consensus-target/$CONSENSUS_CACHE_KEY"
           
           echo "CARGO_CACHE_DIR=$CARGO_CACHE_DIR" >> $GITHUB_ENV
           echo "TARGET_CACHE_DIR=$TARGET_CACHE_DIR" >> $GITHUB_ENV
-          echo "CONSENSUS_TARGET_DIR=$CONSENSUS_TARGET_DIR" >> $GITHUB_ENV
           
           echo "cache-key=$CACHE_KEY" >> $GITHUB_OUTPUT
-          echo "consensus-cache-key=$CONSENSUS_CACHE_KEY" >> $GITHUB_OUTPUT
           
-          mkdir -p "$CARGO_CACHE_DIR"/{registry,git} "$TARGET_CACHE_DIR" "$CONSENSUS_TARGET_DIR"
+          mkdir -p "$CARGO_CACHE_DIR"/{registry,git} "$TARGET_CACHE_DIR"
           
 
       - name: Install Rust
@@ -118,27 +93,13 @@ jobs:
 
       - name: Strip [patch.crates-io] for crates.io-only CI
         uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
-      - name: Checkout consensus
-        uses: actions/checkout@v4
-        with:
-          repository: BTCDecoded/blvm-consensus
-          path: _temp-blvm-consensus
-      
-      - name: Move consensus
-        run: |
-          if [ -d "../blvm-consensus" ]; then rm -rf ../blvm-consensus; fi
-          mv _temp-blvm-consensus ../blvm-consensus
-      
+
       - name: Cache
-        run: |
-          CACHE_ROOT="/tmp/runner-cache"
-          CACHE_KEY="${{ needs.setup.outputs.cache-key }}"
-          CONSENSUS_CACHE_KEY="${{ needs.setup.outputs.consensus-cache-key }}"
-          
-          echo "CARGO_CACHE_DIR=$CACHE_ROOT/cargo/$CACHE_KEY" >> $GITHUB_ENV
-          echo "TARGET_CACHE_DIR=$CACHE_ROOT/target/$CACHE_KEY" >> $GITHUB_ENV
-          echo "CONSENSUS_TARGET_DIR=$CACHE_ROOT/blvm-consensus-target/$CONSENSUS_CACHE_KEY" >> $GITHUB_ENV
-      
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: bind-env
+          cache-key: ${{ needs.setup.outputs.cache-key }}
+
       - name: Restore Cargo cache
         uses: BTCDecoded/rust-ci/runner-cargo-cache@main
         with:
@@ -146,7 +107,7 @@ jobs:
 
       - name: Install Rust
         uses: BTCDecoded/rust-ci/install-rust-toolchain@main
-      
+
       - name: Run tests
         run: cargo test --lib --tests
       
@@ -180,26 +141,7 @@ jobs:
 
       - name: Strip [patch.crates-io] for crates.io-only CI
         uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
-      - name: Checkout consensus
-        uses: actions/checkout@v4
-        with:
-          repository: BTCDecoded/blvm-consensus
-          path: _temp-blvm-consensus
-      
-      - name: Move consensus
-        run: |
-          if [ -d "../blvm-consensus" ]; then rm -rf ../blvm-consensus; fi
-          mv _temp-blvm-consensus ../blvm-consensus
-      
-      - name: Setup local dependencies for build
-        run: |
-          mkdir -p .cargo
-          cat > .cargo/config.toml << EOF
-          [patch.crates-io]
-          blvm-consensus = { path = "../blvm-consensus" }
-          EOF
-          echo "✅ Created .cargo/config.toml for local dependency builds"
-      
+
       - name: Cache
         uses: BTCDecoded/rust-ci/runner-cargo-cache@main
         with:
@@ -339,25 +281,6 @@ jobs:
 
       - name: Strip [patch.crates-io] for crates.io-only CI
         uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
-
-      - name: Checkout consensus
-        uses: actions/checkout@v4
-        with:
-          repository: BTCDecoded/blvm-consensus
-          path: _temp-blvm-consensus
-
-      - name: Move consensus
-        run: |
-          if [ -d "../blvm-consensus" ]; then rm -rf ../blvm-consensus; fi
-          mv _temp-blvm-consensus ../blvm-consensus
-
-      - name: Setup local dependencies for build
-        run: |
-          mkdir -p .cargo
-          cat > .cargo/config.toml << EOF
-          [patch.crates-io]
-          blvm-consensus = { path = "../blvm-consensus" }
-          EOF
 
       - name: Setup blvm-spec (PROTOCOL.md + ARCHITECTURE.md for verification)
         uses: BTCDecoded/rust-ci/setup-blvm-spec@main
@@ -585,35 +508,12 @@ jobs:
 
       - name: Strip [patch.crates-io] for crates.io-only CI
         uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
-      - name: Checkout consensus
-        uses: actions/checkout@v4
-        with:
-          repository: BTCDecoded/blvm-consensus
-          path: _temp-blvm-consensus
-      
-      - name: Move consensus
-        run: |
-          if [ -d "../blvm-consensus" ]; then rm -rf ../blvm-consensus; fi
-          mv _temp-blvm-consensus ../blvm-consensus
-      
-      - name: Setup local dependencies for build
-        run: |
-          mkdir -p .cargo
-          cat > .cargo/config.toml << EOF
-          [patch.crates-io]
-          blvm-consensus = { path = "../blvm-consensus" }
-          EOF
-          echo "✅ Created .cargo/config.toml for local dependency builds"
-      
+
       - name: Cache
-        run: |
-          CACHE_ROOT="/tmp/runner-cache"
-          CACHE_KEY="${{ needs.setup.outputs.cache-key }}"
-          CONSENSUS_CACHE_KEY="${{ needs.setup.outputs.consensus-cache-key }}"
-          
-          echo "CARGO_CACHE_DIR=$CACHE_ROOT/cargo/$CACHE_KEY" >> $GITHUB_ENV
-          echo "TARGET_CACHE_DIR=$CACHE_ROOT/target/$CACHE_KEY" >> $GITHUB_ENV
-          echo "CONSENSUS_TARGET_DIR=$CACHE_ROOT/blvm-consensus-target/$CONSENSUS_CACHE_KEY" >> $GITHUB_ENV
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: bind-env
+          cache-key: ${{ needs.setup.outputs.cache-key }}
       
       - name: Restore Cargo cache
         uses: BTCDecoded/rust-ci/runner-cargo-cache@main
