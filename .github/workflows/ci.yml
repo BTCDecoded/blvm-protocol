@@ -149,23 +149,6 @@ jobs:
       
       - name: Run tests
         run: cargo test --lib --tests
-
-      - name: Run tests with coverage
-        continue-on-error: true
-        run: |
-          if ! command -v cargo-tarpaulin >/dev/null 2>&1; then
-            cargo install cargo-tarpaulin --version 0.27.0 --locked
-          fi
-          mkdir -p coverage
-          # Library crate: no [[bin]] targets — omit --bins (avoids "no targets matched" noise).
-          cargo tarpaulin --lib --tests --out xml --output-dir coverage --skip-clean --timeout 180 \
-            || echo "⚠️  tarpaulin exited non-zero (coverage upload skipped); test step above is authoritative"
-      
-      - name: Upload coverage to Codecov
-        continue-on-error: true
-        uses: codecov/codecov-action@v3
-        with:
-          file: coverage/cobertura.xml
       
       - name: Save Cargo cache
         if: always()
