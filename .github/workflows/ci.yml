@@ -109,9 +109,11 @@ jobs:
         uses: BTCDecoded/rust-ci/install-rust-toolchain@main
 
       - name: Run tests
-        # --test-threads=1 prevents OOM on shared self-hosted runners where
-        # multiple jobs compete for memory. Tests are fast enough that the
-        # serialisation cost is negligible compared to a blank OOM kill.
+        # CARGO_BUILD_JOBS=1 limits link parallelism (biggest RSS spike).
+        # --test-threads=1 serialises test execution.
+        # Together they prevent blank OOM kills on shared self-hosted runners.
+        env:
+          CARGO_BUILD_JOBS: '1'
         run: cargo test --lib --tests -- --test-threads=1
       
       - name: Save Cargo cache
