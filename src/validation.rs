@@ -291,7 +291,6 @@ mod tests {
     use super::*;
     use blvm_consensus::types::{OutPoint, TransactionInput, TransactionOutput};
     use blvm_consensus::{Block, BlockHeader, Transaction};
-    use std::collections::HashMap;
 
     #[test]
     fn test_validation_rules() {
