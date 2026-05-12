@@ -9,13 +9,13 @@ use blvm_protocol::payment::{
 };
 /// Test helper: Generate a test keypair as raw bytes.
 /// blvm-protocol signs with &[u8; 32]; blvm_secp256k1 derives the public key.
-fn generate_test_keypair() -> ([u8; 32], Vec<u8>) {
+fn generate_test_keypair() -> ([u8; 32], [u8; 33]) {
     let secret_bytes = [1u8; 32];
     let mut scalar = blvm_secp256k1::scalar::Scalar::zero();
     scalar.set_b32(&secret_bytes);
     let ge = blvm_secp256k1::ecdsa::pubkey_from_secret(&scalar);
     let pubkey_bytes = blvm_secp256k1::ecdsa::ge_to_compressed(&ge);
-    (secret_bytes, pubkey_bytes.to_vec())
+    (secret_bytes, pubkey_bytes)
 }
 
 /// Test helper: Create a test payment output
