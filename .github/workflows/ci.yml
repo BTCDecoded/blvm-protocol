@@ -344,12 +344,12 @@ jobs:
           fi
           echo "✅ blvm-spec-lock verification passed"
 
-  # Fuzz is skippable via commit message `[skip_fuzz]` on push (skips fuzz-build + all fuzz shards; build still runs).
-  fuzz-build:
-    name: Fuzz (build once)
+  # Fuzz is skippable via commit message `[skip_fuzz]` on push (build still runs).
+  fuzz:
+    name: Fuzz
     needs: [setup]
     runs-on: [self-hosted, Linux, X64, builds]
-    timeout-minutes: 60
+    timeout-minutes: 30
     if: |
       (github.event_name != 'push' || github.event.head_commit == null || 
        (!contains(github.event.head_commit.message, '[skip ci]') &&
@@ -391,62 +391,12 @@ jobs:
           chmod +x init_corpus.sh
           ./init_corpus.sh
 
-      # Do not set RUSTFLAGS here: cargo-fuzz already injects sancov + ASAN; duplicating
-      # -Cpasses=sancov-module breaks the link step (sancov ctors discarded with --gc-sections).
-      - name: Build all fuzz binaries (once per workflow)
+      # cargo-fuzz injects sancov + ASAN; do not set RUSTFLAGS here.
+      - name: Build fuzz binaries
         working-directory: fuzz
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           cargo +nightly fuzz build
-
-      - name: Save Cargo cache
-        if: always()
-        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
-        with:
-          operation: save
-
-      - name: Stash fuzz target for shard jobs
-        run: |
-          STASH="/tmp/gh-fuzz-blvm-protocol/${GITHUB_RUN_ID}"
-          rm -rf "$STASH"
-          mkdir -p "$STASH"
-          cp -a fuzz/target "$STASH/"
-
-  fuzz:
-    name: Fuzz (all targets, parallel)
-    needs: [setup, fuzz-build]
-    runs-on: [self-hosted, Linux, X64, builds]
-    timeout-minutes: 30
-    if: |
-      (github.event_name != 'push' || github.event.head_commit == null || 
-       (!contains(github.event.head_commit.message, '[skip ci]') &&
-        !contains(github.event.head_commit.message, '[ci skip]') &&
-        !contains(github.event.head_commit.message, '[no ci]'))) &&
-      (github.event_name != 'push' || github.event.head_commit == null || 
-       !contains(github.event.head_commit.message, '[skip_fuzz]')) &&
-      (github.event_name != 'workflow_dispatch' || github.event.inputs.skip_tests != 'true')
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Initialize corpus dirs
-        working-directory: fuzz
-        run: |
-          chmod +x init_corpus.sh
-          ./init_corpus.sh
-
-      - name: Restore fuzz target from stash or workspace
-        run: |
-          if [ -d "fuzz/target" ]; then
-            echo "✅ fuzz/target present in workspace (single-runner path)."
-          else
-            STASH="/tmp/gh-fuzz-blvm-protocol/${GITHUB_RUN_ID}"
-            if [ ! -d "$STASH/target" ]; then
-              echo "❌ fuzz/target missing from workspace and stash ($STASH/target not found)."
-              exit 1
-            fi
-            cp -a "$STASH/target" fuzz/target
-            echo "✅ fuzz/target restored from stash."
-          fi
 
       - name: Run all libFuzzer binaries in parallel
         working-directory: fuzz
@@ -456,32 +406,27 @@ jobs:
           mapfile -t bins < <(grep -v '^#' TARGETS.md | grep -v '^$' || true)
           JOBS=$(nproc)
           echo "Running ${#bins[@]} fuzz targets across $JOBS cores in parallel"
-
-          # Write a runner script for xargs -P
           RUNSCRIPT=$(mktemp /tmp/fuzz-run-XXXXXX.sh)
           cat > "$RUNSCRIPT" << 'SCRIPT'
           #!/usr/bin/env bash
           t=$1
           bin="$PWD/target/x86_64-unknown-linux-gnu/release/$t"
-          if [ ! -x "$bin" ]; then
-            echo "❌ missing: $bin"
-            exit 1
-          fi
+          if [ ! -x "$bin" ]; then echo "❌ missing: $bin"; exit 1; fi
           echo "▶ $t"
-          timeout 210 "$bin" "corpus/$t" -- \
-            -max_total_time=60 \
-            -timeout=10 \
-            -max_len=100000 \
-            2>&1 | tail -3
+          timeout 210 "$bin" "corpus/$t" -- -max_total_time=60 -timeout=10 -max_len=100000 2>&1 | tail -3
           echo "✓ $t"
           SCRIPT
           chmod +x "$RUNSCRIPT"
-
-          # Run all targets in parallel, collect exit codes
           printf '%s\n' "${bins[@]}" | xargs -P"$JOBS" -I{} bash "$RUNSCRIPT" {}
           EXIT=$?
           rm -f "$RUNSCRIPT"
           exit $EXIT
+
+      - name: Save Cargo cache
+        if: always()
+        uses: BTCDecoded/rust-ci/runner-cargo-cache@main
+        with:
+          operation: save
 
   build:
     name: Build
@@ -493,7 +438,6 @@ jobs:
       - docs
       - security
       - verify
-      - fuzz-build
       - fuzz
     runs-on: [self-hosted, Linux, X64, builds]
     if: |
@@ -511,8 +455,7 @@ jobs:
         (needs.docs.result == 'success' || needs.docs.result == 'skipped') &&
         (needs.security.result == 'success' || needs.security.result == 'skipped') &&
         (needs.verify.result == 'success' || needs.verify.result == 'skipped') &&
-        ((needs.fuzz-build.result == 'success' && needs.fuzz.result == 'success') ||
-         (needs.fuzz-build.result == 'skipped' && needs.fuzz.result == 'skipped'))))
+        (needs.fuzz.result == 'success' || needs.fuzz.result == 'skipped')))
     steps:
       - uses: actions/checkout@v4
       
@@ -545,7 +488,7 @@ jobs:
 
   release:
     name: Release
-    needs: [build, test, clippy, fmt, docs, security, verify, fuzz-build, fuzz]
+    needs: [build, test, clippy, fmt, docs, security, verify, fuzz]
     runs-on: [self-hosted, Linux, X64, builds]
     if: |
       always() &&
@@ -564,8 +507,7 @@ jobs:
         (needs.docs.result == 'success' || needs.docs.result == 'skipped') &&
         (needs.security.result == 'success' || needs.security.result == 'skipped') &&
         (needs.verify.result == 'success' || needs.verify.result == 'skipped') &&
-        ((needs.fuzz-build.result == 'success' && needs.fuzz.result == 'success') ||
-         (needs.fuzz-build.result == 'skipped' && needs.fuzz.result == 'skipped'))))
+        (needs.fuzz.result == 'success' || needs.fuzz.result == 'skipped')))
     permissions:
       contents: write
       id-token: write
