@@ -413,15 +413,10 @@ jobs:
           cp -a fuzz/target "$STASH/"
 
   fuzz:
-    name: Fuzz (shard ${{ matrix.shard }}/8)
+    name: Fuzz (all targets, parallel)
     needs: [setup, fuzz-build]
     runs-on: [self-hosted, Linux, X64, builds]
-    timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      max-parallel: 6
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    timeout-minutes: 30
     if: |
       (github.event_name != 'push' || github.event.head_commit == null || 
        (!contains(github.event.head_commit.message, '[skip ci]') &&
@@ -433,9 +428,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Shards only execute prebuilt libFuzzer binaries from fuzz-build (no Cargo/rustup).
-      # `cargo fuzz run` re-invokes Cargo, re-locks, and races rustup on shared runners.
-
       - name: Initialize corpus dirs
         working-directory: fuzz
         run: |
@@ -444,9 +436,6 @@ jobs:
 
       - name: Restore fuzz target from stash or workspace
         run: |
-          # On a single persistent runner the workspace survives between jobs;
-          # fuzz/target is already in place from fuzz-build. Fall back to the
-          # /tmp stash only when the workspace was wiped (e.g. multi-runner pool).
           if [ -d "fuzz/target" ]; then
             echo "✅ fuzz/target present in workspace (single-runner path)."
           else
@@ -459,32 +448,40 @@ jobs:
             echo "✅ fuzz/target restored from stash."
           fi
 
-      - name: Run libFuzzer binaries (TARGETS.md shard)
+      - name: Run all libFuzzer binaries in parallel
         working-directory: fuzz
         env:
           ASAN_OPTIONS: detect_odr_violation=0
         run: |
           mapfile -t bins < <(grep -v '^#' TARGETS.md | grep -v '^$' || true)
-          shard=${{ matrix.shard }}
-          shards=8
-          idx=0
-          for t in "${bins[@]}"; do
-            if (( idx % shards != shard )); then
-              ((idx++)) || true
-              continue
-            fi
-            ((idx++)) || true
-            echo "=== shard $shard/$shards: $t ==="
-            bin="$PWD/target/x86_64-unknown-linux-gnu/release/$t"
-            if [ ! -x "$bin" ]; then
-              echo "missing executable $bin"
-              exit 1
-            fi
-            timeout 210 "$bin" "corpus/$t" -- \
-              -max_total_time=120 \
-              -timeout=10 \
-              -max_len=100000
-          done
+          JOBS=$(nproc)
+          echo "Running ${#bins[@]} fuzz targets across $JOBS cores in parallel"
+
+          # Write a runner script for xargs -P
+          RUNSCRIPT=$(mktemp /tmp/fuzz-run-XXXXXX.sh)
+          cat > "$RUNSCRIPT" << 'SCRIPT'
+          #!/usr/bin/env bash
+          t=$1
+          bin="$PWD/target/x86_64-unknown-linux-gnu/release/$t"
+          if [ ! -x "$bin" ]; then
+            echo "❌ missing: $bin"
+            exit 1
+          fi
+          echo "▶ $t"
+          timeout 210 "$bin" "corpus/$t" -- \
+            -max_total_time=60 \
+            -timeout=10 \
+            -max_len=100000 \
+            2>&1 | tail -3
+          echo "✓ $t"
+          SCRIPT
+          chmod +x "$RUNSCRIPT"
+
+          # Run all targets in parallel, collect exit codes
+          printf '%s\n' "${bins[@]}" | xargs -P"$JOBS" -I{} bash "$RUNSCRIPT" {}
+          EXIT=$?
+          rm -f "$RUNSCRIPT"
+          exit $EXIT
 
   build:
     name: Build
