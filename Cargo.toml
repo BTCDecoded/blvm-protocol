@@ -103,6 +103,7 @@ protocol-verification = ["dep:blvm-spec-lock"]
 
 [dev-dependencies]
 blvm-primitives = { version = ">=0.1, <1", default-features = false }
+blvm-secp256k1 = { version = ">=0.1, <1" }
 
 # Fast release: opt-level 2 for iteration (matches blvm/blvm-node/blvm-consensus)
 [profile.release-fast]

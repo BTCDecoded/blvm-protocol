@@ -7,14 +7,15 @@ use blvm_protocol::payment::{
     Bip70Error, Payment, PaymentACK, PaymentDetails, PaymentOutput, PaymentProtocolServer,
     PaymentRequest, SignedRefundAddress,
 };
-use secp256k1::{Secp256k1, SecretKey};
-
-/// Test helper: Generate a test keypair (secp256k1 0.28 API)
-fn generate_test_keypair() -> (SecretKey, secp256k1::PublicKey) {
-    let secret_key = SecretKey::from_slice(&[1; 32]).unwrap();
-    let secp = Secp256k1::new();
-    let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
-    (secret_key, public_key)
+/// Test helper: Generate a test keypair as raw bytes.
+/// blvm-protocol signs with &[u8; 32]; blvm_secp256k1 derives the public key.
+fn generate_test_keypair() -> ([u8; 32], Vec<u8>) {
+    let secret_bytes = [1u8; 32];
+    let mut scalar = blvm_secp256k1::scalar::Scalar::zero();
+    scalar.set_b32(&secret_bytes);
+    let ge = blvm_secp256k1::ecdsa::pubkey_from_secret(&scalar);
+    let pubkey_bytes = blvm_secp256k1::ecdsa::ge_to_compressed(&ge);
+    (secret_bytes, pubkey_bytes.to_vec())
 }
 
 /// Test helper: Create a test payment output
@@ -70,8 +71,7 @@ fn test_payment_request_creation() {
 #[test]
 fn test_payment_request_with_merchant_key() {
     // Test setting merchant public key
-    let (_, pubkey) = generate_test_keypair();
-    let pubkey_bytes = pubkey.serialize();
+    let (_, pubkey_bytes) = generate_test_keypair();
 
     let outputs = vec![create_test_payment_output()];
     let request = PaymentRequest::new("main".to_string(), outputs, 1234567890)
