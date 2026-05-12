@@ -309,23 +309,11 @@ jobs:
       - name: Install Rust
         uses: BTCDecoded/rust-ci/install-rust-toolchain@main
 
-      - name: Install spec-lock build deps (Z3 / clang)
+      - name: Verify spec-lock build deps (Z3 / clang)
         run: |
-          # Self-hosted runners have no TTY: plain `sudo` cannot prompt. Prefer
-          # pre-installed packages on the runner; otherwise use non-interactive sudo.
-          if pkg-config --exists z3 2>/dev/null && command -v clang >/dev/null 2>&1; then
-            echo "✅ Z3 + clang already available (skipping apt/pacman)."
-            exit 0
-          fi
-          if command -v apt-get >/dev/null 2>&1; then
-            sudo -n apt-get update -qq
-            sudo -n apt-get install -y -qq libz3-dev libclang-dev clang pkg-config
-          elif command -v pacman >/dev/null 2>&1; then
-            sudo -n pacman -Sy --noconfirm z3 llvm clang pkgconf
-          else
-            echo "❌ Need Z3 development libs + clang; install them on this runner or add apt-get/pacman."
-            exit 1
-          fi
+          pkg-config --exists z3 || { echo "❌ libz3-dev not found; install z3 on the runner."; exit 1; }
+          command -v clang >/dev/null 2>&1 || { echo "❌ clang not found; install clang on the runner."; exit 1; }
+          echo "✅ Z3 + clang present."
 
       - name: Install cargo-spec-lock from crates.io
         run: |
