@@ -442,15 +442,22 @@ jobs:
           chmod +x init_corpus.sh
           ./init_corpus.sh
 
-      - name: Restore fuzz target from shared stash
+      - name: Restore fuzz target from stash or workspace
         run: |
-          STASH="/tmp/gh-fuzz-blvm-protocol/${GITHUB_RUN_ID}"
-          if [ ! -d "$STASH/target" ]; then
-            echo "Expected $STASH/target from fuzz-build (same GITHUB_RUN_ID, shared /tmp on runner pool)"
-            exit 1
+          # On a single persistent runner the workspace survives between jobs;
+          # fuzz/target is already in place from fuzz-build. Fall back to the
+          # /tmp stash only when the workspace was wiped (e.g. multi-runner pool).
+          if [ -d "fuzz/target" ]; then
+            echo "✅ fuzz/target present in workspace (single-runner path)."
+          else
+            STASH="/tmp/gh-fuzz-blvm-protocol/${GITHUB_RUN_ID}"
+            if [ ! -d "$STASH/target" ]; then
+              echo "❌ fuzz/target missing from workspace and stash ($STASH/target not found)."
+              exit 1
+            fi
+            cp -a "$STASH/target" fuzz/target
+            echo "✅ fuzz/target restored from stash."
           fi
-          rm -rf fuzz/target
-          cp -a "$STASH/target" fuzz/target
 
       - name: Run libFuzzer binaries (TARGETS.md shard)
         working-directory: fuzz
