@@ -252,8 +252,7 @@ pub mod bip119 {
 pub mod bip152; // BIP152: Compact block relay (wire types)
 pub mod bip157; // BIP157: Client-side block filtering network protocol
 pub mod bip158; // BIP158: Compact block filters
-pub mod fibre;
-pub mod payment; // BIP70: Payment protocol (P2P variant) // FIBRE: Fast Internet Bitcoin Relay Engine protocol definitions
+pub mod payment; // BIP70: Payment protocol (P2P variant)
 pub mod time;
 
 /// Bitcoin Protocol Engine

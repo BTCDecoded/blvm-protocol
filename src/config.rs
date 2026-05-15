@@ -372,10 +372,6 @@ pub struct ProtocolConfig {
     /// Commons-specific extensions configuration
     #[serde(default)]
     pub commons: CommonsExtensionsConfig,
-
-    /// FIBRE protocol configuration
-    #[serde(default)]
-    pub fibre: crate::fibre::FibreConfig,
 }
 
 fn default_protocol_version() -> ProtocolVersion {
@@ -393,7 +389,6 @@ impl Default for ProtocolConfig {
             fee_rates: FeeRateConfig::default(),
             compact_blocks: CompactBlockConfig::default(),
             commons: CommonsExtensionsConfig::default(),
-            fibre: crate::fibre::FibreConfig::default(),
         }
     }
 }

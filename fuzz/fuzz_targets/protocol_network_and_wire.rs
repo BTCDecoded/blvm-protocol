@@ -1,10 +1,9 @@
 #![no_main]
-//! Address / varint / genesis params / spam filter / FIBRE packet decode — bounded, panic-free paths.
+//! Address / varint / genesis params / spam filter — bounded, panic-free paths.
 use std::io::Cursor;
 
 use blvm_protocol::address::BitcoinAddress;
 use blvm_protocol::economic::EconomicParameters;
-use blvm_protocol::fibre::FecChunk;
 use blvm_protocol::genesis::{mainnet_genesis, regtest_genesis, testnet_genesis};
 use blvm_protocol::serialization::transaction::deserialize_transaction;
 use blvm_protocol::spam_filter::{SpamFilter, SpamFilterPreset};
@@ -16,8 +15,6 @@ use blvm_protocol::varint::read_varint;
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    let _ = FecChunk::deserialize(data);
-
     let mut cur = Cursor::new(data);
     let _ = read_varint(&mut cur);
 

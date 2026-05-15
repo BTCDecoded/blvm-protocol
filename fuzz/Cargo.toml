@@ -190,20 +190,6 @@ doc = false
 bench = false
 
 [[bin]]
-name = "protocol_fibre_chunk_deserialize"
-path = "fuzz_targets/protocol_fibre_chunk_deserialize.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
-name = "protocol_fibre_chunk_roundtrip"
-path = "fuzz_targets/protocol_fibre_chunk_roundtrip.rs"
-test = false
-doc = false
-bench = false
-
-[[bin]]
 name = "protocol_misc_time_and_params"
 path = "fuzz_targets/protocol_misc_time_and_params.rs"
 test = false
