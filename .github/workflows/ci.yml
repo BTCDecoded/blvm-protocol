@@ -52,7 +52,7 @@ jobs:
         run: |
           CACHE_ROOT="/tmp/runner-cache/${{ github.repository }}"
           
-          # Generate cache key from Cargo.toml (sibling libraries do not commit Cargo.lock)
+          # Cache key from Cargo.toml + toolchain (root Cargo.lock is not committed per .gitignore).
           DEPS_KEY=$(sha256sum Cargo.toml | cut -d' ' -f1)
           
           # Include toolchain version in cache key
@@ -120,6 +120,19 @@ jobs:
           CARGO_BUILD_JOBS: '1'
           RUST_BACKTRACE: full
         run: cargo test --lib --tests -- --test-threads=1 --nocapture
+
+      # Protocol-local cfg(feature = "production") (e.g. spam_filter, lib.rs) is not enabled by the
+      # default-feature job above; consensus still gets production via blvm-consensus defaults.
+      - name: Compile tests with protocol production feature (no-run)
+        env:
+          CARGO_BUILD_JOBS: '1'
+        run: cargo test --lib --tests --features production --no-run
+
+      - name: Run tests with protocol production feature
+        env:
+          CARGO_BUILD_JOBS: '1'
+          RUST_BACKTRACE: full
+        run: cargo test --lib --tests --features production -- --test-threads=1 --nocapture
       
       - name: Save Cargo cache
         if: always()
