@@ -74,6 +74,10 @@ impl SpamFilterPreset {
         match self {
             Self::Disabled => SpamFilterConfig {
                 filter_ordinals: false,
+                filter_unexec_if: false,
+                filter_null_data_op13: false,
+                filter_null_data_magic: false,
+                filter_data_like_ms: false,
                 filter_dust: false,
                 filter_brc20: false,
                 filter_large_witness: false,
@@ -145,6 +149,14 @@ pub enum SpamType {
     ManySmallOutputs,
     /// Not spam (valid transaction)
     NotSpam,
+    /// Unexecuted `OP_IF` plus a tapscript CHECKSIG remainder.
+    UnexecIf,
+    /// `OP_RETURN OP_13` null-data wrapper.
+    NullDataOp13,
+    /// `OP_RETURN` payload with a known prefix.
+    NullDataMagic,
+    /// Bare multisig whose keys are data, not compressed pubkeys.
+    DataLikeMs,
 }
 
 /// Adaptive witness size thresholds based on script type
@@ -201,6 +213,14 @@ pub struct WitnessElementAnalysis {
 pub struct SpamFilterConfig {
     /// Filter Ordinals/Inscriptions
     pub filter_ordinals: bool,
+    /// Filter unexecuted-IF tapscripts (`ScriptTemplate::UnexecIf`).
+    pub filter_unexec_if: bool,
+    /// Filter `OP_RETURN OP_13` scripts.
+    pub filter_null_data_op13: bool,
+    /// Filter `OP_RETURN` scripts with a known payload prefix.
+    pub filter_null_data_magic: bool,
+    /// Filter data-like bare multisig scripts.
+    pub filter_data_like_ms: bool,
     /// Filter dust outputs
     pub filter_dust: bool,
     /// Filter BRC-20 patterns
@@ -289,6 +309,10 @@ impl Default for SpamFilterConfig {
     fn default() -> Self {
         Self {
             filter_ordinals: true,
+            filter_unexec_if: true,
+            filter_null_data_op13: true,
+            filter_null_data_magic: true,
+            filter_data_like_ms: true,
             filter_dust: true,
             filter_brc20: true,
             filter_large_witness: true,
@@ -396,6 +420,30 @@ impl SpamFilter {
         utxo_set: Option<&UtxoSet>,
     ) -> SpamFilterResult {
         let mut detected_types = Vec::new();
+
+        match blvm_consensus::script::templates::scan_tx(tx, witnesses) {
+            blvm_consensus::script::templates::ScriptTemplate::UnexecIf { .. }
+                if self.config.filter_unexec_if =>
+            {
+                detected_types.push(SpamType::UnexecIf);
+            }
+            blvm_consensus::script::templates::ScriptTemplate::NullDataOp13
+                if self.config.filter_null_data_op13 =>
+            {
+                detected_types.push(SpamType::NullDataOp13);
+            }
+            blvm_consensus::script::templates::ScriptTemplate::NullDataMagic { .. }
+                if self.config.filter_null_data_magic =>
+            {
+                detected_types.push(SpamType::NullDataMagic);
+            }
+            blvm_consensus::script::templates::ScriptTemplate::DataLikeMs { .. }
+                if self.config.filter_data_like_ms =>
+            {
+                detected_types.push(SpamType::DataLikeMs);
+            }
+            _ => {}
+        }
 
         // Check for Ordinals/Inscriptions (now with witness data support)
         if self.config.filter_ordinals && self.detect_ordinals(tx, witnesses, utxo_set) {
@@ -894,26 +942,6 @@ impl SpamFilter {
         if tx_size > 0 { fee / tx_size as u64 } else { 0 }
     }
 
-    /// Calculate fee rate using heuristics (fallback)
-    #[allow(dead_code)]
-    fn calculate_fee_rate_heuristic(&self, tx: &Transaction, tx_size: usize) -> u64 {
-        if tx_size == 0 {
-            return 0;
-        }
-
-        let total_output_value: i64 = tx.outputs.iter().map(|out| out.value).sum();
-
-        // Heuristic: large transactions with small output value likely have low fee rate
-        if tx_size > 1000 && total_output_value < 10000 {
-            // Assume minimal fee (1000 sats) for large transactions
-            1000u64.saturating_div(tx_size as u64)
-        } else {
-            // For other transactions, assume reasonable fee rate
-            // This is conservative - may have false negatives
-            self.config.min_fee_rate
-        }
-    }
-
     /// Detect transactions with large total witness size across all inputs
     fn detect_large_total_witness(&self, witnesses: Option<&[Witness]>) -> bool {
         if !self.config.filter_large_total_witness {
@@ -1203,6 +1231,10 @@ impl SpamFilter {
                         SpamType::LowFeeRate => spam_breakdown.dust += 1, // Count as suspicious
                         SpamType::HighSizeValueRatio => spam_breakdown.ordinals += 1, // Count as Ordinals
                         SpamType::ManySmallOutputs => spam_breakdown.dust += 1, // Count as dust-like
+                        SpamType::UnexecIf
+                        | SpamType::NullDataOp13
+                        | SpamType::NullDataMagic
+                        | SpamType::DataLikeMs => spam_breakdown.ordinals += 1,
                         SpamType::NotSpam => {}
                     }
                 }
@@ -1319,6 +1351,14 @@ impl From<WitnessSizeThresholds> for WitnessSizeThresholdsSerializable {
 pub struct SpamFilterConfigSerializable {
     #[serde(default = "default_true")]
     pub filter_ordinals: bool,
+    #[serde(default = "default_true")]
+    pub filter_unexec_if: bool,
+    #[serde(default = "default_true")]
+    pub filter_null_data_op13: bool,
+    #[serde(default = "default_true")]
+    pub filter_null_data_magic: bool,
+    #[serde(default = "default_true")]
+    pub filter_data_like_ms: bool,
     #[serde(default = "default_true")]
     pub filter_dust: bool,
     #[serde(default = "default_true")]
@@ -1459,6 +1499,10 @@ impl Default for SpamFilterConfigSerializable {
     fn default() -> Self {
         Self {
             filter_ordinals: default_true(),
+            filter_unexec_if: default_true(),
+            filter_null_data_op13: default_true(),
+            filter_null_data_magic: default_true(),
+            filter_data_like_ms: default_true(),
             filter_dust: default_true(),
             filter_brc20: default_true(),
             filter_large_witness: default_true(),
@@ -1492,6 +1536,10 @@ impl From<SpamFilterConfigSerializable> for SpamFilterConfig {
     fn from(serializable: SpamFilterConfigSerializable) -> Self {
         SpamFilterConfig {
             filter_ordinals: serializable.filter_ordinals,
+            filter_unexec_if: serializable.filter_unexec_if,
+            filter_null_data_op13: serializable.filter_null_data_op13,
+            filter_null_data_magic: serializable.filter_null_data_magic,
+            filter_data_like_ms: serializable.filter_data_like_ms,
             filter_dust: serializable.filter_dust,
             filter_brc20: serializable.filter_brc20,
             filter_large_witness: serializable.filter_large_witness,
@@ -1527,6 +1575,10 @@ impl From<SpamFilterConfig> for SpamFilterConfigSerializable {
     fn from(config: SpamFilterConfig) -> Self {
         SpamFilterConfigSerializable {
             filter_ordinals: config.filter_ordinals,
+            filter_unexec_if: config.filter_unexec_if,
+            filter_null_data_op13: config.filter_null_data_op13,
+            filter_null_data_magic: config.filter_null_data_magic,
+            filter_data_like_ms: config.filter_data_like_ms,
             filter_dust: config.filter_dust,
             filter_brc20: config.filter_brc20,
             filter_large_witness: config.filter_large_witness,

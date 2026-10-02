@@ -1,7 +1,7 @@
 //! Bitcoin **TCP v1** framed messages: standard header (magic, command, length, checksum) plus payload.
 //!
-//! This is the full [`ProtocolMessage`] union and [`TcpFramedParser`] (parse/serialize) used by the
-//! full node (`blvm-node`). **BIP324** v2 encrypted transport is the separate `v2_transport`
+//! This is the full [`ProtocolMessage`] union and [`TcpFramedParser`] (parse/serialize).
+//! **BIP324** v2 encrypted transport is the separate `v2_transport`
 //! module (enable `feature = "bip324"`), not this stack.
 //!
 //! The embedding binary supplies which command strings are accepted (e.g. node `ALLOWED_COMMANDS`).

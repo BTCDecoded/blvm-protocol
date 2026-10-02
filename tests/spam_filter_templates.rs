@@ -1,7 +1,7 @@
 //! Filter labels: UnexecIf + Witness, NullDataOp13 + OpReturn, DataLikeMs + Witness.
 
 use blvm_consensus::opcodes::{
-    OP_0, OP_1, OP_2, OP_CHECKMULTISIG, OP_CHECKSIG, OP_ENDIF, OP_IF, OP_RETURN, OP_13,
+    OP_0, OP_1, OP_2, OP_13, OP_CHECKMULTISIG, OP_CHECKSIG, OP_ENDIF, OP_IF, OP_RETURN,
     PUSH_32_BYTES,
 };
 use blvm_consensus::types::{OutPoint, Transaction, TransactionInput, TransactionOutput};

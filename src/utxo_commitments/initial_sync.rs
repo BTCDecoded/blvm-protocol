@@ -340,6 +340,12 @@ impl InitialSync {
                         SpamType::ManySmallOutputs => {
                             spam_summary.by_type.dust += 1; // Count as dust-like
                         }
+                        SpamType::UnexecIf
+                        | SpamType::NullDataOp13
+                        | SpamType::NullDataMagic
+                        | SpamType::DataLikeMs => {
+                            spam_summary.by_type.ordinals += 1;
+                        }
                         SpamType::NotSpam => {}
                     }
                 }
