@@ -787,7 +787,7 @@ mod tests {
                     hash: [0u8; 32],
                     index: 0xffffffff,
                 },
-                script_sig: vec![0x01, 0x00],
+                script_sig: vec![0x00, 0xff],
                 sequence: 0xffffffff,
             }],
             outputs: blvm_consensus::tx_outputs![TransactionOutput {
@@ -819,7 +819,7 @@ mod tests {
             .collect();
         let mut context = ProtocolValidationContext::new(ProtocolVersion::Regtest, 0).unwrap();
         context.network_time = block.header.timestamp;
-        context.median_time_past = block.header.timestamp;
+        context.median_time_past = block.header.timestamp - 1;
 
         let (result, new_utxos) = engine
             .validate_and_connect_block(&block, &witnesses, &utxos, 0, None, &context)
