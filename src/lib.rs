@@ -513,6 +513,7 @@ impl BitcoinProtocolEngine {
     ///
     /// `difficulty_ancestor` maps a height to that header's compact bits and timestamp.
     /// `None` leaves the required-work check to the caller.
+    #[allow(clippy::too_many_arguments)]
     pub fn validate_and_connect_block_with_difficulty(
         &self,
         block: &Block,
