@@ -149,7 +149,20 @@ jobs:
           CARGO_BUILD_JOBS: '1'
           RUST_BACKTRACE: full
         run: cargo test --lib --tests --features production -- --test-threads=1 --nocapture
-      
+
+      # Same feature set as fuzz/Cargo.toml. utxo-commitments tests and the bip324
+      # v2_transport module are cfg'd out of the default and production-only passes.
+      - name: Compile tests with utxo-commitments, bip324, and production (no-run)
+        env:
+          CARGO_BUILD_JOBS: '1'
+        run: cargo test --lib --tests --features utxo-commitments,bip324,production --no-run
+
+      - name: Run tests with utxo-commitments, bip324, and production
+        env:
+          CARGO_BUILD_JOBS: '1'
+          RUST_BACKTRACE: full
+        run: cargo test --lib --tests --features utxo-commitments,bip324,production -- --test-threads=1 --nocapture
+
       - name: Save Cargo cache
         if: always()
         uses: BTCDecoded/rust-ci/runner-cargo-cache@main
