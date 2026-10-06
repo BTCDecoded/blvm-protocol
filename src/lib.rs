@@ -498,6 +498,31 @@ impl BitcoinProtocolEngine {
         recent_headers: Option<&[BlockHeader]>,
         context: &validation::ProtocolValidationContext,
     ) -> Result<(ValidationResult, UtxoSet)> {
+        self.validate_and_connect_block_with_difficulty(
+            block,
+            witnesses,
+            utxos,
+            height,
+            recent_headers,
+            context,
+            None,
+        )
+    }
+
+    /// [`validate_and_connect_block`] plus the ancestor lookup for required `nBits`.
+    ///
+    /// `difficulty_ancestor` maps a height to that header's compact bits and timestamp.
+    /// `None` leaves the required-work check to the caller.
+    pub fn validate_and_connect_block_with_difficulty(
+        &self,
+        block: &Block,
+        witnesses: &[Vec<segwit::Witness>],
+        utxos: &UtxoSet,
+        height: u64,
+        recent_headers: Option<&[BlockHeader]>,
+        context: &validation::ProtocolValidationContext,
+        difficulty_ancestor: Option<block::DifficultyAncestor>,
+    ) -> Result<(ValidationResult, UtxoSet)> {
         // First, protocol validation with witnesses for accurate BIP141 weight check.
         let protocol_result = self
             .validate_block_with_protocol_and_witnesses(block, witnesses, utxos, height, context)?;
@@ -524,6 +549,7 @@ impl BitcoinProtocolEngine {
             self.connect_block_validation_context(recent_headers, network_time)
         };
         consensus_ctx.signet_challenge = self.network_params.signet_challenge.clone();
+        consensus_ctx.difficulty_ancestor = difficulty_ancestor;
         let (result, new_utxo_set, _undo_log) = blvm_consensus::block::connect_block(
             block,
             witnesses,
