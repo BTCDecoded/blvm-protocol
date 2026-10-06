@@ -137,21 +137,9 @@ jobs:
           RUST_BACKTRACE: full
         run: cargo test --lib --tests -- --test-threads=1 --nocapture
 
-      # Protocol-local cfg(feature = "production") (e.g. spam_filter, lib.rs) is not enabled by the
-      # default-feature job above; consensus still gets production via blvm-consensus defaults.
-      - name: Compile tests with protocol production feature (no-run)
-        env:
-          CARGO_BUILD_JOBS: '1'
-        run: cargo test --lib --tests --features production --no-run
-
-      - name: Run tests with protocol production feature
-        env:
-          CARGO_BUILD_JOBS: '1'
-          RUST_BACKTRACE: full
-        run: cargo test --lib --tests --features production -- --test-threads=1 --nocapture
-
-      # Same feature set as fuzz/Cargo.toml. utxo-commitments tests and the bip324
-      # v2_transport module are cfg'd out of the default and production-only passes.
+      # Same feature set as fuzz/Cargo.toml. This pass includes production, so
+      # protocol-local cfg(feature = "production") runs here. utxo-commitments tests
+      # and the bip324 v2_transport module are cfg'd out of the default pass.
       - name: Compile tests with utxo-commitments, bip324, and production (no-run)
         env:
           CARGO_BUILD_JOBS: '1'
