@@ -10,7 +10,12 @@ fn test_all_variants_list() {
     // Test that all variants are returned
     let variants = ProtocolVariant::all_variants();
 
-    assert_eq!(variants.len(), 4);
+    assert_eq!(variants.len(), 5);
+    assert!(
+        variants
+            .iter()
+            .any(|v| v.version == ProtocolVersion::Testnet4)
+    );
     assert!(
         variants
             .iter()

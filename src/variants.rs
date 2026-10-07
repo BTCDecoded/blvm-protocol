@@ -156,7 +156,11 @@ mod tests {
     #[test]
     fn test_protocol_variants() {
         let variants = ProtocolVariant::all_variants();
-        assert_eq!(variants.len(), 4);
+        assert_eq!(variants.len(), 5);
+
+        let testnet4 = ProtocolVariant::for_version(ProtocolVersion::Testnet4).unwrap();
+        assert_eq!(testnet4.name, "Bitcoin Testnet4");
+        assert!(!testnet4.is_production_ready());
 
         let mainnet = ProtocolVariant::for_version(ProtocolVersion::BitcoinV1).unwrap();
         assert_eq!(mainnet.name, "Bitcoin Mainnet");
