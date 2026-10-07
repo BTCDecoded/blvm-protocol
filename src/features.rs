@@ -96,6 +96,7 @@ impl FeatureRegistry {
             ProtocolVersion::Testnet3 => Self::testnet(),
             ProtocolVersion::Regtest => Self::regtest(),
             ProtocolVersion::Signet => Self::signet(),
+            ProtocolVersion::Testnet4 => Self::testnet4(),
         }
     }
 
@@ -303,6 +304,50 @@ impl FeatureRegistry {
                     activation_timestamp: None,
                     activation_method: ActivationMethod::AlwaysActive,
                     bip_number: Some(325),
+                },
+            ],
+        }
+    }
+
+    /// Testnet4 feature activations (Core: buried forks from height 1, BIP94 always).
+    pub fn testnet4() -> Self {
+        Self {
+            protocol_version: ProtocolVersion::Testnet4,
+            features: vec![
+                FeatureActivation {
+                    feature_name: "segwit".to_string(),
+                    activation_height: Some(1),
+                    activation_timestamp: None,
+                    activation_method: ActivationMethod::HeightBased,
+                    bip_number: Some(141),
+                },
+                FeatureActivation {
+                    feature_name: "taproot".to_string(),
+                    activation_height: Some(1),
+                    activation_timestamp: None,
+                    activation_method: ActivationMethod::HeightBased,
+                    bip_number: Some(341),
+                },
+                FeatureActivation {
+                    feature_name: "rbf".to_string(),
+                    activation_height: Some(0),
+                    activation_timestamp: None,
+                    activation_method: ActivationMethod::AlwaysActive,
+                    bip_number: Some(125),
+                },
+                FeatureActivation {
+                    feature_name: "csv".to_string(),
+                    activation_height: Some(1),
+                    activation_timestamp: None,
+                    activation_method: ActivationMethod::HeightBased,
+                    bip_number: Some(112),
+                },
+                FeatureActivation {
+                    feature_name: "cltv".to_string(),
+                    activation_height: Some(1),
+                    activation_timestamp: None,
+                    activation_method: ActivationMethod::HeightBased,
+                    bip_number: Some(65),
                 },
             ],
         }

@@ -1,6 +1,6 @@
 [package]
 name = "blvm-protocol"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2024"
 authors = ["Bitcoin Commons Team"]
 description = "Bitcoin Commons BLVM: Bitcoin protocol abstraction layer for multiple variants and evolution"

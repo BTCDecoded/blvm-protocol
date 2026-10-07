@@ -160,6 +160,58 @@ pub fn regtest_genesis() -> Block {
     }
 }
 
+/// Create Bitcoin testnet4 genesis block (BIP94).
+///
+/// Hash: `00000000da84f2bafbbc53dee25a72ae507ff4914b867c565be350b0da8bf043`
+pub fn testnet4_genesis() -> Block {
+    let msg = b"03/May/2024 000000000000000000001ebd58c244970b3aa9d783bb001011fbe8ea8e98e00e";
+    let mut script_sig = vec![
+        0x04,
+        0xff,
+        0xff,
+        0x00,
+        0x1d,
+        0x01,
+        0x04,
+        0x4c,
+        msg.len() as u8,
+    ];
+    script_sig.extend_from_slice(msg);
+    let mut script_pubkey = vec![0x21];
+    script_pubkey.extend_from_slice(&[0u8; 33]);
+    script_pubkey.push(0xac);
+    let coinbase = Transaction {
+        version: 1,
+        inputs: crate::tx_inputs![TransactionInput {
+            prevout: OutPoint {
+                hash: [0u8; 32],
+                index: 0xffffffff,
+            },
+            script_sig,
+            sequence: 0xffffffff,
+        }],
+        outputs: crate::tx_outputs![TransactionOutput {
+            value: 50_0000_0000,
+            script_pubkey,
+        }],
+        lock_time: 0,
+    };
+    let merkle_root =
+        blvm_consensus::mining::calculate_merkle_root(std::slice::from_ref(&coinbase))
+            .expect("testnet4 genesis merkle root");
+    Block {
+        header: BlockHeader {
+            version: 1,
+            prev_block_hash: [0u8; 32],
+            merkle_root,
+            timestamp: 1_714_777_860,
+            bits: 0x1d00ffff,
+            nonce: 393_743_547,
+        },
+        transactions: vec![coinbase].into_boxed_slice(),
+    }
+}
+
 /// Create Bitcoin signet genesis block (default public signet, BIP325)
 pub fn signet_genesis() -> Block {
     // Hash: 0x00000008819873e925422c1ff0f99f7cc9bbb232af63a077a480a3633bee1ef6
@@ -207,5 +259,38 @@ pub fn signet_genesis() -> Block {
             lock_time: 0,
         }]
         .into_boxed_slice(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn testnet4_genesis_matches_core() {
+        let block = testnet4_genesis();
+        let hash = blvm_consensus::block::block_header_hash(&block.header);
+        let mut display = hash;
+        display.reverse();
+        assert_eq!(
+            hex_encode(&display),
+            "00000000da84f2bafbbc53dee25a72ae507ff4914b867c565be350b0da8bf043"
+        );
+        let mut merkle = block.header.merkle_root;
+        merkle.reverse();
+        assert_eq!(
+            hex_encode(&merkle),
+            "7aa0a7ae1e223414cb807e40cd57e667b718e42aaf9306db9102fe28912b7b4e"
+        );
+    }
+
+    fn hex_encode(bytes: &[u8]) -> String {
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        let mut out = String::with_capacity(bytes.len() * 2);
+        for b in bytes {
+            out.push(HEX[(b >> 4) as usize] as char);
+            out.push(HEX[(b & 0xf) as usize] as char);
+        }
+        out
     }
 }

@@ -49,6 +49,7 @@ impl NetworkConstants {
             ProtocolVersion::Testnet3 => Self::testnet(),
             ProtocolVersion::Regtest => Self::regtest(),
             ProtocolVersion::Signet => Self::signet(),
+            ProtocolVersion::Testnet4 => Self::testnet4(),
         }
     }
 
@@ -138,6 +139,25 @@ impl NetworkConstants {
             dns_seeds: vec![
                 "seed.signet.bitcoin.sprovoost.nl".to_string(),
                 "seed.signet.achownodes.xyz".to_string(),
+            ],
+            checkpoints: vec![],
+        })
+    }
+
+    /// Bitcoin testnet4 constants (BIP94).
+    pub fn testnet4() -> Result<Self> {
+        let genesis = crate::genesis::testnet4_genesis();
+        Ok(Self {
+            magic_bytes: [0x1c, 0x16, 0x3f, 0x28],
+            default_port: 48333,
+            genesis_hash: blvm_consensus::block::block_header_hash(&genesis.header),
+            max_target: 0x1d00ffff,
+            halving_interval: 210_000,
+            network_name: "testnet4".to_string(),
+            is_testnet: true,
+            dns_seeds: vec![
+                "seed.testnet4.bitcoin.sprovoost.nl".to_string(),
+                "seed.testnet4.wiz.biz".to_string(),
             ],
             checkpoints: vec![],
         })

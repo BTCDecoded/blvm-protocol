@@ -271,6 +271,8 @@ pub enum ProtocolVersion {
     Regtest,
     /// Signet test network (BIP325 block-solution challenge)
     Signet,
+    /// Bitcoin testnet4 (BIP94)
+    Testnet4,
 }
 
 impl ProtocolVersion {
@@ -281,6 +283,7 @@ impl ProtocolVersion {
             ProtocolVersion::Testnet3 => types::Network::Testnet,
             ProtocolVersion::Regtest => types::Network::Regtest,
             ProtocolVersion::Signet => types::Network::Signet,
+            ProtocolVersion::Testnet4 => types::Network::Testnet4,
         }
     }
 }
@@ -580,6 +583,9 @@ impl BitcoinProtocolEngine {
             ProtocolVersion::Signet => {
                 matches!(feature, "segwit" | "taproot" | "rbf" | "ctv" | "signet")
             }
+            ProtocolVersion::Testnet4 => {
+                matches!(feature, "segwit" | "taproot" | "rbf" | "ctv")
+            }
         }
     }
 
@@ -615,6 +621,7 @@ impl NetworkParameters {
             ProtocolVersion::Testnet3 => Self::testnet(),
             ProtocolVersion::Regtest => Self::regtest(),
             ProtocolVersion::Signet => Self::signet(),
+            ProtocolVersion::Testnet4 => Self::testnet4(),
         }
     }
 
@@ -669,6 +676,20 @@ impl NetworkParameters {
             max_target: 0x1e0377ae,
             halving_interval: 210_000,
             network_name: "signet".to_string(),
+            is_testnet: true,
+            signet_challenge: None,
+        })
+    }
+
+    /// Bitcoin testnet4 parameters (BIP94).
+    pub fn testnet4() -> Result<Self> {
+        Ok(NetworkParameters {
+            magic_bytes: [0x1c, 0x16, 0x3f, 0x28],
+            default_port: 48333,
+            genesis_block: genesis::testnet4_genesis(),
+            max_target: 0x1d00ffff,
+            halving_interval: 210_000,
+            network_name: "testnet4".to_string(),
             is_testnet: true,
             signet_challenge: None,
         })

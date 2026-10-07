@@ -407,6 +407,7 @@ impl ProtocolConfig {
                 "Testnet3" | "testnet" => ProtocolVersion::Testnet3,
                 "Regtest" | "regtest" => ProtocolVersion::Regtest,
                 "Signet" | "signet" => ProtocolVersion::Signet,
+                "Testnet4" | "testnet4" => ProtocolVersion::Testnet4,
                 _ => ProtocolVersion::BitcoinV1,
             };
         }

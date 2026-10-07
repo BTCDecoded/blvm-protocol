@@ -37,6 +37,7 @@ impl EconomicParameters {
             ProtocolVersion::Testnet3 => Self::testnet(),
             ProtocolVersion::Regtest => Self::regtest(),
             ProtocolVersion::Signet => Self::signet(),
+            ProtocolVersion::Testnet4 => Self::testnet(),
         }
     }
 

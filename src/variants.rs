@@ -55,6 +55,14 @@ impl ProtocolVariant {
                 supports_mining: true,
                 supports_wallet: true,
             },
+            ProtocolVariant {
+                version: ProtocolVersion::Testnet4,
+                name: "Bitcoin Testnet4".to_string(),
+                description: "Testnet4 with BIP94 timewarp mitigation".to_string(),
+                is_production: false,
+                supports_mining: true,
+                supports_wallet: true,
+            },
         ]
     }
 
