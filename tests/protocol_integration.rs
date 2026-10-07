@@ -18,6 +18,9 @@ fn coinbase_script_sig(height: u64) -> Vec<u8> {
     if height == 0 {
         return vec![0x00, 0xff];
     }
+    if (1..=16).contains(&height) {
+        return vec![0x50 + height as u8, 0xff];
+    }
     let mut height_bytes = height.to_le_bytes().to_vec();
     while height_bytes.last() == Some(&0) && height_bytes.len() > 1 {
         height_bytes.pop();
