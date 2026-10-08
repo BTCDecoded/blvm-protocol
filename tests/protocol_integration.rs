@@ -15,25 +15,7 @@ fn block_hash(header: &BlockHeader) -> Hash {
 }
 
 fn coinbase_script_sig(height: u64) -> Vec<u8> {
-    if height == 0 {
-        return vec![0x00, 0xff];
-    }
-    if (1..=16).contains(&height) {
-        return vec![0x50 + height as u8, 0xff];
-    }
-    let mut height_bytes = height.to_le_bytes().to_vec();
-    while height_bytes.last() == Some(&0) && height_bytes.len() > 1 {
-        height_bytes.pop();
-    }
-    if height_bytes.last().is_some_and(|b| b & 0x80 != 0) {
-        height_bytes.push(0x00);
-    }
-    let mut script_sig = vec![height_bytes.len() as u8];
-    script_sig.extend(height_bytes);
-    if script_sig.len() < 2 {
-        script_sig.push(0xff);
-    }
-    script_sig
+    blvm_consensus::bip_validation::encode_bip34_coinbase_script(height)
 }
 
 fn regtest_coinbase_block(prev_hash: Hash, height: u64) -> Block {

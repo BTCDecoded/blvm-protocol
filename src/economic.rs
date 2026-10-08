@@ -4,6 +4,9 @@
 //! Provides comprehensive economic parameters for protocol variants.
 
 use crate::ProtocolVersion;
+use blvm_consensus::constants::INITIAL_SUBSIDY;
+use blvm_consensus::economic::{block_subsidy_at_interval, subsidy_halving_interval};
+use blvm_consensus::types::Network;
 use serde::{Deserialize, Serialize};
 
 /// Economic model parameters for a protocol version
@@ -44,8 +47,8 @@ impl EconomicParameters {
     /// Mainnet economic parameters (Bitcoin production network)
     pub fn mainnet() -> Self {
         Self {
-            initial_subsidy: 50_0000_0000, // 50 BTC in satoshis
-            halving_interval: 210_000,
+            initial_subsidy: INITIAL_SUBSIDY as u64,
+            halving_interval: subsidy_halving_interval(Network::Mainnet),
             max_money_supply: 21_0000_0000_0000_0000, // 21M BTC in satoshis
             coinbase_maturity: 100,                   // 100 blocks
             dust_limit: 546,                          // 546 satoshis
@@ -58,24 +61,14 @@ impl EconomicParameters {
 
     /// Testnet economic parameters (same as mainnet)
     pub fn testnet() -> Self {
-        Self {
-            initial_subsidy: 50_0000_0000,
-            halving_interval: 210_000,
-            max_money_supply: 21_0000_0000_0000_0000,
-            coinbase_maturity: 100,
-            dust_limit: 546,
-            min_fee_rate: 1,
-            max_fee_rate: 1_000_000,
-            min_relay_fee: 1000,
-            subsidy_schedule: Vec::new(),
-        }
+        Self::mainnet()
     }
 
     /// Regtest economic parameters (relaxed for testing)
     pub fn regtest() -> Self {
         Self {
-            initial_subsidy: 50_0000_0000,
-            halving_interval: 150, // Faster halving for testing
+            initial_subsidy: INITIAL_SUBSIDY as u64,
+            halving_interval: subsidy_halving_interval(Network::Regtest),
             max_money_supply: 21_0000_0000_0000_0000,
             coinbase_maturity: 100,
             dust_limit: 546,
@@ -86,19 +79,9 @@ impl EconomicParameters {
         }
     }
 
-    /// Signet economic parameters (same halving schedule as mainnet)
+    /// Signet economic parameters (same schedule as mainnet)
     pub fn signet() -> Self {
-        Self {
-            initial_subsidy: 50_0000_0000,
-            halving_interval: 210_000,
-            max_money_supply: 21_0000_0000_0000_0000,
-            coinbase_maturity: 100,
-            dust_limit: 546,
-            min_fee_rate: 1,
-            max_fee_rate: 1_000_000,
-            min_relay_fee: 1000,
-            subsidy_schedule: Vec::new(),
-        }
+        Self::mainnet()
     }
 
     /// Calculate block subsidy for a given height
@@ -113,16 +96,7 @@ impl EconomicParameters {
             return 0;
         }
 
-        // Use standard halving formula
-        let halving_period = height / self.halving_interval;
-
-        // After 64 halvings, subsidy becomes 0
-        if halving_period >= 64 {
-            return 0;
-        }
-
-        // Calculate: initial_subsidy / 2^halving_period
-        self.initial_subsidy >> halving_period
+        block_subsidy_at_interval(height, self.halving_interval, self.initial_subsidy as i64) as u64
     }
 
     /// Calculate total supply up to a given height

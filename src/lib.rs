@@ -632,7 +632,9 @@ impl NetworkParameters {
             default_port: 8333,
             genesis_block: genesis::mainnet_genesis(),
             max_target: 0x1d00ffff,
-            halving_interval: 210000,
+            halving_interval: blvm_consensus::economic::subsidy_halving_interval(
+                blvm_consensus::types::Network::Mainnet,
+            ),
             network_name: "mainnet".to_string(),
             is_testnet: false,
             signet_challenge: None,
@@ -646,7 +648,9 @@ impl NetworkParameters {
             default_port: 18333,
             genesis_block: genesis::testnet_genesis(),
             max_target: 0x1d00ffff,
-            halving_interval: 210000,
+            halving_interval: blvm_consensus::economic::subsidy_halving_interval(
+                blvm_consensus::types::Network::Testnet,
+            ),
             network_name: "testnet".to_string(),
             is_testnet: true,
             signet_challenge: None,
@@ -660,7 +664,9 @@ impl NetworkParameters {
             default_port: 18444,
             genesis_block: genesis::regtest_genesis(),
             max_target: 0x207fffff, // Easier difficulty for testing
-            halving_interval: 150,  // Faster halving for testing
+            halving_interval: blvm_consensus::economic::subsidy_halving_interval(
+                blvm_consensus::types::Network::Regtest,
+            ),
             network_name: "regtest".to_string(),
             is_testnet: true,
             signet_challenge: None,
@@ -674,7 +680,9 @@ impl NetworkParameters {
             default_port: 38333,
             genesis_block: genesis::signet_genesis(),
             max_target: 0x1e0377ae,
-            halving_interval: 210_000,
+            halving_interval: blvm_consensus::economic::subsidy_halving_interval(
+                blvm_consensus::types::Network::Signet,
+            ),
             network_name: "signet".to_string(),
             is_testnet: true,
             signet_challenge: None,
@@ -688,7 +696,9 @@ impl NetworkParameters {
             default_port: 48333,
             genesis_block: genesis::testnet4_genesis(),
             max_target: 0x1d00ffff,
-            halving_interval: 210_000,
+            halving_interval: blvm_consensus::economic::subsidy_halving_interval(
+                blvm_consensus::types::Network::Testnet4,
+            ),
             network_name: "testnet4".to_string(),
             is_testnet: true,
             signet_challenge: None,
