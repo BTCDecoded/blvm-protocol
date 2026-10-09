@@ -12,10 +12,10 @@ use blvm_spec_lock::spec_locked;
 use crate::wire::{
     deserialize_addrv2, deserialize_cmpctblock, deserialize_feefilter, deserialize_getblocks,
     deserialize_getdata, deserialize_getheaders, deserialize_headers, deserialize_inv,
-    deserialize_notfound, deserialize_reject, deserialize_sendcmpct, deserialize_tx,
+    deserialize_notfound, deserialize_reject, deserialize_sendcmpct, deserialize_tx_with_witness,
     serialize_addrv2, serialize_cmpctblock, serialize_feefilter, serialize_getblocks,
     serialize_getdata, serialize_getheaders, serialize_inv, serialize_notfound, serialize_reject,
-    serialize_sendcmpct, serialize_tx,
+    serialize_sendcmpct, serialize_tx_with_witness,
 };
 use crate::{BlockHeader, Hash, Transaction};
 use anyhow::Result;
@@ -727,9 +727,12 @@ impl TcpFramedParser {
                 Ok(ProtocolMessage::Reject(msg))
             }
             cmd::TX => {
-                let transaction = deserialize_tx(payload)
+                let (transaction, witnesses) = deserialize_tx_with_witness(payload)
                     .map_err(|e| anyhow::anyhow!("Failed to deserialize tx: {}", e))?;
-                Ok(ProtocolMessage::Tx(TxMessage { transaction }))
+                Ok(ProtocolMessage::Tx(TxMessage {
+                    transaction,
+                    witnesses,
+                }))
             }
             cmd::MEMPOOL => Ok(ProtocolMessage::MemPool),
             cmd::FEEFILTER => {
@@ -924,7 +927,8 @@ impl TcpFramedParser {
             ),
             ProtocolMessage::Tx(msg) => (
                 cmd::TX,
-                serialize_tx(&msg.transaction).map_err(|e| anyhow::anyhow!("{}", e))?,
+                serialize_tx_with_witness(&msg.transaction, &msg.witnesses)
+                    .map_err(|e| anyhow::anyhow!("{}", e))?,
             ),
             ProtocolMessage::FeeFilter(msg) => (
                 cmd::FEEFILTER,

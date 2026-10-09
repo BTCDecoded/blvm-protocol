@@ -107,6 +107,9 @@ pub struct BlockMessage {
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct TxMessage {
     pub transaction: Transaction,
+    /// One witness stack per input. Empty when the wire encoding has no witness flag.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub witnesses: Vec<crate::segwit::Witness>,
 }
 
 /// Compact block P2P message: decoded BIP152 compact block.

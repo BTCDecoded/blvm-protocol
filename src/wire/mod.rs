@@ -964,10 +964,36 @@ pub fn deserialize_block(data: &[u8]) -> Result<crate::Block> {
 pub fn serialize_tx(tx: &crate::Transaction) -> Result<Vec<u8>> {
     Ok(crate::serialization::serialize_transaction(tx))
 }
+
+/// Serialize a transaction, including witness stacks when any stack is non-empty.
+pub fn serialize_tx_with_witness(
+    tx: &crate::Transaction,
+    witnesses: &[crate::segwit::Witness],
+) -> Result<Vec<u8>> {
+    let has_witness =
+        witnesses.len() == tx.inputs.len() && witnesses.iter().any(|stack| !stack.is_empty());
+    if has_witness {
+        crate::serialization::serialize_transaction_with_witness(tx, witnesses).map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+        })
+    } else {
+        serialize_tx(tx)
+    }
+}
+
 pub fn deserialize_tx(data: &[u8]) -> Result<crate::Transaction> {
-    crate::serialization::deserialize_transaction(data).map_err(|e| {
-        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
-    })
+    deserialize_tx_with_witness(data).map(|(tx, _)| tx)
+}
+
+/// Deserialize a transaction and the witness stack for each input.
+pub fn deserialize_tx_with_witness(
+    data: &[u8],
+) -> Result<(crate::Transaction, Vec<crate::segwit::Witness>)> {
+    crate::serialization::deserialize_transaction_with_witness(data)
+        .map(|(tx, witnesses, _)| (tx, witnesses))
+        .map_err(|e| {
+            ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
+        })
 }
 
 /// Serialize PingMessage to Bitcoin wire format (8-byte nonce)
@@ -1259,7 +1285,7 @@ pub fn serialize_cmpctblock(cb: &crate::network::CmpctBlockMessage) -> Result<Ve
         last_index = pt.index as i64;
         let tx_bytes = match &pt.witness {
             Some(wit) if wit.iter().any(|w| !w.is_empty()) => {
-                crate::serialization::serialize_transaction_with_witness(&pt.tx, wit)
+                crate::serialization::serialize_transaction_with_witness(&pt.tx, wit)?
             }
             _ => crate::serialization::serialize_transaction(&pt.tx),
         };
@@ -1465,7 +1491,7 @@ pub fn serialize_blocktxn(bt: &crate::network::BlockTxnMessage) -> Result<Vec<u8
             for (tx, wit) in bt.transactions.iter().zip(witnesses.iter()) {
                 buf.extend_from_slice(&crate::serialization::serialize_transaction_with_witness(
                     tx, wit,
-                ));
+                )?);
             }
         }
         _ => {
