@@ -254,11 +254,7 @@ impl TryFrom<crate::bip152::CompactBlock> for CmpctBlockMessage {
             prev_idx = Some(idx);
             let index = u16::try_from(idx)
                 .map_err(|_| CompactBlockWireConvertError::PrefilledIndexTooLarge(idx))?;
-            prefilled_txs.push(PrefilledTransaction {
-                index,
-                tx,
-                witness,
-            });
+            prefilled_txs.push(PrefilledTransaction { index, tx, witness });
         }
         Ok(CmpctBlockMessage {
             header: value.header,
