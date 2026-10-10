@@ -33,11 +33,13 @@ fn test_version_message_too_old() {
         services: 1,
         timestamp: 1234567890,
         addr_recv: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
         },
         addr_from: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
@@ -78,11 +80,13 @@ fn test_version_message_invalid_user_agent_length() {
         services: 1,
         timestamp: 1234567890,
         addr_recv: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
         },
         addr_from: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
@@ -126,6 +130,7 @@ fn test_addr_message_too_many_addresses() {
 
     let addresses: Vec<NetworkAddress> = (0..1001)
         .map(|i| NetworkAddress {
+            time: 0,
             services: 1,
             ip: [i as u8; 16],
             port: 8333,
@@ -412,11 +417,13 @@ fn test_version_message_wrong_network() {
         services: 1,
         timestamp: 1234567890,
         addr_recv: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
         },
         addr_from: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,

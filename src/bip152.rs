@@ -18,6 +18,7 @@ pub struct CompactBlock {
     pub nonce: u64,
     /// Short transaction IDs (6 bytes each)
     pub short_ids: Vec<ShortTxId>,
-    /// Prefilled transactions (full txs for selected indices)
-    pub prefilled_txs: Vec<(usize, Transaction)>,
+    /// Prefilled transactions: block index, transaction, and witness stacks.
+    /// `None` means the transaction has no witness.
+    pub prefilled_txs: Vec<(usize, Transaction, Option<Vec<crate::segwit::Witness>>)>,
 }

@@ -27,6 +27,7 @@ fn test_addr_message_limit() {
     // Test at limit (1000 addresses) - should pass
     let addresses: Vec<NetworkAddress> = (0..1000)
         .map(|i| NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333 + i as u16,
@@ -53,6 +54,7 @@ fn test_addr_message_limit() {
     // Test over limit (1001 addresses) - should reject
     let addresses: Vec<NetworkAddress> = (0..1001)
         .map(|i| NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333 + i as u16,
@@ -475,11 +477,13 @@ fn test_version_message_user_agent_limit() {
         services: 1,
         timestamp: 1234567890,
         addr_recv: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
         },
         addr_from: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,

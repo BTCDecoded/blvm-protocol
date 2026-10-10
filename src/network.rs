@@ -242,12 +242,12 @@ impl TryFrom<crate::bip152::CompactBlock> for CmpctBlockMessage {
     /// Builds a cmpctblock-shaped message from the integration [`crate::bip152::CompactBlock`].
     ///
     /// Prefilled entries are **sorted by transaction index** (required for BIP152 diff-encoding on the wire).
-    /// Witness stacks are not represented on [`crate::bip152::CompactBlock`]; prefilled txs use `witness: None`.
+    /// Witness stacks stored on the compact block are copied onto each prefilled transaction.
     fn try_from(mut value: crate::bip152::CompactBlock) -> std::result::Result<Self, Self::Error> {
-        value.prefilled_txs.sort_by_key(|(i, _)| *i);
+        value.prefilled_txs.sort_by_key(|(i, _, _)| *i);
         let mut prefilled_txs = Vec::with_capacity(value.prefilled_txs.len());
         let mut prev_idx: Option<usize> = None;
-        for (idx, tx) in value.prefilled_txs {
+        for (idx, tx, witness) in value.prefilled_txs {
             if prev_idx == Some(idx) {
                 return Err(CompactBlockWireConvertError::DuplicatePrefilledIndex(idx));
             }
@@ -257,7 +257,7 @@ impl TryFrom<crate::bip152::CompactBlock> for CmpctBlockMessage {
             prefilled_txs.push(PrefilledTransaction {
                 index,
                 tx,
-                witness: None,
+                witness,
             });
         }
         Ok(CmpctBlockMessage {
@@ -278,7 +278,7 @@ impl From<&CmpctBlockMessage> for crate::bip152::CompactBlock {
             prefilled_txs: msg
                 .prefilled_txs
                 .iter()
-                .map(|p| (usize::from(p.index), p.tx.clone()))
+                .map(|p| (usize::from(p.index), p.tx.clone(), p.witness.clone()))
                 .collect(),
         }
     }
@@ -293,7 +293,7 @@ impl From<CmpctBlockMessage> for crate::bip152::CompactBlock {
             prefilled_txs: msg
                 .prefilled_txs
                 .into_iter()
-                .map(|p| (usize::from(p.index), p.tx))
+                .map(|p| (usize::from(p.index), p.tx, p.witness))
                 .collect(),
         }
     }
@@ -325,6 +325,8 @@ pub struct NetworkAddress {
     pub services: u64,
     pub ip: [u8; 16], // IPv6 address (IPv4 mapped to IPv6)
     pub port: u16,
+    /// Advertised unix time. Zero is stored and is outside the relay horizon.
+    pub time: u32,
 }
 
 /// BIP155: Address type for addrv2 message
@@ -422,6 +424,7 @@ impl NetworkAddressV2 {
                     ipv6[11] = 0xff;
                     ipv6[12..16].copy_from_slice(&self.address);
                     Some(NetworkAddress {
+                        time: self.time,
                         services: self.services,
                         ip: ipv6,
                         port: self.port,
@@ -435,6 +438,7 @@ impl NetworkAddressV2 {
                     let mut ipv6 = [0u8; 16];
                     ipv6.copy_from_slice(&self.address);
                     Some(NetworkAddress {
+                        time: self.time,
                         services: self.services,
                         ip: ipv6,
                         port: self.port,
@@ -1183,7 +1187,9 @@ fn process_getblocktxn_message(
                 for &index in &getblocktxn.indices {
                     let idx = index as usize;
                     if idx >= block.transactions.len() {
-                        continue;
+                        return Ok(NetworkResponse::Reject(
+                            "getblocktxn index past end of block".into(),
+                        ));
                     }
                     transactions.push(block.transactions[idx].clone());
                     let tx_witness = stored_witnesses
@@ -1270,4 +1276,60 @@ fn process_banlist_message(_banlist: &commons::BanListMessage) -> Result<Network
     Ok(NetworkResponse::Reject(
         "Ban list relay not implemented".into(),
     ))
+}
+
+#[cfg(test)]
+fn assert_getblocktxn_past_end_rejects() {
+    struct TwoTx;
+    impl ChainStateAccess for TwoTx {
+        fn has_object(&self, _hash: &Hash) -> bool {
+            true
+        }
+        fn get_object(&self, hash: &Hash) -> Option<ChainObject> {
+            let tx = Transaction {
+                version: 1,
+                inputs: vec![].into(),
+                outputs: vec![].into(),
+                lock_time: 0,
+            };
+            let block = Block {
+                header: BlockHeader {
+                    version: 1,
+                    prev_block_hash: [0; 32],
+                    merkle_root: [0; 32],
+                    timestamp: 1,
+                    bits: 1,
+                    nonce: 1,
+                },
+                transactions: vec![tx.clone(), tx].into_boxed_slice(),
+            };
+            if hash == &[9u8; 32] {
+                Some(ChainObject::Block(Arc::new(block)))
+            } else {
+                None
+            }
+        }
+        fn get_headers_for_locator(&self, _locator: &[Hash], _stop: &Hash) -> Vec<BlockHeader> {
+            Vec::new()
+        }
+        fn get_mempool_transactions(&self) -> Vec<Transaction> {
+            Vec::new()
+        }
+    }
+    let msg = GetBlockTxnMessage {
+        block_hash: [9u8; 32],
+        indices: vec![5],
+    };
+    let response =
+        process_getblocktxn_message(&msg, Some(&TwoTx), &ProtocolConfig::default()).unwrap();
+    assert!(
+        matches!(response, NetworkResponse::Reject(_)),
+        "expected reject, got {response:?}"
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn getblocktxn_index_past_block_returns_reject_and_no_blocktxn() {
+    assert_getblocktxn_past_end_rejects();
 }

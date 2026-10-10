@@ -250,7 +250,12 @@ fn deserialize_network_address(data: &[u8]) -> Result<crate::network::NetworkAdd
     // port: u16 big-endian (bytes 24-25)
     let port = u16::from_be_bytes([data[24], data[25]]);
 
-    Ok(crate::network::NetworkAddress { services, ip, port })
+    Ok(crate::network::NetworkAddress {
+        time: 0,
+        services,
+        ip,
+        port,
+    })
 }
 
 /// Serialize VersionMessage to Bitcoin wire format
@@ -422,8 +427,7 @@ pub fn serialize_addr(a: &crate::network::AddrMessage) -> Result<Vec<u8>> {
     write_varint(&mut buf, a.addresses.len() as u64)?;
 
     for addr in &a.addresses {
-        // time: u32 (4 bytes, little-endian) - use 0 when not stored in NetworkAddress
-        buf.extend_from_slice(&0u32.to_le_bytes());
+        buf.extend_from_slice(&addr.time.to_le_bytes());
         // services: u64 (8 bytes, little-endian)
         buf.extend_from_slice(&addr.services.to_le_bytes());
         // address: 16 bytes (IPv6, IPv4-mapped)
@@ -453,7 +457,7 @@ pub fn deserialize_addr(data: &[u8]) -> Result<crate::network::AddrMessage> {
                 "Addr time: {e}"
             ))))
         })?;
-        let _time = u32::from_le_bytes(time_bytes);
+        let time = u32::from_le_bytes(time_bytes);
 
         let mut services_bytes = [0u8; 8];
         cursor.read_exact(&mut services_bytes).map_err(|e| {
@@ -478,7 +482,12 @@ pub fn deserialize_addr(data: &[u8]) -> Result<crate::network::AddrMessage> {
         })?;
         let port = u16::from_be_bytes(port_bytes);
 
-        addresses.push(crate::network::NetworkAddress { services, ip, port });
+        addresses.push(crate::network::NetworkAddress {
+            services,
+            ip,
+            port,
+            time,
+        });
     }
     Ok(crate::network::AddrMessage { addresses })
 }
@@ -1514,7 +1523,7 @@ pub fn deserialize_blocktxn(data: &[u8]) -> Result<crate::network::BlockTxnMessa
     block_hash.copy_from_slice(&data[0..32]);
     let mut cursor = std::io::Cursor::new(&data[32..]);
     let count = read_varint(&mut cursor)? as usize;
-    if count > 2000 {
+    if count > 10000 {
         return Err(ProtocolError::Consensus(ConsensusError::Serialization(
             Cow::Owned("BlockTxn too many transactions".to_string()),
         )));

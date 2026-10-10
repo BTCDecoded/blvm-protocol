@@ -20,11 +20,13 @@ fn test_checksum_calculation() {
         services: 1,
         timestamp: 1234567890,
         addr_recv: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
         },
         addr_from: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
@@ -208,6 +210,7 @@ fn test_version_message_serialization_roundtrip() {
         services: 0x0000000000000001, // NODE_NETWORK
         timestamp: 1234567890,
         addr_recv: NetworkAddress {
+            time: 0,
             services: 0x0000000000000001,
             ip: [
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x7f, 0x00,
@@ -216,6 +219,7 @@ fn test_version_message_serialization_roundtrip() {
             port: 8333,
         },
         addr_from: NetworkAddress {
+            time: 0,
             services: 0x0000000000000001,
             ip: [
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x7f, 0x00,
@@ -263,6 +267,7 @@ fn test_version_message_wire_format_compatibility() {
         services: 0x0000000000000001, // NODE_NETWORK
         timestamp: 1234567890,
         addr_recv: NetworkAddress {
+            time: 0,
             services: 0x0000000000000001,
             ip: [
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x7f, 0x00,
@@ -271,6 +276,7 @@ fn test_version_message_wire_format_compatibility() {
             port: 8333,
         },
         addr_from: NetworkAddress {
+            time: 0,
             services: 0x0000000000000001,
             ip: [
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x7f, 0x00,
@@ -344,11 +350,13 @@ fn test_version_message_user_agent_variants() {
             services: 0x0000000000000001,
             timestamp: 1234567890,
             addr_recv: NetworkAddress {
+                time: 0,
                 services: 0,
                 ip: [0u8; 16],
                 port: 0,
             },
             addr_from: NetworkAddress {
+                time: 0,
                 services: 0,
                 ip: [0u8; 16],
                 port: 0,
@@ -381,6 +389,7 @@ fn test_version_message_network_address_encoding() {
         services: 0,
         timestamp: 0,
         addr_recv: NetworkAddress {
+            time: 0,
             services: 0x0102030405060708,
             ip: [
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0x0a, 0x00,
@@ -389,6 +398,7 @@ fn test_version_message_network_address_encoding() {
             port: 0x1234, // Port 4660
         },
         addr_from: NetworkAddress {
+            time: 0,
             services: 0,
             ip: [0u8; 16],
             port: 0,

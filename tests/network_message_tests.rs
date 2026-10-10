@@ -129,11 +129,13 @@ fn create_test_version_message() -> VersionMessage {
         services: 1,
         timestamp: 1234567890,
         addr_recv: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
         },
         addr_from: NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
@@ -228,11 +230,13 @@ fn test_process_addr_message() {
     let mut peer_state = create_test_peer_state();
     let addresses = vec![
         NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
         },
         NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8334,
@@ -261,6 +265,7 @@ fn test_process_addr_message_too_many() {
     let mut peer_state = create_test_peer_state();
     let addresses: Vec<NetworkAddress> = (0..1001)
         .map(|i| NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333 + i as u16,
@@ -430,11 +435,13 @@ fn test_process_getaddr_message() {
     let mut peer_state = create_test_peer_state();
     peer_state.known_addresses = vec![
         NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8333,
         },
         NetworkAddress {
+            time: 0,
             services: 1,
             ip: [0u8; 16],
             port: 8334,

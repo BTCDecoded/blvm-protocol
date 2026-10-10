@@ -130,6 +130,10 @@ pub mod bip113 {
     pub use blvm_consensus::bip113::*;
 }
 
+pub mod locktime {
+    pub use blvm_consensus::locktime::*;
+}
+
 pub mod bip_validation {
     pub use blvm_consensus::bip_validation::*;
 }

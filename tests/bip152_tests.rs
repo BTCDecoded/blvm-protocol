@@ -724,7 +724,7 @@ fn test_compact_block_to_cmpctblock_sorts_prefilled() {
         header: header.clone(),
         nonce: 42,
         short_ids: vec![],
-        prefilled_txs: vec![(2, tx.clone()), (0, tx.clone())],
+        prefilled_txs: vec![(2, tx.clone(), None), (0, tx.clone(), None)],
     };
 
     let cmpct = CmpctBlockMessage::try_from(cb).unwrap();
@@ -764,7 +764,7 @@ fn test_compact_block_duplicate_prefilled_rejected() {
         },
         nonce: 0,
         short_ids: vec![],
-        prefilled_txs: vec![(1, tx.clone()), (1, tx)],
+        prefilled_txs: vec![(1, tx.clone(), None), (1, tx, None)],
     };
 
     let err = CmpctBlockMessage::try_from(cb).unwrap_err();
@@ -798,7 +798,7 @@ fn test_compact_block_prefilled_index_u16_overflow() {
         },
         nonce: 0,
         short_ids: vec![],
-        prefilled_txs: vec![(65536, tx)],
+        prefilled_txs: vec![(65536, tx, None)],
     };
 
     let err = CmpctBlockMessage::try_from(cb).unwrap_err();
