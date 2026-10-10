@@ -558,19 +558,10 @@ fn test_getblocktxn_out_of_bounds_indices() {
     )
     .unwrap();
 
-    // Should return only valid transactions
-    match response {
-        NetworkResponse::SendMessage(msg) => {
-            match *msg {
-                NetworkMessage::BlockTxn(blocktxn) => {
-                    // Should only have transactions at valid indices
-                    assert!(blocktxn.transactions.len() <= 4);
-                }
-                _ => panic!("Expected BlockTxn message"),
-            }
-        }
-        _ => panic!("Expected SendMessage with BlockTxn"),
-    }
+    assert!(
+        matches!(response, NetworkResponse::Reject(_)),
+        "an index past the block is a reject, got {response:?}"
+    );
 }
 
 #[test]
