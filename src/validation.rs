@@ -275,12 +275,6 @@ impl BitcoinProtocolEngine {
             ));
         }
 
-        if block.transactions.len() > 10000 {
-            return Err(ProtocolError::Validation(
-                "Too many transactions in block (max 10000)".into(),
-            ));
-        }
-
         for tx in &block.transactions {
             self.apply_transaction_protocol_validation(tx, context)?;
         }

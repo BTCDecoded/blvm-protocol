@@ -4,12 +4,11 @@
 //! denial-of-service attacks through oversized messages.
 
 use blvm_protocol::network::{
-    AddrMessage, FeeFilterMessage, GetBlocksMessage, GetDataMessage, HeadersMessage, InvMessage,
-    NetworkAddress, NetworkMessage, NotFoundMessage, PeerState, RejectMessage, VersionMessage,
-    process_network_message,
+    process_network_message, AddrMessage, GetBlocksMessage, GetDataMessage, HeadersMessage,
+    InvMessage, NetworkAddress, NetworkMessage, NotFoundMessage, PeerState, RejectMessage,
+    VersionMessage,
 };
 use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion};
-use std::sync::Arc;
 
 fn create_test_engine() -> BitcoinProtocolEngine {
     BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap()
@@ -513,17 +512,14 @@ fn test_version_message_user_agent_limit() {
 #[test]
 fn test_block_transaction_count_limit() {
     use blvm_consensus::types::UtxoSet;
-    use blvm_consensus::{Block, BlockHeader};
-    use blvm_consensus::{tx_inputs, tx_outputs};
+    use blvm_consensus::{tx_inputs, tx_outputs, Block, BlockHeader};
+    use blvm_protocol::validation::ProtocolValidationContext;
 
     let engine = create_test_engine();
-    let mut peer_state = create_test_peer_state();
-
-    // Create a minimal UTXO set for validation
     let utxo_set = UtxoSet::default();
+    let context = ProtocolValidationContext::new(ProtocolVersion::BitcoinV1, 0).unwrap();
 
-    // Test at limit (10000 transactions) - should pass protocol limit check
-    let transactions: Vec<blvm_consensus::Transaction> = (0..10000)
+    let transactions: Vec<blvm_consensus::Transaction> = (0..12_239)
         .map(|_| blvm_consensus::Transaction {
             version: 1,
             inputs: tx_inputs![],
@@ -531,7 +527,6 @@ fn test_block_transaction_count_limit() {
             lock_time: 0,
         })
         .collect();
-
     let block = Block {
         header: BlockHeader {
             version: 1,
@@ -543,84 +538,45 @@ fn test_block_transaction_count_limit() {
         },
         transactions: transactions.into_boxed_slice(),
     };
-
-    // Check protocol limit first (before validation)
-    // Protocol limit check happens before consensus validation
-    let response = process_network_message(
-        &engine,
-        &NetworkMessage::Block(Arc::new(block), vec![]),
-        &mut peer_state,
-        None, // chain_access
-        Some(&utxo_set),
-        Some(0), // height
-    );
-
-    // The response might be an error due to invalid block (consensus validation),
-    // but we're testing protocol limits, not consensus validation
-    // So we check if it's a rejection due to transaction count limit
-    let response = match response {
-        Ok(r) => r,
-        Err(_) => {
-            // If validation fails, that's expected for a test block
-            // We're only checking protocol limits here
-            // The protocol limit check happens before validation, so if we get here,
-            // the protocol limit was not exceeded
-            return;
-        }
-    };
-
-    // Should pass (at limit)
-    // Note: Actual validation requires UTXO set, so this may fail validation
-    // but should not fail due to transaction count limit
-    assert!(!matches!(
-        response,
-        blvm_protocol::network::NetworkResponse::Reject(ref r) if r.contains("Too many transactions")
-    ));
-
-    // Test over limit (10001 transactions) - should reject due to protocol limit
-    let transactions: Vec<blvm_consensus::Transaction> = (0..10001)
-        .map(|_| blvm_consensus::Transaction {
-            version: 1,
-            inputs: tx_inputs![],
-            outputs: tx_outputs![],
-            lock_time: 0,
-        })
-        .collect();
-
-    let block = Block {
-        header: BlockHeader {
-            version: 1,
-            prev_block_hash: [0u8; 32],
-            merkle_root: [0u8; 32],
-            timestamp: 1231006505,
-            bits: 0x1d00ffff,
-            nonce: 0,
-        },
-        transactions: transactions.into_boxed_slice(),
-    };
-
-    // Protocol limit check should reject before validation
-    // But we still need to provide utxo_set and height for the function signature
-    let response = process_network_message(
-        &engine,
-        &NetworkMessage::Block(Arc::new(block), vec![]),
-        &mut peer_state,
-        None, // chain_access
-        Some(&utxo_set),
-        Some(0), // height
-    );
-
-    // Should be rejected due to transaction count limit (protocol limit check happens first)
-    match response {
-        Ok(blvm_protocol::network::NetworkResponse::Reject(ref r)) => {
-            assert!(r.contains("Too many transactions") || r.contains("Message size exceeds"));
-        }
-        Ok(_) => {
-            // If it passes protocol limit but fails validation, that's also acceptable
-            // The important thing is it doesn't pass both protocol limit AND validation
-        }
-        Err(_) => {
-            // Error is also acceptable - protocol limit check may return error
+    match engine.validate_block_with_protocol(&block, &utxo_set, 0, &context) {
+        Ok(_) => {}
+        Err(err) => {
+            let msg = err.to_string();
+            assert!(
+                !msg.contains("Too many transactions"),
+                "count cap rejected a 12239-transaction block: {msg}"
+            );
+            assert!(
+                msg.contains("Block weight exceeds"),
+                "unexpected rejection: {msg}"
+            );
         }
     }
+
+    let heavy = Block {
+        header: BlockHeader {
+            version: 1,
+            prev_block_hash: [0u8; 32],
+            merkle_root: [0u8; 32],
+            timestamp: 1231006505,
+            bits: 0x1d00ffff,
+            nonce: 0,
+        },
+        transactions: vec![blvm_consensus::Transaction {
+            version: 1,
+            inputs: tx_inputs![],
+            outputs: tx_outputs![blvm_consensus::TransactionOutput {
+                value: 0,
+                script_pubkey: vec![0u8; 1_100_000].into(),
+            }],
+            lock_time: 0,
+        }]
+        .into_boxed_slice(),
+    };
+    let err = engine
+        .validate_block_with_protocol(&heavy, &utxo_set, 0, &context)
+        .expect_err("overweight block");
+    let msg = err.to_string();
+    assert!(msg.contains("Block weight exceeds"), "{msg}");
+    assert!(!msg.contains("Too many transactions"), "{msg}");
 }
