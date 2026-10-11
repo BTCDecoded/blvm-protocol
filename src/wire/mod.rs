@@ -9,16 +9,16 @@
 //! - Checksum: First 4 bytes of double SHA256 of payload
 //! - Payload: Message-specific data
 
-use crate::ConsensusError;
-use crate::Result;
 use crate::error::ProtocolError;
 use crate::network::NetworkMessage;
+use crate::ConsensusError;
+use crate::Result;
 use std::borrow::Cow;
 use std::io::Read;
 use std::sync::Arc;
 
 mod frame_header;
-pub use frame_header::{MAX_MESSAGE_PAYLOAD, MESSAGE_HEADER_SIZE, calculate_checksum};
+pub use frame_header::{calculate_checksum, MAX_MESSAGE_PAYLOAD, MESSAGE_HEADER_SIZE};
 
 /// Serialize a network message to Bitcoin P2P wire format
 pub fn serialize_message(message: &NetworkMessage, magic_bytes: [u8; 4]) -> Result<Vec<u8>> {
@@ -1523,7 +1523,8 @@ pub fn deserialize_blocktxn(data: &[u8]) -> Result<crate::network::BlockTxnMessa
     block_hash.copy_from_slice(&data[0..32]);
     let mut cursor = std::io::Cursor::new(&data[32..]);
     let count = read_varint(&mut cursor)? as usize;
-    if count > 10000 {
+    // Same ceiling as compact-block short ids and getblocktxn indexes.
+    if count > 50_000 {
         return Err(ProtocolError::Consensus(ConsensusError::Serialization(
             Cow::Owned("BlockTxn too many transactions".to_string()),
         )));
@@ -1641,4 +1642,38 @@ fn deserialize_banlist(data: &[u8]) -> Result<crate::commons::BanListMessage> {
     bincode::deserialize(data).map_err(|e| {
         ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(e.to_string())))
     })
+}
+
+#[cfg(test)]
+mod blocktxn_count {
+    use super::deserialize_blocktxn;
+
+    fn minimal_tx() -> Vec<u8> {
+        let mut tx = Vec::new();
+        tx.extend_from_slice(&1i32.to_le_bytes());
+        tx.push(0);
+        tx.push(0);
+        tx.extend_from_slice(&0u32.to_le_bytes());
+        tx
+    }
+
+    #[test]
+    fn twelve_thousand_transactions_decode() {
+        let one = minimal_tx();
+        let mut payload = vec![0u8; 32];
+        payload.push(0xfd);
+        payload.extend_from_slice(&12_239u16.to_le_bytes());
+        for _ in 0..12_239 {
+            payload.extend_from_slice(&one);
+        }
+        let msg = deserialize_blocktxn(&payload).expect("12239 transactions fit");
+        assert_eq!(msg.transactions.len(), 12_239);
+
+        let mut over = vec![0u8; 32];
+        over.push(0xfd);
+        over.extend_from_slice(&50_001u16.to_le_bytes());
+        let err = deserialize_blocktxn(&over).unwrap_err();
+        let text = format!("{err:?}");
+        assert!(text.contains("too many"), "{text}");
+    }
 }

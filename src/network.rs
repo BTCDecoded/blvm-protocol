@@ -475,7 +475,11 @@ pub struct PeerState {
     pub known_addresses: Vec<NetworkAddress>,
     pub ping_nonce: Option<u64>,
     pub last_pong: Option<std::time::SystemTime>,
+    /// BIP133 minimum, in satoshis per 1,000 virtual bytes. `None` means the peer sent no filter.
     pub min_fee_rate: Option<u64>,
+    /// BIP37 relay byte. `false` means this peer asked not to receive transaction announcements.
+    /// A version message that omits the byte leaves this `true`.
+    pub relay_tx: bool,
     /// BIP130: peer prefers `headers` over `inv` for block announcements.
     pub prefer_headers: bool,
     /// BIP152: negotiated compact-block version (1 or 2), if peer sent sendcmpct.
@@ -509,6 +513,7 @@ impl PeerState {
             ping_nonce: None,
             last_pong: None,
             min_fee_rate: None,
+            relay_tx: true,
             prefer_headers: false,
             compact_block_version: None,
             prefer_compact_block: false,
