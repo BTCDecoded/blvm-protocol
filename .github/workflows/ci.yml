@@ -358,7 +358,7 @@ jobs:
           command -v jq >/dev/null 2>&1 || { echo "❌ jq not found; install jq on the runner."; exit 1; }
           echo "✅ Z3 + clang + jq present."
 
-          cargo install blvm-spec-lock --version '>=0.1, <1' --locked --features z3
+          cargo install --force blvm-spec-lock --version '>=0.1, <1' --locked --features z3
 
           if [ -f "../blvm-spec/PROTOCOL.md" ] && [ -f "../blvm-spec/ARCHITECTURE.md" ]; then
             SPEC_PATH_ARGS="--spec-path ../blvm-spec/PROTOCOL.md ../blvm-spec/ARCHITECTURE.md"
