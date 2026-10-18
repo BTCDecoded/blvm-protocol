@@ -184,21 +184,18 @@ fn test_filtered_block_edge_case_filters() {
         min_output_value: u64::MAX,
     };
 
-    let get_filtered_block = GetFilteredBlockMessage {
-        request_id: 12345,
-        block_hash: [0x42; 32],
-        filter_preferences: filter_prefs_all,
-        include_bip158_filter: true,
-    };
-
-    // Should handle various filter configurations
-    assert!(get_filtered_block.filter_preferences.filter_ordinals);
-    assert!(get_filtered_block.filter_preferences.filter_dust);
-    assert!(get_filtered_block.filter_preferences.filter_brc20);
-
-    // Test other configurations
-    let _ = filter_prefs_none;
-    let _ = filter_prefs_extreme;
+    for prefs in [filter_prefs_all, filter_prefs_none, filter_prefs_extreme] {
+        let message = GetFilteredBlockMessage {
+            request_id: 12345,
+            block_hash: [0x42; 32],
+            filter_preferences: prefs.clone(),
+            include_bip158_filter: true,
+        };
+        let bytes = bincode::serialize(&message).expect("serialize");
+        let decoded: GetFilteredBlockMessage = bincode::deserialize(&bytes).expect("deserialize");
+        assert_eq!(decoded, message);
+        assert_eq!(decoded.filter_preferences, prefs);
+    }
 }
 
 #[test]

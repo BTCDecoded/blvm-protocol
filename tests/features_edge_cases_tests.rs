@@ -122,13 +122,11 @@ fn test_feature_registry_for_protocol() {
 fn test_feature_registry_is_feature_active() {
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
 
-    // Test with known features
-    // SegWit should be active at high heights
-    let segwit_active = registry.is_feature_active("segwit", 500_000, 1_500_000_000);
-    // May or may not be active depending on activation height
-    let _ = segwit_active;
-
-    // Unknown feature should return false
+    // Mainnet SegWit is height-gated at 481,824. The timestamp cannot open it early.
+    assert!(!registry.is_feature_active("segwit", 481_823, 1_500_000_000));
+    assert!(registry.is_feature_active("segwit", 481_824, 1_500_000_000));
+    assert!(registry.is_feature_active("segwit", 500_000, 1_500_000_000));
+    assert!(!registry.is_feature_active("taproot", 500_000, 1_500_000_000));
     assert!(!registry.is_feature_active("nonexistent_feature", 0, 0));
 }
 
@@ -136,12 +134,10 @@ fn test_feature_registry_is_feature_active() {
 fn test_feature_registry_get_feature() {
     let registry = FeatureRegistry::for_protocol(ProtocolVersion::BitcoinV1);
 
-    // Should be able to get known features
-    let segwit = registry.get_feature("segwit");
-    // May or may not exist depending on registry
-    let _ = segwit;
-
-    // Unknown feature should return None
+    let segwit = registry.get_feature("segwit").expect("segwit");
+    assert_eq!(segwit.feature_name, "segwit");
+    assert_eq!(segwit.activation_height, Some(481_824));
+    assert_eq!(segwit.bip_number, Some(141));
     assert!(registry.get_feature("nonexistent_feature").is_none());
 }
 
@@ -166,8 +162,16 @@ fn test_feature_context_creation() {
 
     let context = registry.create_context(500_000, 1_500_000_000);
 
-    // Context should be created (feature list is valid)
-    let _ = context.active_features().len();
+    assert!(context.segwit);
+    assert!(!context.taproot);
+    assert!(context.csv);
+    assert!(context.cltv);
+    assert!(context.rbf);
+    assert!(!context.ctv);
+    assert_eq!(
+        context.active_features(),
+        vec!["segwit", "csv", "cltv", "rbf"]
+    );
 }
 
 #[test]
