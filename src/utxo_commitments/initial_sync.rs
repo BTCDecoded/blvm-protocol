@@ -128,14 +128,12 @@ impl InitialSync {
         self.peer_consensus
             .verify_consensus_commitment(&consensus, header_chain)?;
 
-        // Step 6: Optional per-UTXO proof verification (requires network proof requests).
+        // Step 6: Per-UTXO proofs. An empty proof list is a failure, not a skip.
         #[cfg(feature = "utxo-proof-verification")]
         {
-            return Err(UtxoCommitmentError::VerificationFailed(
-                "utxo-proof-verification feature is enabled but per-UTXO proof verification is not implemented; \
-                 disable the feature or use full-block sync_forward validation"
-                    .to_string(),
-            ));
+            let commitment =
+                crate::utxo_commitments::peer_consensus::accept_commitment_proofs(&consensus)?;
+            return Ok(commitment);
         }
 
         // Step 7: Return verified commitment

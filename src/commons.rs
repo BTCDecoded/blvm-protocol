@@ -92,6 +92,9 @@ pub struct FilteredBlockMessage {
     pub transaction_indices: Vec<u32>,
     /// Summary of filtered spam
     pub spam_summary: SpamSummary,
+    /// Basic block filter bytes. `None` when this message is not a filter reply.
+    #[serde(default)]
+    pub bip158_filter: Option<Vec<u8>>,
 }
 
 /// GetBanList message - Request ban list from peer

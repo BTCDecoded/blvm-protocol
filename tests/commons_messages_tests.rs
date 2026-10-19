@@ -56,10 +56,13 @@ fn test_getutxoset_message_processing() {
         None,
         None,
         None,
-    )
-    .unwrap();
+    );
 
-    assert_reject_contains(response, "UTXO set relay");
+    let err = response.expect_err("a missing UTXO set is an error");
+    assert!(
+        err.to_string().contains("utxo set is not available"),
+        "{err}"
+    );
 }
 
 #[cfg(feature = "utxo-commitments")]
@@ -80,10 +83,13 @@ fn test_getutxoset_zero_height() {
         None,
         None,
         None,
-    )
-    .unwrap();
+    );
 
-    assert_reject_contains(response, "UTXO set relay");
+    let err = response.expect_err("a missing UTXO set is an error");
+    assert!(
+        err.to_string().contains("utxo set is not available"),
+        "{err}"
+    );
 }
 
 #[cfg(feature = "utxo-commitments")]
@@ -118,7 +124,7 @@ fn test_utxoset_message_processing() {
     )
     .unwrap();
 
-    assert_reject_contains(response, "UTXO set relay");
+    assert_reject_contains(response, "does not match the local set");
 }
 
 #[cfg(feature = "utxo-commitments")]
@@ -154,7 +160,7 @@ fn test_utxoset_chunked_response() {
     )
     .unwrap();
 
-    assert_reject_contains(response, "UTXO set relay");
+    assert_reject_contains(response, "does not match the local set");
 }
 
 // ============================================================================
@@ -188,10 +194,13 @@ fn test_getfilteredblock_message_processing() {
         None,
         None,
         None,
-    )
-    .unwrap();
+    );
 
-    assert_reject_contains(response, "Filtered block relay");
+    let err = response.expect_err("a missing filter is an error");
+    assert!(
+        err.to_string().contains("block filter is not available"),
+        "{err}"
+    );
 }
 
 #[cfg(feature = "utxo-commitments")]
@@ -221,10 +230,13 @@ fn test_getfilteredblock_no_bip158_filter() {
         None,
         None,
         None,
-    )
-    .unwrap();
+    );
 
-    assert_reject_contains(response, "Filtered block relay");
+    let err = response.expect_err("a missing filter is an error");
+    assert!(
+        err.to_string().contains("block filter is not available"),
+        "{err}"
+    );
 }
 
 #[cfg(feature = "utxo-commitments")]
@@ -280,6 +292,7 @@ fn test_filteredblock_message_processing() {
         transactions: vec![filtered_tx],
         transaction_indices: vec![1],
         spam_summary,
+        bip158_filter: None,
     };
 
     let response = process_network_message(
@@ -292,7 +305,7 @@ fn test_filteredblock_message_processing() {
     )
     .unwrap();
 
-    assert_reject_contains(response, "Filtered block relay");
+    assert_reject_contains(response, "does not match the local filter");
 }
 
 #[cfg(feature = "utxo-commitments")]
@@ -332,6 +345,7 @@ fn test_filteredblock_empty_transactions() {
         transactions: vec![], // All filtered
         transaction_indices: vec![],
         spam_summary,
+        bip158_filter: None,
     };
 
     let response = process_network_message(
@@ -344,7 +358,7 @@ fn test_filteredblock_empty_transactions() {
     )
     .unwrap();
 
-    assert_reject_contains(response, "Filtered block relay");
+    assert_reject_contains(response, "does not match the local filter");
 }
 
 // ============================================================================
@@ -371,7 +385,17 @@ fn test_getbanlist_message_processing() {
     )
     .unwrap();
 
-    assert_reject_contains(response, "Ban list relay");
+    match &response {
+        NetworkResponse::SendMessage(message) => match message.as_ref() {
+            NetworkMessage::BanList(list) => assert!(list.entries.is_empty()),
+            other => panic!("expected an empty ban list, got {other:?}"),
+        },
+        NetworkResponse::Ok => {}
+        NetworkResponse::Reject(reason) => {
+            assert!(reason.contains("ban path is not available"), "{reason}")
+        }
+        other => panic!("unexpected ban response: {other:?}"),
+    }
 }
 
 #[test]
@@ -394,7 +418,17 @@ fn test_getbanlist_no_min_score() {
     )
     .unwrap();
 
-    assert_reject_contains(response, "Ban list relay");
+    match &response {
+        NetworkResponse::SendMessage(message) => match message.as_ref() {
+            NetworkMessage::BanList(list) => assert!(list.entries.is_empty()),
+            other => panic!("expected an empty ban list, got {other:?}"),
+        },
+        NetworkResponse::Ok => {}
+        NetworkResponse::Reject(reason) => {
+            assert!(reason.contains("ban path is not available"), "{reason}")
+        }
+        other => panic!("unexpected ban response: {other:?}"),
+    }
 }
 
 #[test]
@@ -432,7 +466,17 @@ fn test_banlist_message_processing() {
     )
     .unwrap();
 
-    assert_reject_contains(response, "Ban list relay");
+    match &response {
+        NetworkResponse::SendMessage(message) => match message.as_ref() {
+            NetworkMessage::BanList(list) => assert!(list.entries.is_empty()),
+            other => panic!("expected an empty ban list, got {other:?}"),
+        },
+        NetworkResponse::Ok => {}
+        NetworkResponse::Reject(reason) => {
+            assert!(reason.contains("ban path is not available"), "{reason}")
+        }
+        other => panic!("unexpected ban response: {other:?}"),
+    }
 }
 
 #[test]
@@ -456,7 +500,17 @@ fn test_banlist_empty_entries() {
     )
     .unwrap();
 
-    assert_reject_contains(response, "Ban list relay");
+    match &response {
+        NetworkResponse::SendMessage(message) => match message.as_ref() {
+            NetworkMessage::BanList(list) => assert!(list.entries.is_empty()),
+            other => panic!("expected an empty ban list, got {other:?}"),
+        },
+        NetworkResponse::Ok => {}
+        NetworkResponse::Reject(reason) => {
+            assert!(reason.contains("ban path is not available"), "{reason}")
+        }
+        other => panic!("unexpected ban response: {other:?}"),
+    }
 }
 
 #[test]
@@ -494,7 +548,17 @@ fn test_banlist_with_signature() {
     )
     .unwrap();
 
-    assert_reject_contains(response, "Ban list relay");
+    match &response {
+        NetworkResponse::SendMessage(message) => match message.as_ref() {
+            NetworkMessage::BanList(list) => assert!(list.entries.is_empty()),
+            other => panic!("expected an empty ban list, got {other:?}"),
+        },
+        NetworkResponse::Ok => {}
+        NetworkResponse::Reject(reason) => {
+            assert!(reason.contains("ban path is not available"), "{reason}")
+        }
+        other => panic!("unexpected ban response: {other:?}"),
+    }
 }
 
 #[test]
@@ -535,5 +599,15 @@ fn test_banlist_multiple_entries() {
     )
     .unwrap();
 
-    assert_reject_contains(response, "Ban list relay");
+    match &response {
+        NetworkResponse::SendMessage(message) => match message.as_ref() {
+            NetworkMessage::BanList(list) => assert!(list.entries.is_empty()),
+            other => panic!("expected an empty ban list, got {other:?}"),
+        },
+        NetworkResponse::Ok => {}
+        NetworkResponse::Reject(reason) => {
+            assert!(reason.contains("ban path is not available"), "{reason}")
+        }
+        other => panic!("unexpected ban response: {other:?}"),
+    }
 }

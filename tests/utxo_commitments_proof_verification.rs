@@ -12,7 +12,7 @@
 mod tests {
     use blvm_consensus::types::{OutPoint, UTXO};
     use blvm_protocol::utxo_commitments::peer_consensus::{
-        ConsensusConfig, ConsensusResult, PeerConsensus,
+        ConsensusConfig, ConsensusResult, PeerConsensus, accept_commitment_proofs,
     };
     use blvm_protocol::utxo_commitments::*;
 
@@ -104,6 +104,7 @@ mod tests {
             agreement_count: 8,
             total_peers: 10,
             agreement_ratio: 0.8,
+            proofs: Vec::new(),
         };
 
         // Test batch verification
@@ -249,6 +250,7 @@ mod tests {
             agreement_count: 8,
             total_peers: 10,
             agreement_ratio: 0.8,
+            proofs: Vec::new(),
         };
 
         // Generate proofs
@@ -343,5 +345,54 @@ mod tests {
                 UtxoMerkleTree::verify_utxo_proof(&commitment, outpoint, utxo, proof).unwrap();
             assert!(is_valid, "Proof should be valid for UTXO at index");
         }
+    }
+
+    #[test]
+    fn a_matching_proof_is_accepted_and_a_mismatch_is_not() {
+        let mut tree = UtxoMerkleTree::new().unwrap();
+        let outpoint = OutPoint {
+            hash: [7; 32],
+            index: 0,
+        };
+        let utxo = UTXO {
+            value: 9000,
+            script_pubkey: vec![0x51].into(),
+            height: 3,
+            is_coinbase: false,
+        };
+        tree.insert(outpoint.clone(), utxo.clone()).unwrap();
+        let commitment = tree.generate_commitment([8; 32], 3);
+        let proof = tree.generate_proof(&outpoint).unwrap();
+        let matching = ConsensusResult {
+            commitment: commitment.clone(),
+            agreement_count: 1,
+            total_peers: 1,
+            agreement_ratio: 1.0,
+            proofs: vec![(outpoint.clone(), utxo.clone(), proof.clone())],
+        };
+        let accepted = accept_commitment_proofs(&matching).expect("matching proof");
+        assert_eq!(accepted.merkle_root, commitment.merkle_root);
+
+        let empty = ConsensusResult {
+            proofs: Vec::new(),
+            ..matching.clone()
+        };
+        let missing = accept_commitment_proofs(&empty).expect_err("empty proofs fail");
+        assert!(matches!(
+            missing,
+            blvm_protocol::utxo_commitments::UtxoCommitmentError::VerificationFailed(_)
+        ));
+
+        let mut wrong = utxo.clone();
+        wrong.value = 1;
+        let mismatched = ConsensusResult {
+            proofs: vec![(outpoint, wrong, proof)],
+            ..matching
+        };
+        let rejected = accept_commitment_proofs(&mismatched).expect_err("mismatch fails");
+        assert!(matches!(
+            rejected,
+            blvm_protocol::utxo_commitments::UtxoCommitmentError::VerificationFailed(_)
+        ));
     }
 }

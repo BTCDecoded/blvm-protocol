@@ -464,6 +464,15 @@ pub enum NetworkResponse {
     Reject(String),
 }
 
+/// Compact block held until `blocktxn` fills the short ids the mempool missed.
+#[derive(Clone)]
+pub(crate) struct PendingCompact {
+    pub header: BlockHeader,
+    pub nonce: u64,
+    pub slots: Vec<Option<(Transaction, Vec<blvm_consensus::segwit::Witness>)>>,
+    pub missing: Vec<(usize, ShortTxId)>,
+}
+
 /// Peer connection state
 #[derive(Clone)]
 pub struct PeerState {
@@ -486,6 +495,8 @@ pub struct PeerState {
     pub compact_block_version: Option<u8>,
     /// BIP152: peer prefers compact blocks when true.
     pub prefer_compact_block: bool,
+    /// Compact block waiting on `blocktxn` for the short ids the mempool did not fill.
+    pub(crate) pending_compact: Option<PendingCompact>,
     /// BIP324: v2 encrypted transport state (if enabled)
     /// Note: V2Transport is not Clone, so we use Option<Box<V2Transport>> for storage
     #[cfg(all(
@@ -517,6 +528,7 @@ impl PeerState {
             prefer_headers: false,
             compact_block_version: None,
             prefer_compact_block: false,
+            pending_compact: None,
             #[cfg(all(
                 feature = "bip324",
                 any(target_arch = "x86_64", target_arch = "aarch64")
@@ -605,6 +617,34 @@ pub trait ChainStateAccess {
     ) -> Option<Vec<Vec<blvm_consensus::segwit::Witness>>> {
         None
     }
+
+    /// Ban entries this node would return from `getbanlist`. Default: none stored.
+    fn ban_entries(&self) -> Vec<crate::commons::BanEntry> {
+        Vec::new()
+    }
+
+    /// Apply one ban the way `setban` does: the address is the IP with port 0, and
+    /// `timestamp` is the absolute unban time (`0` is permanent).
+    fn apply_ban(&self, entry: &crate::commons::BanEntry) -> std::result::Result<(), String> {
+        let _ = entry;
+        Err("ban path is not available".into())
+    }
+
+    /// Stored UTXO commitment for a block, when this node has one.
+    fn stored_utxo_commitment(
+        &self,
+        _block_hash: &Hash,
+    ) -> std::result::Result<Option<crate::commons::UTXOCommitment>, String> {
+        Ok(None)
+    }
+
+    /// Basic block filter for a block, the bytes `getblockfilter` already builds.
+    fn stored_block_filter(
+        &self,
+        _block_hash: &Hash,
+    ) -> std::result::Result<Option<(BlockHeader, Vec<u8>)>, String> {
+        Ok(None)
+    }
 }
 
 /// Process incoming network message
@@ -662,23 +702,39 @@ pub fn process_network_message(
         NetworkMessage::SendCmpct(sendcmpct) => {
             process_sendcmpct_message(sendcmpct, peer_state, config)
         }
-        NetworkMessage::CmpctBlock(cmpctblock) => process_cmpctblock_message(cmpctblock),
+        NetworkMessage::CmpctBlock(cmpctblock) => process_cmpctblock_message(
+            engine,
+            cmpctblock,
+            peer_state,
+            chain_access,
+            utxo_set,
+            height,
+            config,
+        ),
         NetworkMessage::GetBlockTxn(getblocktxn) => {
             process_getblocktxn_message(getblocktxn, chain_access, config)
         }
-        NetworkMessage::BlockTxn(blocktxn) => process_blocktxn_message(blocktxn),
-        #[cfg(feature = "utxo-commitments")]
-        NetworkMessage::GetUTXOSet(getutxoset) => process_getutxoset_message(getutxoset),
-        #[cfg(feature = "utxo-commitments")]
-        NetworkMessage::UTXOSet(utxoset) => process_utxoset_message(utxoset),
-        #[cfg(feature = "utxo-commitments")]
-        NetworkMessage::GetFilteredBlock(getfiltered) => {
-            process_getfilteredblock_message(getfiltered)
+        NetworkMessage::BlockTxn(blocktxn) => {
+            process_blocktxn_message(engine, blocktxn, peer_state, utxo_set, height, config)
         }
         #[cfg(feature = "utxo-commitments")]
-        NetworkMessage::FilteredBlock(filtered) => process_filteredblock_message(filtered),
-        NetworkMessage::GetBanList(getbanlist) => process_getbanlist_message(getbanlist),
-        NetworkMessage::BanList(banlist) => process_banlist_message(banlist),
+        NetworkMessage::GetUTXOSet(getutxoset) => {
+            process_getutxoset_message(getutxoset, chain_access)
+        }
+        #[cfg(feature = "utxo-commitments")]
+        NetworkMessage::UTXOSet(utxoset) => process_utxoset_message(utxoset, chain_access),
+        #[cfg(feature = "utxo-commitments")]
+        NetworkMessage::GetFilteredBlock(getfiltered) => {
+            process_getfilteredblock_message(getfiltered, chain_access)
+        }
+        #[cfg(feature = "utxo-commitments")]
+        NetworkMessage::FilteredBlock(filtered) => {
+            process_filteredblock_message(filtered, chain_access)
+        }
+        NetworkMessage::GetBanList(getbanlist) => {
+            process_getbanlist_message(getbanlist, chain_access)
+        }
+        NetworkMessage::BanList(banlist) => process_banlist_message(banlist, chain_access),
     }
 }
 
@@ -1156,11 +1212,155 @@ fn process_sendcmpct_message(
     Ok(NetworkResponse::Ok)
 }
 
+fn txid_of(tx: &Transaction) -> Hash {
+    use sha2::{Digest, Sha256};
+    let bytes = crate::wire::serialize_tx(tx).unwrap_or_default();
+    let first = Sha256::digest(&bytes);
+    let second = Sha256::digest(first);
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&second);
+    hash
+}
+
+fn header_hash(header: &BlockHeader) -> Hash {
+    use sha2::{Digest, Sha256};
+    let bytes = crate::serialization::serialize_block_header(header);
+    let first = Sha256::digest(&bytes);
+    let second = Sha256::digest(first);
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&second);
+    hash
+}
+
+fn short_id_hex(id: &ShortTxId) -> String {
+    hex::encode(id)
+}
+
+/// Place prefilled transactions and unique mempool matches. Missing short ids stay empty.
+fn begin_pending_compact(
+    msg: &CmpctBlockMessage,
+    mempool: &[Transaction],
+) -> std::result::Result<PendingCompact, String> {
+    let n = msg.short_ids.len() + msg.prefilled_txs.len();
+    let mut slots: Vec<Option<(Transaction, Vec<blvm_consensus::segwit::Witness>)>> = vec![None; n];
+    let mut prefilled = std::collections::HashSet::new();
+    for item in &msg.prefilled_txs {
+        let index = usize::from(item.index);
+        if index >= n || !prefilled.insert(index) {
+            return Err(format!(
+                "prefilled compact-block index {index} is not usable"
+            ));
+        }
+        slots[index] = Some((item.tx.clone(), item.witness.clone().unwrap_or_default()));
+    }
+
+    let mut missing = Vec::new();
+    let mut next = 0usize;
+    for short_id in &msg.short_ids {
+        while prefilled.contains(&next) {
+            next = next.saturating_add(1);
+        }
+        let block_index = next;
+        next = next.saturating_add(1);
+        if block_index >= n {
+            return Err("compact block short ids ran past the transaction list".into());
+        }
+        let mut found: Option<(Transaction, Vec<blvm_consensus::segwit::Witness>)> = None;
+        let mut hits = 0usize;
+        for tx in mempool {
+            let id = crate::bip152::short_tx_id(&msg.header, &txid_of(tx), msg.nonce);
+            if &id == short_id {
+                hits += 1;
+                found = Some((tx.clone(), Vec::new()));
+            }
+        }
+        if hits == 1 {
+            slots[block_index] = found;
+        } else {
+            missing.push((block_index, *short_id));
+        }
+    }
+    Ok(PendingCompact {
+        header: msg.header.clone(),
+        nonce: msg.nonce,
+        slots,
+        missing,
+    })
+}
+
+fn finish_compact_block(
+    engine: &BitcoinProtocolEngine,
+    pending: PendingCompact,
+    utxo_set: Option<&UtxoSet>,
+    height: Option<u64>,
+    config: &ProtocolConfig,
+) -> Result<NetworkResponse> {
+    if !pending.missing.is_empty() {
+        let id = short_id_hex(&pending.missing[0].1);
+        return Ok(NetworkResponse::Reject(format!(
+            "short id {id} matches neither the mempool nor blocktxn"
+        )));
+    }
+    let mut transactions = Vec::with_capacity(pending.slots.len());
+    let mut witnesses = Vec::with_capacity(pending.slots.len());
+    for slot in pending.slots {
+        let Some((tx, witness)) = slot else {
+            return Ok(NetworkResponse::Reject(
+                "compact block still has an empty transaction slot".into(),
+            ));
+        };
+        transactions.push(tx);
+        witnesses.push(witness);
+    }
+    let block = Block::from_parts(pending.header, transactions.into_boxed_slice());
+    match process_block_message(engine, &block, &witnesses, utxo_set, height, config) {
+        Ok(response) => Ok(response),
+        Err(err) if err.to_string().contains("Missing validation context") => {
+            Ok(NetworkResponse::SendMessage(Box::new(
+                NetworkMessage::Block(Arc::new(block), witnesses),
+            )))
+        }
+        Err(err) => Err(err),
+    }
+}
+
 /// Process cmpctblock message (BIP152)
-fn process_cmpctblock_message(_cmpctblock: &CmpctBlockMessage) -> Result<NetworkResponse> {
-    Ok(NetworkResponse::Reject(
-        "Compact block reconstruction not implemented".into(),
-    ))
+fn process_cmpctblock_message(
+    engine: &BitcoinProtocolEngine,
+    cmpctblock: &CmpctBlockMessage,
+    peer_state: &mut PeerState,
+    chain_access: Option<&dyn ChainStateAccess>,
+    utxo_set: Option<&UtxoSet>,
+    height: Option<u64>,
+    config: &ProtocolConfig,
+) -> Result<NetworkResponse> {
+    if !config.compact_blocks.enabled {
+        return Ok(NetworkResponse::Reject("Compact blocks not enabled".into()));
+    }
+    let mempool = chain_access
+        .map(|chain| chain.get_mempool_transactions())
+        .unwrap_or_default();
+    let pending = match begin_pending_compact(cmpctblock, &mempool) {
+        Ok(pending) => pending,
+        Err(reason) => return Ok(NetworkResponse::Reject(reason)),
+    };
+    if pending.missing.is_empty() {
+        peer_state.pending_compact = None;
+        return finish_compact_block(engine, pending, utxo_set, height, config);
+    }
+    let indices: Vec<u16> = pending
+        .missing
+        .iter()
+        .map(|(index, _)| u16::try_from(*index).unwrap_or(u16::MAX))
+        .collect();
+    let block_hash = header_hash(&pending.header);
+    peer_state.pending_compact = Some(pending);
+    Ok(NetworkResponse::SendMessage(Box::new(
+        NetworkMessage::GetBlockTxn(GetBlockTxnMessage {
+            block_hash,
+            indices,
+        }),
+    )))
 }
 
 /// Process getblocktxn message (BIP152)
@@ -1223,60 +1423,220 @@ fn process_getblocktxn_message(
 }
 
 /// Process blocktxn message (BIP152)
-fn process_blocktxn_message(_blocktxn: &BlockTxnMessage) -> Result<NetworkResponse> {
-    Ok(NetworkResponse::Reject(
-        "Compact block reconstruction not implemented".into(),
-    ))
+fn process_blocktxn_message(
+    engine: &BitcoinProtocolEngine,
+    blocktxn: &BlockTxnMessage,
+    peer_state: &mut PeerState,
+    utxo_set: Option<&UtxoSet>,
+    height: Option<u64>,
+    config: &ProtocolConfig,
+) -> Result<NetworkResponse> {
+    let Some(mut pending) = peer_state.pending_compact.clone() else {
+        return Ok(NetworkResponse::Reject(
+            "blocktxn does not match a pending compact block".into(),
+        ));
+    };
+    if header_hash(&pending.header) != blocktxn.block_hash {
+        return Ok(NetworkResponse::Reject(
+            "blocktxn does not match a pending compact block".into(),
+        ));
+    }
+    if blocktxn.transactions.len() != pending.missing.len() {
+        let id = pending
+            .missing
+            .first()
+            .map(|(_, short_id)| short_id_hex(short_id))
+            .unwrap_or_else(|| "none".into());
+        return Ok(NetworkResponse::Reject(format!(
+            "short id {id} matches neither the mempool nor blocktxn"
+        )));
+    }
+    for (i, (index, expected)) in pending.missing.iter().enumerate() {
+        let tx = &blocktxn.transactions[i];
+        let got = crate::bip152::short_tx_id(&pending.header, &txid_of(tx), pending.nonce);
+        if &got != expected {
+            return Ok(NetworkResponse::Reject(format!(
+                "short id {} matches neither the mempool nor blocktxn",
+                short_id_hex(expected)
+            )));
+        }
+        let witness = blocktxn
+            .witnesses
+            .as_ref()
+            .and_then(|all| all.get(i).cloned())
+            .unwrap_or_default();
+        pending.slots[*index] = Some((tx.clone(), witness));
+    }
+    pending.missing.clear();
+    peer_state.pending_compact = None;
+    finish_compact_block(engine, pending, utxo_set, height, config)
 }
 
 #[cfg(feature = "utxo-commitments")]
 /// Process getutxoset message
-fn process_getutxoset_message(_getutxoset: &commons::GetUTXOSetMessage) -> Result<NetworkResponse> {
-    Ok(NetworkResponse::Reject(
-        "UTXO set relay not implemented".into(),
-    ))
+fn process_getutxoset_message(
+    getutxoset: &commons::GetUTXOSetMessage,
+    chain_access: Option<&dyn ChainStateAccess>,
+) -> Result<NetworkResponse> {
+    let Some(chain) = chain_access else {
+        return Err(ProtocolError::Validation(
+            "utxo set is not available".into(),
+        ));
+    };
+    match chain.stored_utxo_commitment(&getutxoset.block_hash) {
+        Ok(Some(commitment)) => Ok(NetworkResponse::SendMessage(Box::new(
+            NetworkMessage::UTXOSet(commons::UTXOSetMessage {
+                request_id: 0,
+                utxo_count: commitment.utxo_count,
+                is_complete: true,
+                chunk_id: None,
+                commitment,
+            }),
+        ))),
+        Ok(None) => Err(ProtocolError::Validation(
+            format!(
+                "no stored UTXO set for block {}",
+                hex::encode(getutxoset.block_hash)
+            )
+            .into(),
+        )),
+        Err(reason) => Err(ProtocolError::Validation(reason.into())),
+    }
 }
 
 #[cfg(feature = "utxo-commitments")]
 /// Process utxoset message
-fn process_utxoset_message(_utxoset: &commons::UTXOSetMessage) -> Result<NetworkResponse> {
-    Ok(NetworkResponse::Reject(
-        "UTXO set relay not implemented".into(),
-    ))
+fn process_utxoset_message(
+    utxoset: &commons::UTXOSetMessage,
+    chain_access: Option<&dyn ChainStateAccess>,
+) -> Result<NetworkResponse> {
+    let Some(chain) = chain_access else {
+        return Ok(NetworkResponse::Reject(
+            "utxo commitment does not match the local set".into(),
+        ));
+    };
+    match chain.stored_utxo_commitment(&utxoset.commitment.block_hash) {
+        Ok(Some(local)) if local == utxoset.commitment => Ok(NetworkResponse::Ok),
+        Ok(_) => Ok(NetworkResponse::Reject(format!(
+            "utxo commitment does not match the local set for {}",
+            hex::encode(utxoset.commitment.block_hash)
+        ))),
+        Err(reason) => Ok(NetworkResponse::Reject(reason)),
+    }
 }
 
 #[cfg(feature = "utxo-commitments")]
 /// Process getfilteredblock message
 fn process_getfilteredblock_message(
-    _getfiltered: &commons::GetFilteredBlockMessage,
+    getfiltered: &commons::GetFilteredBlockMessage,
+    chain_access: Option<&dyn ChainStateAccess>,
 ) -> Result<NetworkResponse> {
-    Ok(NetworkResponse::Reject(
-        "Filtered block relay not implemented".into(),
-    ))
+    let Some(chain) = chain_access else {
+        return Err(ProtocolError::Validation(
+            "block filter is not available".into(),
+        ));
+    };
+    match chain.stored_block_filter(&getfiltered.block_hash) {
+        Ok(Some((header, filter))) => {
+            let commitment = chain
+                .stored_utxo_commitment(&getfiltered.block_hash)
+                .ok()
+                .flatten()
+                .unwrap_or(commons::UTXOCommitment {
+                    merkle_root: [0u8; 32],
+                    total_supply: 0,
+                    utxo_count: 0,
+                    block_height: 0,
+                    block_hash: getfiltered.block_hash,
+                });
+            Ok(NetworkResponse::SendMessage(Box::new(
+                NetworkMessage::FilteredBlock(commons::FilteredBlockMessage {
+                    request_id: getfiltered.request_id,
+                    header,
+                    commitment,
+                    transactions: Vec::new(),
+                    transaction_indices: Vec::new(),
+                    spam_summary: commons::SpamSummary {
+                        filtered_count: 0,
+                        filtered_value: 0,
+                        filter_reasons: 0,
+                    },
+                    bip158_filter: Some(filter),
+                }),
+            )))
+        }
+        Ok(None) => Err(ProtocolError::Validation(
+            format!(
+                "no block filter for {}",
+                hex::encode(getfiltered.block_hash)
+            )
+            .into(),
+        )),
+        Err(reason) => Err(ProtocolError::Validation(reason.into())),
+    }
 }
 
 #[cfg(feature = "utxo-commitments")]
 /// Process filteredblock message
 fn process_filteredblock_message(
-    _filtered: &commons::FilteredBlockMessage,
+    filtered: &commons::FilteredBlockMessage,
+    chain_access: Option<&dyn ChainStateAccess>,
 ) -> Result<NetworkResponse> {
-    Ok(NetworkResponse::Reject(
-        "Filtered block relay not implemented".into(),
-    ))
+    let Some(chain) = chain_access else {
+        return Ok(NetworkResponse::Reject(
+            "filtered block does not match the local filter".into(),
+        ));
+    };
+    let block_hash = header_hash(&filtered.header);
+    match chain.stored_block_filter(&block_hash) {
+        Ok(Some((_, local))) if filtered.bip158_filter.as_ref() == Some(&local) => {
+            Ok(NetworkResponse::Ok)
+        }
+        Ok(_) => Ok(NetworkResponse::Reject(format!(
+            "filtered block does not match the local filter for {}",
+            hex::encode(block_hash)
+        ))),
+        Err(reason) => Ok(NetworkResponse::Reject(reason)),
+    }
 }
 
 /// Process getbanlist message
-fn process_getbanlist_message(_getbanlist: &commons::GetBanListMessage) -> Result<NetworkResponse> {
-    Ok(NetworkResponse::Reject(
-        "Ban list relay not implemented".into(),
-    ))
+fn process_getbanlist_message(
+    getbanlist: &commons::GetBanListMessage,
+    chain_access: Option<&dyn ChainStateAccess>,
+) -> Result<NetworkResponse> {
+    let mut entries = chain_access
+        .map(|chain| chain.ban_entries())
+        .unwrap_or_default();
+    if let Some(min_score) = getbanlist.min_score {
+        entries.retain(|entry| entry.score >= min_score);
+    }
+    Ok(NetworkResponse::SendMessage(Box::new(
+        NetworkMessage::BanList(commons::BanListMessage {
+            request_id: getbanlist.request_id,
+            entries,
+            list_signature: None,
+        }),
+    )))
 }
 
 /// Process banlist message
-fn process_banlist_message(_banlist: &commons::BanListMessage) -> Result<NetworkResponse> {
-    Ok(NetworkResponse::Reject(
-        "Ban list relay not implemented".into(),
-    ))
+fn process_banlist_message(
+    banlist: &commons::BanListMessage,
+    chain_access: Option<&dyn ChainStateAccess>,
+) -> Result<NetworkResponse> {
+    if banlist.entries.is_empty() {
+        return Ok(NetworkResponse::Ok);
+    }
+    let Some(chain) = chain_access else {
+        return Ok(NetworkResponse::Reject("ban path is not available".into()));
+    };
+    for entry in &banlist.entries {
+        if let Err(reason) = chain.apply_ban(entry) {
+            return Ok(NetworkResponse::Reject(reason));
+        }
+    }
+    Ok(NetworkResponse::Ok)
 }
 
 #[cfg(test)]
@@ -1333,4 +1693,409 @@ fn assert_getblocktxn_past_end_rejects() {
 #[test]
 fn getblocktxn_index_past_block_returns_reject_and_no_blocktxn() {
     assert_getblocktxn_past_end_rejects();
+}
+
+#[cfg(test)]
+fn sample_tx(tag: u8) -> Transaction {
+    Transaction {
+        version: 1,
+        inputs: vec![blvm_consensus::types::TransactionInput {
+            prevout: blvm_consensus::types::OutPoint {
+                hash: [tag; 32],
+                index: 0,
+            },
+            script_sig: vec![tag],
+            sequence: 0xffffffff,
+        }]
+        .into(),
+        outputs: vec![blvm_consensus::types::TransactionOutput {
+            value: 1000,
+            script_pubkey: vec![0x51],
+        }]
+        .into(),
+        lock_time: 0,
+    }
+}
+
+#[cfg(test)]
+fn sample_header() -> BlockHeader {
+    BlockHeader {
+        version: 1,
+        prev_block_hash: [2u8; 32],
+        merkle_root: [3u8; 32],
+        timestamp: 1_700_000_000,
+        bits: 0x1d00ffff,
+        nonce: 4,
+    }
+}
+
+#[cfg(test)]
+struct MempoolChain(Transaction);
+
+#[cfg(test)]
+impl ChainStateAccess for MempoolChain {
+    fn has_object(&self, _hash: &Hash) -> bool {
+        false
+    }
+    fn get_object(&self, _hash: &Hash) -> Option<ChainObject> {
+        None
+    }
+    fn get_headers_for_locator(&self, _locator: &[Hash], _stop: &Hash) -> Vec<BlockHeader> {
+        Vec::new()
+    }
+    fn get_mempool_transactions(&self) -> Vec<Transaction> {
+        vec![self.0.clone()]
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn compact_block_rebuilds_from_mempool_and_names_a_miss() {
+    use crate::{BitcoinProtocolEngine, ProtocolVersion};
+    let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
+    let header = sample_header();
+    let coinbase = sample_tx(0);
+    let pooled = sample_tx(7);
+    let nonce = 9u64;
+    let short = crate::bip152::short_tx_id(&header, &txid_of(&pooled), nonce);
+    let cmpct = CmpctBlockMessage {
+        header: header.clone(),
+        nonce,
+        short_ids: vec![short],
+        prefilled_txs: vec![PrefilledTransaction {
+            index: 0,
+            tx: coinbase.clone(),
+            witness: None,
+        }],
+    };
+    let mut peer = PeerState::new();
+    let response = process_cmpctblock_message(
+        &engine,
+        &cmpct,
+        &mut peer,
+        Some(&MempoolChain(pooled.clone())),
+        None,
+        None,
+        &ProtocolConfig::default(),
+    )
+    .unwrap();
+    match response {
+        NetworkResponse::SendMessage(message) => match *message {
+            NetworkMessage::Block(block, _) => {
+                assert_eq!(block.header, header);
+                assert_eq!(block.transactions.len(), 2);
+                assert_eq!(block.transactions[0], coinbase);
+                assert_eq!(block.transactions[1], pooled);
+            }
+            other => panic!("expected the reconstructed block, got {other:?}"),
+        },
+        other => panic!("expected the reconstructed block, got {other:?}"),
+    }
+
+    let missing = [0xabu8; 6];
+    let cmpct = CmpctBlockMessage {
+        header: header.clone(),
+        nonce,
+        short_ids: vec![missing],
+        prefilled_txs: vec![PrefilledTransaction {
+            index: 0,
+            tx: coinbase,
+            witness: None,
+        }],
+    };
+    let mut peer = PeerState::new();
+    let asked = process_cmpctblock_message(
+        &engine,
+        &cmpct,
+        &mut peer,
+        Some(&MempoolChain(pooled.clone())),
+        None,
+        None,
+        &ProtocolConfig::default(),
+    )
+    .unwrap();
+    assert!(matches!(
+        asked,
+        NetworkResponse::SendMessage(ref message) if matches!(**message, NetworkMessage::GetBlockTxn(_))
+    ));
+    let wrong = BlockTxnMessage {
+        block_hash: header_hash(&header),
+        transactions: vec![pooled],
+        witnesses: None,
+    };
+    let rejected = process_blocktxn_message(
+        &engine,
+        &wrong,
+        &mut peer,
+        None,
+        None,
+        &ProtocolConfig::default(),
+    )
+    .unwrap();
+    match rejected {
+        NetworkResponse::Reject(reason) => {
+            assert!(reason.contains(&short_id_hex(&missing)), "{reason}");
+        }
+        other => panic!("expected a named short-id reject, got {other:?}"),
+    }
+}
+
+#[cfg(test)]
+struct BanBook {
+    entries: std::sync::Mutex<Vec<crate::commons::BanEntry>>,
+}
+
+#[cfg(test)]
+impl ChainStateAccess for BanBook {
+    fn has_object(&self, _hash: &Hash) -> bool {
+        false
+    }
+    fn get_object(&self, _hash: &Hash) -> Option<ChainObject> {
+        None
+    }
+    fn get_headers_for_locator(&self, _locator: &[Hash], _stop: &Hash) -> Vec<BlockHeader> {
+        Vec::new()
+    }
+    fn get_mempool_transactions(&self) -> Vec<Transaction> {
+        Vec::new()
+    }
+    fn ban_entries(&self) -> Vec<crate::commons::BanEntry> {
+        self.entries.lock().expect("ban book").clone()
+    }
+    fn apply_ban(&self, entry: &crate::commons::BanEntry) -> std::result::Result<(), String> {
+        self.entries.lock().expect("ban book").push(entry.clone());
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn ban_messages_list_and_apply_without_the_old_reject() {
+    let book = BanBook {
+        entries: std::sync::Mutex::new(Vec::new()),
+    };
+    let empty = process_getbanlist_message(
+        &crate::commons::GetBanListMessage {
+            request_id: 1,
+            min_score: None,
+        },
+        Some(&book),
+    )
+    .unwrap();
+    match empty {
+        NetworkResponse::SendMessage(message) => match *message {
+            NetworkMessage::BanList(list) => assert!(list.entries.is_empty()),
+            other => panic!("expected an empty ban list, got {other:?}"),
+        },
+        other => panic!("expected an empty ban list, got {other:?}"),
+    }
+    let entry = crate::commons::BanEntry {
+        ip: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff, 1, 2, 3, 4],
+        score: 100,
+        reason: 1,
+        timestamp: 1_700_000_000,
+        signature: None,
+    };
+    process_banlist_message(
+        &crate::commons::BanListMessage {
+            request_id: 2,
+            entries: vec![entry.clone()],
+            list_signature: None,
+        },
+        Some(&book),
+    )
+    .unwrap();
+    assert_eq!(book.entries.lock().unwrap().as_slice(), &[entry]);
+    let none = process_getbanlist_message(
+        &crate::commons::GetBanListMessage {
+            request_id: 3,
+            min_score: None,
+        },
+        None,
+    )
+    .unwrap();
+    assert!(matches!(none, NetworkResponse::SendMessage(_)));
+}
+
+#[cfg(all(test, feature = "utxo-commitments"))]
+struct UtxoBook {
+    hash: Hash,
+    commitment: crate::commons::UTXOCommitment,
+    header: BlockHeader,
+    filter: Vec<u8>,
+}
+
+#[cfg(all(test, feature = "utxo-commitments"))]
+impl ChainStateAccess for UtxoBook {
+    fn has_object(&self, _hash: &Hash) -> bool {
+        false
+    }
+    fn get_object(&self, _hash: &Hash) -> Option<ChainObject> {
+        None
+    }
+    fn get_headers_for_locator(&self, _locator: &[Hash], _stop: &Hash) -> Vec<BlockHeader> {
+        Vec::new()
+    }
+    fn get_mempool_transactions(&self) -> Vec<Transaction> {
+        Vec::new()
+    }
+    fn stored_utxo_commitment(
+        &self,
+        block_hash: &Hash,
+    ) -> std::result::Result<Option<crate::commons::UTXOCommitment>, String> {
+        if block_hash == &self.hash {
+            Ok(Some(self.commitment.clone()))
+        } else {
+            Ok(None)
+        }
+    }
+    fn stored_block_filter(
+        &self,
+        block_hash: &Hash,
+    ) -> std::result::Result<Option<(BlockHeader, Vec<u8>)>, String> {
+        if block_hash == &self.hash {
+            Ok(Some((self.header.clone(), self.filter.clone())))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[cfg(all(test, feature = "utxo-commitments"))]
+#[test]
+fn utxo_and_filter_messages_use_the_stored_set() {
+    let hash = [9u8; 32];
+    let commitment = crate::commons::UTXOCommitment {
+        merkle_root: [4u8; 32],
+        total_supply: 50,
+        utxo_count: 2,
+        block_height: 10,
+        block_hash: hash,
+    };
+    let book = UtxoBook {
+        hash,
+        commitment: commitment.clone(),
+        header: sample_header(),
+        filter: vec![0x01, 0x02, 0x03],
+    };
+    let got = process_getutxoset_message(
+        &crate::commons::GetUTXOSetMessage {
+            height: 10,
+            block_hash: hash,
+        },
+        Some(&book),
+    )
+    .unwrap();
+    match got {
+        NetworkResponse::SendMessage(message) => match *message {
+            NetworkMessage::UTXOSet(msg) => assert_eq!(msg.commitment, commitment),
+            other => panic!("expected the stored commitment, got {other:?}"),
+        },
+        other => panic!("expected the stored commitment, got {other:?}"),
+    }
+    let missing = process_getutxoset_message(
+        &crate::commons::GetUTXOSetMessage {
+            height: 11,
+            block_hash: [1u8; 32],
+        },
+        Some(&book),
+    );
+    let err = missing.expect_err("a missing set is an error");
+    assert!(!err.to_string().contains("not implemented"));
+
+    let matched = process_utxoset_message(
+        &crate::commons::UTXOSetMessage {
+            request_id: 1,
+            commitment: commitment.clone(),
+            utxo_count: 2,
+            is_complete: true,
+            chunk_id: None,
+        },
+        Some(&book),
+    )
+    .unwrap();
+    assert!(matches!(matched, NetworkResponse::Ok));
+    let mut other_commitment = commitment.clone();
+    other_commitment.total_supply = 1;
+    let rejected = process_utxoset_message(
+        &crate::commons::UTXOSetMessage {
+            request_id: 1,
+            commitment: other_commitment,
+            utxo_count: 2,
+            is_complete: true,
+            chunk_id: None,
+        },
+        Some(&book),
+    )
+    .unwrap();
+    assert!(matches!(rejected, NetworkResponse::Reject(_)));
+
+    let filter_msg = process_getfilteredblock_message(
+        &crate::commons::GetFilteredBlockMessage {
+            request_id: 7,
+            block_hash: hash,
+            filter_preferences: crate::commons::FilterPreferences {
+                filter_ordinals: false,
+                filter_dust: false,
+                filter_brc20: false,
+                min_output_value: 0,
+            },
+            include_bip158_filter: true,
+        },
+        Some(&book),
+    )
+    .unwrap();
+    let sent_filter = match filter_msg {
+        NetworkResponse::SendMessage(message) => match *message {
+            NetworkMessage::FilteredBlock(msg) => msg.bip158_filter.expect("filter bytes"),
+            other => panic!("expected a filter, got {other:?}"),
+        },
+        other => panic!("expected a filter, got {other:?}"),
+    };
+    assert_eq!(sent_filter, vec![0x01, 0x02, 0x03]);
+
+    let header = sample_header();
+    let stored_hash = header_hash(&header);
+    let book = UtxoBook {
+        hash: stored_hash,
+        commitment,
+        header: header.clone(),
+        filter: vec![0x01, 0x02, 0x03],
+    };
+    let ok = process_filteredblock_message(
+        &crate::commons::FilteredBlockMessage {
+            request_id: 7,
+            header: header.clone(),
+            commitment: book.commitment.clone(),
+            transactions: Vec::new(),
+            transaction_indices: Vec::new(),
+            spam_summary: crate::commons::SpamSummary {
+                filtered_count: 0,
+                filtered_value: 0,
+                filter_reasons: 0,
+            },
+            bip158_filter: Some(vec![0x01, 0x02, 0x03]),
+        },
+        Some(&book),
+    )
+    .unwrap();
+    assert!(matches!(ok, NetworkResponse::Ok));
+    let bad = process_filteredblock_message(
+        &crate::commons::FilteredBlockMessage {
+            request_id: 7,
+            header,
+            commitment: book.commitment.clone(),
+            transactions: Vec::new(),
+            transaction_indices: Vec::new(),
+            spam_summary: crate::commons::SpamSummary {
+                filtered_count: 0,
+                filtered_value: 0,
+                filter_reasons: 0,
+            },
+            bip158_filter: Some(vec![0xff]),
+        },
+        Some(&book),
+    )
+    .unwrap();
+    assert!(matches!(bad, NetworkResponse::Reject(_)));
 }

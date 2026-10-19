@@ -67,6 +67,8 @@ pub struct ConsensusResult {
     pub total_peers: usize,
     /// Agreement percentage (0.0 to 1.0)
     pub agreement_ratio: f64,
+    /// Per-UTXO proofs carried with the commitment. Empty means none were supplied.
+    pub proofs: Vec<(crate::types::OutPoint, crate::types::UTXO, MerkleProof)>,
 }
 
 /// Peer consensus configuration
@@ -389,6 +391,7 @@ impl PeerConsensus {
             agreement_count,
             total_peers,
             agreement_ratio,
+            proofs: Vec::new(),
         })
     }
 
@@ -572,6 +575,20 @@ fn compute_block_hash(header: &BlockHeader) -> Hash {
     let mut hash = [0u8; 32];
     hash.copy_from_slice(&second_hash);
     hash
+}
+
+/// Accept a commitment only when its per-UTXO proofs match. An empty list fails.
+pub fn accept_commitment_proofs(
+    consensus: &ConsensusResult,
+) -> UtxoCommitmentResult<UtxoCommitment> {
+    if consensus.proofs.is_empty() {
+        return Err(UtxoCommitmentError::VerificationFailed(
+            "per-UTXO proof is required".into(),
+        ));
+    }
+    let checker = PeerConsensus::new(ConsensusConfig::default());
+    checker.verify_utxo_proofs(consensus, consensus.proofs.clone())?;
+    Ok(consensus.commitment.clone())
 }
 
 // ============================================================================

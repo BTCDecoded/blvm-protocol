@@ -38,6 +38,7 @@ thiserror = "=1.0.69"
 
 # Cryptography - EXACT VERSIONS for security
 sha2 = "=0.10.9"
+siphasher = "=0.3"
 # ripemd is not used directly in blvm-protocol; blvm-consensus owns OP_HASH160 via its ripemd dep.
 # Pure-Rust secp256k1 (same implementation used by blvm-consensus).
 blvm-secp256k1 = { version = ">=0.1, <1" }
@@ -83,8 +84,8 @@ profile = ["blvm-consensus/profile"]
 benchmarking = ["blvm-consensus/benchmarking"]
 # BIP324: v2 encrypted transport protocol
 bip324 = ["dep:chacha20poly1305", "dep:aead", "dep:getrandom", "dep:hkdf"]
-# UTXO proof verification (optional, for future use)
-utxo-proof-verification = []
+# UTXO proof verification. Off unless this feature is enabled.
+utxo-proof-verification = ["utxo-commitments"]
 # Parallel UTXO proof verification (requires rayon)
 parallel-verification = ["dep:rayon"]
 # Sigop counting module (always available, no feature flag needed)
