@@ -163,6 +163,7 @@ mod tests {
         let merkle_root = calculate_merkle_root(&transactions).expect("merkle root");
         let mut header = create_test_header(1_231_006_505, [0u8; 32]);
         header.merkle_root = merkle_root;
+        blvm_consensus::pow::meet_regtest_proof_of_work(&mut header);
         let block = Block {
             header,
             transactions: transactions.into(),
