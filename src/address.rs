@@ -153,6 +153,9 @@ impl BitcoinAddress {
         // Remaining u5 values are witness program (base32 encoded)
         let program_base32 = &data[1..];
         let witness_program = base32_to_witness_program(program_base32)?;
+        if witness_version == 0 && witness_program.len() != 20 && witness_program.len() != 32 {
+            return Err(AddressError::InvalidWitnessLength);
+        }
 
         // Validate variant matches witness version
         match (witness_version, variant) {

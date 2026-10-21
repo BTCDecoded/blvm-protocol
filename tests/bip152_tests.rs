@@ -287,10 +287,10 @@ fn test_cmpctblock_message_processing() {
     .unwrap();
 
     match response {
-        NetworkResponse::Reject(reason) => {
-            assert!(reason.contains("Compact block reconstruction"));
+        NetworkResponse::SendMessage(message) => {
+            assert!(matches!(message.as_ref(), NetworkMessage::Block(..)));
         }
-        other => panic!("Expected Reject, got {other:?}"),
+        other => panic!("Expected the reconstructed block, got {other:?}"),
     }
 }
 
@@ -345,10 +345,13 @@ fn test_cmpctblock_with_prefilled_txs() {
     .unwrap();
 
     match response {
-        NetworkResponse::Reject(reason) => {
-            assert!(reason.contains("Compact block reconstruction"));
+        NetworkResponse::SendMessage(message) => {
+            let NetworkMessage::Block(block, _) = message.as_ref() else {
+                panic!("Expected the reconstructed block, got {message:?}");
+            };
+            assert_eq!(block.transactions.len(), 1);
         }
-        other => panic!("Expected Reject, got {other:?}"),
+        other => panic!("Expected the reconstructed block, got {other:?}"),
     }
 }
 
@@ -604,7 +607,7 @@ fn test_blocktxn_message_processing() {
 
     match response {
         NetworkResponse::Reject(reason) => {
-            assert!(reason.contains("Compact block reconstruction"));
+            assert!(reason.contains("does not match a pending compact block"));
         }
         other => panic!("Expected Reject, got {other:?}"),
     }
@@ -644,10 +647,10 @@ fn test_cmpctblock_empty_short_ids() {
     .unwrap();
 
     match response {
-        NetworkResponse::Reject(reason) => {
-            assert!(reason.contains("Compact block reconstruction"));
+        NetworkResponse::SendMessage(message) => {
+            assert!(matches!(message.as_ref(), NetworkMessage::Block(..)));
         }
-        other => panic!("Expected Reject, got {other:?}"),
+        other => panic!("Expected the reconstructed block, got {other:?}"),
     }
 }
 

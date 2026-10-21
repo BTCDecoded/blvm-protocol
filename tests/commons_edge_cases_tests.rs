@@ -289,6 +289,7 @@ fn test_filtered_block_large_transaction_lists() {
         transactions,
         transaction_indices,
         spam_summary,
+        bip158_filter: None,
     };
 
     // Should handle large transaction lists
