@@ -3,9 +3,9 @@
 //! End-to-end tests for protocol engine functionality
 
 use blvm_consensus::opcodes::OP_1;
-use blvm_consensus::types::{Hash, OutPoint, TransactionInput, TransactionOutput, UtxoSet, UTXO};
+use blvm_consensus::types::{Hash, OutPoint, TransactionInput, TransactionOutput, UTXO, UtxoSet};
 use blvm_consensus::utxo_set_insert;
-use blvm_consensus::{segwit::Witness, Block, BlockHeader, Transaction};
+use blvm_consensus::{Block, BlockHeader, Transaction, segwit::Witness};
 use blvm_protocol::validation::ProtocolValidationContext;
 use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion, ValidationResult};
 
