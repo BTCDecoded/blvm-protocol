@@ -715,6 +715,16 @@ mod tests {
     use super::*;
     use blvm_consensus::types::{BlockHeader, OutPoint, TransactionInput, TransactionOutput};
 
+    /// Grind the nonce until the header meets its regtest target (about two tries).
+    /// Connect checks proof of work, so block fixtures need real headers.
+    fn mine_regtest(mut header: BlockHeader) -> BlockHeader {
+        header.bits = 0x207fffff;
+        while !blvm_consensus::pow::check_proof_of_work(&header).unwrap() {
+            header.nonce += 1;
+        }
+        header
+    }
+
     #[test]
     fn test_blvm_protocol_creation() {
         let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
@@ -863,14 +873,14 @@ mod tests {
             .expect("merkle root");
 
         let block = Block {
-            header: BlockHeader {
+            header: mine_regtest(BlockHeader {
                 version: 4,
                 prev_block_hash: [0u8; 32],
                 merkle_root,
                 timestamp: 1_231_006_505,
                 bits: 0x0300ffff,
                 nonce: 0,
-            },
+            }),
             transactions: vec![coinbase_tx].into_boxed_slice(),
         };
 

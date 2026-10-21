@@ -18,6 +18,16 @@ fn coinbase_script_sig(height: u64) -> Vec<u8> {
     blvm_consensus::bip_validation::encode_bip34_coinbase_script(height)
 }
 
+/// Grind the nonce until the header meets its regtest target (about two tries).
+/// Connect checks proof of work, so block fixtures need real headers.
+fn mine_regtest(mut header: BlockHeader) -> BlockHeader {
+    header.bits = 0x207fffff;
+    while !blvm_consensus::pow::check_proof_of_work(&header).unwrap() {
+        header.nonce += 1;
+    }
+    header
+}
+
 fn regtest_coinbase_block(prev_hash: Hash, height: u64) -> Block {
     let coinbase = Transaction {
         version: 2,
@@ -39,14 +49,14 @@ fn regtest_coinbase_block(prev_hash: Hash, height: u64) -> Block {
         blvm_consensus::mining::calculate_merkle_root(std::slice::from_ref(&coinbase))
             .expect("merkle root");
     Block {
-        header: BlockHeader {
+        header: mine_regtest(BlockHeader {
             version: 4,
             prev_block_hash: prev_hash,
             merkle_root,
             timestamp: 1_231_006_505 + height * 600,
             bits: 0x0300ffff,
             nonce: height,
-        },
+        }),
         transactions: vec![coinbase].into_boxed_slice(),
     }
 }
