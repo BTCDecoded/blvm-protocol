@@ -3,9 +3,9 @@
 //! End-to-end tests for protocol engine functionality
 
 use blvm_consensus::opcodes::OP_1;
-use blvm_consensus::types::{Hash, OutPoint, TransactionInput, TransactionOutput, UTXO, UtxoSet};
+use blvm_consensus::types::{Hash, OutPoint, TransactionInput, TransactionOutput, UtxoSet, UTXO};
 use blvm_consensus::utxo_set_insert;
-use blvm_consensus::{Block, BlockHeader, Transaction, segwit::Witness};
+use blvm_consensus::{segwit::Witness, Block, BlockHeader, Transaction};
 use blvm_protocol::validation::ProtocolValidationContext;
 use blvm_protocol::{BitcoinProtocolEngine, ProtocolVersion, ValidationResult};
 
@@ -322,13 +322,18 @@ fn test_connect_rejects_invalid_merkle_root() {
     let engine = BitcoinProtocolEngine::new(ProtocolVersion::Regtest).unwrap();
     let mut block = regtest_coinbase_block([0u8; 32], 0);
     block.header.merkle_root = [0xff; 32];
+    // Re-mine so the block passes proof of work and reaches the merkle check.
+    block.header = mine_regtest(block.header.clone());
 
     let utxos = UtxoSet::default();
     let (result, _) = connect_regtest_block(&engine, &block, &utxos, 0);
-    assert!(
-        matches!(result, ValidationResult::Invalid(_)),
-        "bad merkle root must not connect as Valid"
-    );
+    match result {
+        ValidationResult::Invalid(reason) => assert!(
+            reason.contains("Block merkle root does not match transactions"),
+            "bad merkle root rejected for the wrong reason: {reason}"
+        ),
+        other => panic!("bad merkle root must not connect as Valid: {other:?}"),
+    }
 }
 
 #[test]
