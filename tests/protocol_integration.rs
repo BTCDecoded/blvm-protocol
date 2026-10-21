@@ -38,17 +38,19 @@ fn regtest_coinbase_block(prev_hash: Hash, height: u64) -> Block {
     let merkle_root =
         blvm_consensus::mining::calculate_merkle_root(std::slice::from_ref(&coinbase))
             .expect("merkle root");
-    Block {
+    let mut block = Block {
         header: BlockHeader {
             version: 4,
             prev_block_hash: prev_hash,
             merkle_root,
             timestamp: 1_231_006_505 + height * 600,
-            bits: 0x0300ffff,
-            nonce: height,
+            bits: 0x207fffff,
+            nonce: 0,
         },
         transactions: vec![coinbase].into_boxed_slice(),
-    }
+    };
+    blvm_consensus::pow::meet_regtest_proof_of_work(&mut block.header);
+    block
 }
 
 fn witnesses_for(block: &Block) -> Vec<Vec<Witness>> {
