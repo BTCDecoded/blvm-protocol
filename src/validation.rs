@@ -225,10 +225,9 @@ impl BitcoinProtocolEngine {
 
     /// Apply protocol-specific validation rules (witness-blind; lower-bound weight only).
     ///
-    /// This variant does not have witness data available, so the block weight check is a
-    /// lower bound: it rejects blocks whose **base weight** (`stripped_size × 4`) alone
-    /// exceeds the 4 MWU limit, but cannot catch blocks that are within the base limit yet
-    /// exceed 4 MWU due to large witness data.  Prefer
+    /// This variant does not have witness data available, so the block weight check is the
+    /// stripped block: non-witness bytes at ×4. It cannot catch a block that exceeds the
+    /// limit only because of witness data. Prefer
     /// [`apply_protocol_validation_with_witnesses`] when witness data is available.
     fn apply_protocol_validation(
         &self,
@@ -240,31 +239,18 @@ impl BitcoinProtocolEngine {
 
     /// Apply protocol-specific validation rules with optional witness data.
     ///
-    /// When `witnesses` is `Some`, the BIP141 weight check uses the full formula:
-    /// `weight = stripped_size × 4 + total_witness_size`, which correctly rejects
-    /// blocks with heavy witness stacks that would otherwise slip under the base check.
-    ///
-    /// When `witnesses` is `None` the check falls back to `stripped_size × 4` (lower bound).
+    /// Block weight is [`blvm_consensus::segwit::calculate_block_weight_from_nested`]:
+    /// non-witness bytes at ×4, and the marker, flag, stack counts, and witness
+    /// elements at ×1. A missing witness list is the stripped block.
     fn apply_protocol_validation_with_witnesses(
         &self,
         block: &Block,
         witnesses: Option<&[Vec<blvm_consensus::segwit::Witness>]>,
         context: &ProtocolValidationContext,
     ) -> Result<()> {
-        // BIP141 block weight check.
-        let stripped_size = self.calculate_block_size(block);
-        let weight = if let Some(wit) = witnesses {
-            // Full BIP141 weight: base × 4 + witness bytes (counted at ×1).
-            let witness_bytes: u64 = wit
-                .iter()
-                .flat_map(|tx_wit| tx_wit.iter())
-                .flat_map(|stack| stack.iter())
-                .map(|elem| elem.len() as u64)
-                .sum();
-            stripped_size as u64 * 4 + witness_bytes
-        } else {
-            stripped_size as u64 * 4
-        };
+        let witness_list = witnesses.unwrap_or(&[]);
+        let weight =
+            blvm_consensus::segwit::calculate_block_weight_from_nested(block, witness_list)?;
         if weight > context.validation_rules.max_block_size as u64 {
             return Err(ProtocolError::Validation(
                 format!(
@@ -331,19 +317,6 @@ impl BitcoinProtocolEngine {
     }
 
     /// Calculate block size in bytes
-    fn calculate_block_size(&self, block: &Block) -> u32 {
-        // Block size = 80-byte header + varint tx count + serialized transactions (no witness).
-        let header_size = 80; // Block header is always 80 bytes
-        let tx_count_size = 4; // Varint for transaction count
-        let tx_sizes: u32 = block
-            .transactions
-            .iter()
-            .map(|tx| self.calculate_transaction_size(tx))
-            .sum();
-
-        header_size + tx_count_size + tx_sizes
-    }
-
     /// Calculate transaction size in bytes
     fn calculate_transaction_size(&self, tx: &Transaction) -> u32 {
         // Use canonical serialization-based size from consensus layer (TX_NO_WITNESS size).
@@ -777,6 +750,94 @@ mod tests {
         assert!(
             result.is_err(),
             "heavy witness bytes must exceed reduced max_block_size weight limit"
+        );
+    }
+
+    #[test]
+    fn protocol_block_weight_matches_consensus_including_witness_framing() {
+        use blvm_consensus::opcodes::OP_1;
+        use blvm_consensus::{
+            Block, BlockHeader, OutPoint, Transaction, TransactionInput, TransactionOutput,
+        };
+
+        let engine = BitcoinProtocolEngine::new(ProtocolVersion::Regtest).unwrap();
+        let mut context = ProtocolValidationContext::new(ProtocolVersion::Regtest, 1).unwrap();
+        let coinbase = Transaction {
+            version: 1,
+            inputs: vec![TransactionInput {
+                prevout: OutPoint {
+                    hash: [0u8; 32],
+                    index: 0xffffffff,
+                },
+                script_sig: vec![OP_1].into(),
+                sequence: 0xffffffff,
+            }]
+            .into(),
+            outputs: vec![TransactionOutput {
+                value: 50_0000_0000,
+                script_pubkey: vec![OP_1].into(),
+            }]
+            .into(),
+            lock_time: 0,
+        };
+        let tx = Transaction {
+            version: 2,
+            inputs: vec![TransactionInput {
+                prevout: OutPoint {
+                    hash: [1u8; 32],
+                    index: 0,
+                },
+                script_sig: vec![OP_1].into(),
+                sequence: 0xffffffff,
+            }]
+            .into(),
+            outputs: vec![TransactionOutput {
+                value: 1_000,
+                script_pubkey: vec![OP_1].into(),
+            }]
+            .into(),
+            lock_time: 0,
+        };
+        let block = Block {
+            header: BlockHeader {
+                version: 1,
+                prev_block_hash: [0u8; 32],
+                merkle_root: [0u8; 32],
+                timestamp: 1_700_000_000,
+                bits: 0x207fffff,
+                nonce: 0,
+            },
+            transactions: vec![coinbase, tx].into(),
+        };
+        let witnesses: Vec<Vec<blvm_consensus::segwit::Witness>> =
+            vec![vec![vec![]], vec![vec![vec![0x11]]]];
+        let weight = blvm_consensus::segwit::calculate_block_weight_from_nested(&block, &witnesses)
+            .expect("witness stacks match the inputs");
+        context.validation_rules.max_block_size = weight as u32;
+        assert!(
+            engine
+                .validate_block_with_protocol_and_witnesses(
+                    &block,
+                    &witnesses,
+                    &UtxoSet::default(),
+                    1,
+                    &context,
+                )
+                .is_ok(),
+            "weight equal to the consensus weight is accepted"
+        );
+        context.validation_rules.max_block_size = (weight - 1) as u32;
+        assert!(
+            engine
+                .validate_block_with_protocol_and_witnesses(
+                    &block,
+                    &witnesses,
+                    &UtxoSet::default(),
+                    1,
+                    &context,
+                )
+                .is_err(),
+            "one weight unit under the consensus weight is rejected"
         );
     }
 }

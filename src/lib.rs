@@ -878,7 +878,7 @@ mod tests {
                 prev_block_hash: [0u8; 32],
                 merkle_root,
                 timestamp: 1_231_006_505,
-                bits: 0x0300ffff,
+                bits: 0x207fffff,
                 nonce: 0,
             }),
             transactions: vec![coinbase_tx].into_boxed_slice(),
