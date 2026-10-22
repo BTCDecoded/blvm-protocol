@@ -18,6 +18,16 @@ fn coinbase_script_sig(height: u64) -> Vec<u8> {
     blvm_consensus::bip_validation::encode_bip34_coinbase_script(height)
 }
 
+/// Grind the nonce until the header meets its regtest target (about two tries).
+/// Connect checks proof of work, so block fixtures need real headers.
+fn mine_regtest(mut header: BlockHeader) -> BlockHeader {
+    header.bits = 0x207fffff;
+    while !blvm_consensus::pow::check_proof_of_work(&header).unwrap() {
+        header.nonce += 1;
+    }
+    header
+}
+
 fn regtest_coinbase_block(prev_hash: Hash, height: u64) -> Block {
     let coinbase = Transaction {
         version: 2,
@@ -38,19 +48,17 @@ fn regtest_coinbase_block(prev_hash: Hash, height: u64) -> Block {
     let merkle_root =
         blvm_consensus::mining::calculate_merkle_root(std::slice::from_ref(&coinbase))
             .expect("merkle root");
-    let mut block = Block {
-        header: BlockHeader {
+    Block {
+        header: mine_regtest(BlockHeader {
             version: 4,
             prev_block_hash: prev_hash,
             merkle_root,
             timestamp: 1_231_006_505 + height * 600,
-            bits: 0x207fffff,
-            nonce: 0,
-        },
+            bits: 0x0300ffff,
+            nonce: height,
+        }),
         transactions: vec![coinbase].into_boxed_slice(),
-    };
-    blvm_consensus::pow::meet_regtest_proof_of_work(&mut block.header);
-    block
+    }
 }
 
 fn witnesses_for(block: &Block) -> Vec<Vec<Witness>> {
@@ -314,13 +322,18 @@ fn test_connect_rejects_invalid_merkle_root() {
     let engine = BitcoinProtocolEngine::new(ProtocolVersion::Regtest).unwrap();
     let mut block = regtest_coinbase_block([0u8; 32], 0);
     block.header.merkle_root = [0xff; 32];
+    // Re-mine so the block passes proof of work and reaches the merkle check.
+    block.header = mine_regtest(block.header.clone());
 
     let utxos = UtxoSet::default();
     let (result, _) = connect_regtest_block(&engine, &block, &utxos, 0);
-    assert!(
-        matches!(result, ValidationResult::Invalid(_)),
-        "bad merkle root must not connect as Valid"
-    );
+    match result {
+        ValidationResult::Invalid(reason) => assert!(
+            reason.contains("Block merkle root does not match transactions"),
+            "bad merkle root rejected for the wrong reason: {reason}"
+        ),
+        other => panic!("bad merkle root must not connect as Valid: {other:?}"),
+    }
 }
 
 #[test]

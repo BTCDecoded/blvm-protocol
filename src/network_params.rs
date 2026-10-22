@@ -131,7 +131,7 @@ impl NetworkConstants {
     /// Bitcoin signet constants (default public signet)
     pub fn signet() -> Result<Self> {
         Ok(Self {
-            magic_bytes: [0x0f, 0x1b, 0xf2, 0xe1],
+            magic_bytes: [0x0a, 0x03, 0xcf, 0x40], // Bitcoin Core default signet pchMessageStart
             default_port: 38333,
             genesis_hash: [
                 0xf6, 0x1e, 0xee, 0x3b, 0x63, 0xa3, 0x80, 0xa4, 0x77, 0xa0, 0x63, 0xaf, 0x32, 0xb2,
@@ -252,7 +252,7 @@ mod tests {
         assert!(regtest.dns_seeds.is_empty());
 
         let signet = NetworkConstants::signet().unwrap();
-        assert_eq!(signet.magic_bytes, [0x0f, 0x1b, 0xf2, 0xe1]);
+        assert_eq!(signet.magic_bytes, [0x0a, 0x03, 0xcf, 0x40]);
         assert_eq!(signet.default_port, 38333);
         assert!(signet.is_testnet);
         assert!(!signet.dns_seeds.is_empty());

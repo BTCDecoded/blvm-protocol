@@ -7,12 +7,24 @@
 mod tests {
     use blvm_consensus::block::BlockValidationContext;
     use blvm_consensus::test_utils::{create_coinbase_tx, create_test_header};
-    use blvm_consensus::types::{Block, Network, OutPoint, UTXO, UtxoSet, ValidationResult};
+    use blvm_consensus::types::{
+        Block, BlockHeader, Network, OutPoint, UTXO, UtxoSet, ValidationResult,
+    };
     use blvm_protocol::block::connect_block;
     use blvm_protocol::mining::calculate_merkle_root;
     use blvm_protocol::segwit::Witness;
     use blvm_protocol::utxo_commitments::merkle_tree::UtxoMerkleTree;
     use std::sync::Arc;
+
+    /// Grind the nonce until the header meets its regtest target (about two tries).
+    /// Connect checks proof of work, so block fixtures need real headers.
+    fn mine_regtest(mut header: BlockHeader) -> BlockHeader {
+        header.bits = 0x207fffff;
+        while !blvm_consensus::pow::check_proof_of_work(&header).unwrap() {
+            header.nonce += 1;
+        }
+        header
+    }
 
     fn sample_utxo_a() -> UTXO {
         UTXO {
@@ -163,7 +175,7 @@ mod tests {
         let merkle_root = calculate_merkle_root(&transactions).expect("merkle root");
         let mut header = create_test_header(1_231_006_505, [0u8; 32]);
         header.merkle_root = merkle_root;
-        blvm_consensus::pow::meet_regtest_proof_of_work(&mut header);
+        let header = mine_regtest(header);
         let block = Block {
             header,
             transactions: transactions.into(),
