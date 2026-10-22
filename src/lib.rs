@@ -680,7 +680,8 @@ impl NetworkParameters {
     /// Bitcoin signet parameters (BIP325 default signet)
     pub fn signet() -> Result<Self> {
         Ok(NetworkParameters {
-            magic_bytes: [0x0f, 0x1b, 0xf2, 0xe1],
+            // Default signet: first 4 bytes of SHA256d(challenge), as Bitcoin Core's pchMessageStart.
+            magic_bytes: [0x0a, 0x03, 0xcf, 0x40],
             default_port: 38333,
             genesis_block: genesis::signet_genesis(),
             max_target: 0x1e0377ae,
@@ -776,6 +777,29 @@ mod tests {
         assert_eq!(regtest.magic_bytes, [0xfa, 0xbf, 0xb5, 0xda]);
         assert_eq!(regtest.default_port, 18444);
         assert!(regtest.is_testnet);
+    }
+
+    #[test]
+    fn test_signet_magic_matches_bitcoin_core_default_signet() {
+        use sha2::{Digest, Sha256};
+        // Bitcoin Core default signet challenge (1-of-2 multisig), chainparams.cpp.
+        let challenge = hex::decode(
+            "512103ad5e0edad18cb1f0fc0d28a3d4f1f3e445640337489abb10404f2d1e086be430210359ef5021964fe22d6f8e05b2463c9540ce96883fe3b278760f048f5189f2e6c452ae",
+        )
+        .unwrap();
+        // Core: pchMessageStart = first 4 bytes of SHA256d(serialized challenge script).
+        let mut ser = vec![challenge.len() as u8];
+        ser.extend_from_slice(&challenge);
+        let digest = Sha256::digest(Sha256::digest(&ser));
+        let expected = [0x0a, 0x03, 0xcf, 0x40];
+        assert_eq!(&digest[..4], &expected);
+
+        let params = NetworkParameters::signet().unwrap();
+        assert_eq!(params.magic_bytes, expected);
+        let constants = crate::network_params::NetworkConstants::signet().unwrap();
+        assert_eq!(constants.magic_bytes, expected);
+        let engine = BitcoinProtocolEngine::new(ProtocolVersion::Signet).unwrap();
+        assert_eq!(engine.get_network_params().magic_bytes, expected);
     }
 
     #[test]
