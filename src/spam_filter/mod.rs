@@ -361,10 +361,6 @@ pub struct SpamFilterResult {
 #[derive(Clone)]
 pub struct SpamFilter {
     config: SpamFilterConfig,
-    /// Reserved for script-type LRU; wired incrementally in hot paths.
-    #[cfg(feature = "production")]
-    #[allow(dead_code)]
-    pub(crate) script_type_cache: std::sync::Arc<std::sync::RwLock<lru::LruCache<u64, bool>>>,
 }
 
 impl SpamFilter {
@@ -372,22 +368,12 @@ impl SpamFilter {
     pub fn new() -> Self {
         Self {
             config: SpamFilterConfig::default(),
-            #[cfg(feature = "production")]
-            script_type_cache: std::sync::Arc::new(std::sync::RwLock::new(lru::LruCache::new(
-                std::num::NonZeroUsize::new(10_000).unwrap(),
-            ))),
         }
     }
 
     /// Create a new spam filter with custom configuration
     pub fn with_config(config: SpamFilterConfig) -> Self {
-        Self {
-            config,
-            #[cfg(feature = "production")]
-            script_type_cache: std::sync::Arc::new(std::sync::RwLock::new(lru::LruCache::new(
-                std::num::NonZeroUsize::new(10_000).unwrap(),
-            ))),
-        }
+        Self { config }
     }
 
     /// Create a new spam filter with a preset configuration
@@ -1078,7 +1064,7 @@ impl SpamFilter {
         let data = &script[1..];
 
         // Try to decode as UTF-8
-        let script_str = match String::from_utf8(data.to_vec()) {
+        let script_str = match std::str::from_utf8(data) {
             Ok(s) => s,
             Err(_) => {
                 // Not valid UTF-8, use simple pattern matching
@@ -1136,24 +1122,33 @@ impl SpamFilter {
         false
     }
 
+    /// ASCII marker search. The needles are lowercase. Letters in `data` match either case.
+    fn contains_ascii_marker(data: &[u8], marker: &[u8]) -> bool {
+        if marker.is_empty() || data.len() < marker.len() {
+            return false;
+        }
+        data.windows(marker.len()).any(|window| {
+            window
+                .iter()
+                .zip(marker)
+                .all(|(hay, pat)| hay.to_ascii_lowercase() == *pat)
+        })
+    }
+
     /// Check for BRC-20 pattern using simple string matching (fallback)
     fn has_brc20_pattern_simple(&self, data: &[u8]) -> bool {
-        // Convert to string for pattern matching
-        if let Ok(script_str) = String::from_utf8(data.to_vec()) {
-            // Check for BRC-20 markers (case-insensitive)
-            let lower = script_str.to_lowercase();
-            lower.contains("brc-20")
-                || lower.contains("\"p\":\"brc-20\"")
-                || lower.contains("op\":\"mint")
-                || lower.contains("op\":\"transfer")
-                || lower.contains("op\":\"deploy")
+        if std::str::from_utf8(data).is_ok() {
+            Self::contains_ascii_marker(data, b"brc-20")
+                || Self::contains_ascii_marker(data, b"\"p\":\"brc-20\"")
+                || Self::contains_ascii_marker(data, b"op\":\"mint")
+                || Self::contains_ascii_marker(data, b"op\":\"transfer")
+                || Self::contains_ascii_marker(data, b"op\":\"deploy")
         } else {
-            // Not valid UTF-8, try byte pattern matching
-            // Look for "brc-20" in bytes (case-insensitive)
+            // Not valid UTF-8. Only the two exact byte spellings match.
             let pattern = b"brc-20";
-            let pattern_lower = b"BRC-20";
+            let pattern_upper = b"BRC-20";
             data.windows(pattern.len())
-                .any(|window| window == pattern || window == pattern_lower)
+                .any(|window| window == pattern || window == pattern_upper)
         }
     }
 
@@ -1296,8 +1291,7 @@ fn detect_script_type_for_input(
 
     if let Some(utxo_set) = utxo_set {
         if let Some(utxo) = utxo_set.get(&tx.inputs[input_index].prevout) {
-            let spk: ByteString = utxo.script_pubkey.as_ref().to_vec();
-            let script_type = ScriptType::detect(&spk);
+            let script_type = ScriptType::detect(utxo.script_pubkey.as_ref());
             if script_type != ScriptType::Unknown {
                 return Some(script_type);
             }

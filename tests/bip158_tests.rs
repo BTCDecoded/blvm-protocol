@@ -369,7 +369,7 @@ fn test_match_filter_negative_match() {
 fn test_match_filter_with_empty_filter() {
     // Test matching against empty filter
     let empty_filter = CompactBlockFilter {
-        filter_data: Vec::new(),
+        filter_data: std::sync::Arc::new(Vec::new()),
         num_elements: 0,
     };
 

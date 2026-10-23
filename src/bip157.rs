@@ -18,39 +18,45 @@ pub struct FilterHeader {
     pub prev_header_hash: Hash,
 }
 
+/// Double SHA256 of `data`.
+pub fn hash256(data: &[u8]) -> Hash {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    let first = hasher.finalize();
+
+    let mut hasher = Sha256::new();
+    hasher.update(first);
+    let hash_bytes = hasher.finalize();
+
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&hash_bytes);
+    hash
+}
+
+/// Double SHA256 of `left` followed by `right`, with no extra buffer.
+pub fn hash256_concat(left: &[u8], right: &[u8]) -> Hash {
+    let mut hasher = Sha256::new();
+    hasher.update(left);
+    hasher.update(right);
+    let first_hash = hasher.finalize();
+
+    let mut hasher = Sha256::new();
+    hasher.update(first_hash);
+    let hash_bytes = hasher.finalize();
+
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&hash_bytes);
+    hash
+}
+
 impl FilterHeader {
     /// Calculate filter header from filter and previous header
     pub fn new(filter: &CompactBlockFilter, prev_header: Option<&FilterHeader>) -> Self {
-        // Filter hash = SHA256(SHA256(filter_data))
-        let mut hasher = Sha256::new();
-        hasher.update(&filter.filter_data);
-        let first_hash = hasher.finalize();
+        let filter_hash = hash256(filter.filter_data.as_slice());
 
-        let mut hasher2 = Sha256::new();
-        hasher2.update(first_hash);
-        let filter_hash_bytes = hasher2.finalize();
-
-        let mut filter_hash = [0u8; 32];
-        filter_hash.copy_from_slice(&filter_hash_bytes);
-
-        // Previous header hash
+        // Previous header hash is SHA256(SHA256(filter_hash || prev_header_hash)).
         let prev_header_hash = if let Some(prev) = prev_header {
-            // Header hash = SHA256(SHA256(filter_hash || prev_header_hash))
-            let mut combined = Vec::new();
-            combined.extend_from_slice(&prev.filter_hash);
-            combined.extend_from_slice(&prev.prev_header_hash);
-
-            let mut hasher = Sha256::new();
-            hasher.update(&combined);
-            let first_hash = hasher.finalize();
-
-            let mut hasher2 = Sha256::new();
-            hasher2.update(first_hash);
-            let header_hash_bytes = hasher2.finalize();
-
-            let mut header_hash = [0u8; 32];
-            header_hash.copy_from_slice(&header_hash_bytes);
-            header_hash
+            hash256_concat(&prev.filter_hash, &prev.prev_header_hash)
         } else {
             // Genesis filter header (all zeros or block hash)
             [0u8; 32]
@@ -64,21 +70,7 @@ impl FilterHeader {
 
     /// Calculate header hash (double SHA256 of filter_hash || prev_header_hash)
     pub fn header_hash(&self) -> Hash {
-        let mut combined = Vec::new();
-        combined.extend_from_slice(&self.filter_hash);
-        combined.extend_from_slice(&self.prev_header_hash);
-
-        let mut hasher = Sha256::new();
-        hasher.update(&combined);
-        let first_hash = hasher.finalize();
-
-        let mut hasher2 = Sha256::new();
-        hasher2.update(first_hash);
-        let hash_bytes = hasher2.finalize();
-
-        let mut header_hash = [0u8; 32];
-        header_hash.copy_from_slice(&hash_bytes);
-        header_hash
+        hash256_concat(&self.filter_hash, &self.prev_header_hash)
     }
 }
 
@@ -178,7 +170,7 @@ mod tests {
     #[test]
     fn test_filter_header() {
         let empty_filter = CompactBlockFilter {
-            filter_data: vec![1, 2, 3],
+            filter_data: std::sync::Arc::new(vec![1, 2, 3]),
             num_elements: 0,
         };
 
@@ -190,5 +182,29 @@ mod tests {
         // Header hashes should be different when chained
         assert_ne!(header1.header_hash(), header2.header_hash());
         assert_eq!(header2.prev_header_hash, header1.header_hash());
+        assert_eq!(
+            header1.header_hash(),
+            concat_hash256(&header1.filter_hash, &header1.prev_header_hash)
+        );
+        assert_eq!(
+            header2.header_hash(),
+            concat_hash256(&header2.filter_hash, &header2.prev_header_hash)
+        );
+    }
+
+    fn concat_hash256(left: &[u8], right: &[u8]) -> [u8; 32] {
+        use sha2::{Digest, Sha256};
+        let mut combined = Vec::new();
+        combined.extend_from_slice(left);
+        combined.extend_from_slice(right);
+        let mut hasher = Sha256::new();
+        hasher.update(&combined);
+        let first = hasher.finalize();
+        let mut hasher = Sha256::new();
+        hasher.update(first);
+        let bytes = hasher.finalize();
+        let mut hash = [0u8; 32];
+        hash.copy_from_slice(&bytes);
+        hash
     }
 }

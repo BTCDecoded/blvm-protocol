@@ -6,7 +6,6 @@
 //! Heuristic thresholds are tuned for witness-size–based relay policy (not a consensus BIP).
 
 use blvm_consensus::opcodes::*;
-use blvm_consensus::types::ByteString;
 
 /// Script type classification
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -34,7 +33,7 @@ impl ScriptType {
     ///
     /// This analyzes the output script to determine its type.
     /// For input scripts (scriptSig), use `detect_input_script_type` instead.
-    pub fn detect(script_pubkey: &ByteString) -> Self {
+    pub fn detect(script_pubkey: &[u8]) -> Self {
         if script_pubkey.is_empty() {
             return Self::Unknown;
         }
@@ -102,7 +101,7 @@ impl ScriptType {
     /// Detect multi-signature script type
     ///
     /// Returns `Some(MultiSig { n, m })` if script is a multi-sig, `None` otherwise.
-    fn detect_multisig(script: &ByteString) -> Option<Self> {
+    fn detect_multisig(script: &[u8]) -> Option<Self> {
         if script.len() < 3 {
             return None;
         }
@@ -148,7 +147,7 @@ impl ScriptType {
     ///
     /// HTLCs are used in payment channels (Lightning Network). Requires conditional branch,
     /// time lock, hash, and equality opcodes as executable instructions (not inside push data).
-    fn has_htlc_pattern(script: &ByteString) -> bool {
+    fn has_htlc_pattern(script: &[u8]) -> bool {
         if script.len() < 20 {
             return false;
         }
@@ -216,7 +215,7 @@ impl ScriptType {
 }
 
 /// Returns true when `opcode` appears as an executable instruction (not inside push data).
-fn script_has_executable_opcode(script: &ByteString, opcode: u8) -> bool {
+fn script_has_executable_opcode(script: &[u8], opcode: u8) -> bool {
     let mut i = 0;
     while i < script.len() {
         let op = script[i];
@@ -267,7 +266,7 @@ fn script_has_executable_opcode(script: &ByteString, opcode: u8) -> bool {
 /// This analyzes the input script to infer the script type of the output being spent.
 /// This is less reliable than analyzing scriptPubKey directly, but useful when
 /// scriptPubKey is not available.
-pub fn detect_input_script_type(script_sig: &ByteString) -> Option<ScriptType> {
+pub fn detect_input_script_type(script_sig: &[u8]) -> Option<ScriptType> {
     if script_sig.is_empty() {
         // Empty scriptSig suggests SegWit (P2WPKH, P2WSH, or P2TR)
         return Some(ScriptType::P2WPKH); // Most common SegWit type
@@ -398,6 +397,7 @@ impl TransactionType {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use blvm_consensus::types::ByteString;
 
     #[test]
     fn test_detect_p2pkh() {
