@@ -209,7 +209,10 @@ pub fn build_block_filter(
     block_transactions: &[Transaction],
     previous_outpoint_scripts: &[Vec<u8>],
 ) -> Result<CompactBlockFilter, String> {
-    let refs: Vec<&[u8]> = previous_outpoint_scripts.iter().map(Vec::as_slice).collect();
+    let refs: Vec<&[u8]> = previous_outpoint_scripts
+        .iter()
+        .map(Vec::as_slice)
+        .collect();
     build_block_filter_slices(block_transactions, &refs)
 }
 
