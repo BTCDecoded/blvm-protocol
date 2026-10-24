@@ -1074,7 +1074,7 @@ impl SpamFilter {
 
         // Use JSON validation if enabled
         if self.config.use_json_validation_brc20 {
-            self.has_brc20_pattern_json(&script_str)
+            self.has_brc20_pattern_json(script_str)
         } else {
             // Fallback to simple string matching
             self.has_brc20_pattern_simple(data)
