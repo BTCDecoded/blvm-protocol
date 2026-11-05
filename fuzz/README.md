@@ -2,7 +2,7 @@
 
 Coverage-guided fuzzing with **libFuzzer**. Harness names are the **`[[bin]]`** entries in **`fuzz/Cargo.toml`** and the list in **`TARGETS.md`** — those files are authoritative.
 
-Narrative overview (timeless): [Fuzzing (BLVM docs)](https://docs.thebitcoincommons.org/development/fuzzing.html).
+Narrative overview (timeless): [Fuzzing (BLVM docs)](https://docs.btcdecoded.org/blvm/development/fuzzing.html).
 
 ## `production` / feature alignment
 
