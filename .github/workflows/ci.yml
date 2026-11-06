@@ -358,8 +358,6 @@ jobs:
           command -v jq >/dev/null 2>&1 || { echo "❌ jq not found; install jq on the runner."; exit 1; }
           echo "✅ Z3 + clang + jq present."
 
-          # 0.1.48 check-drift exits on notation mismatches and on functions the
-          # Orange Paper does not name. 0.1.45 is the verifier that passed 0.1.39 (same pin as consensus).
           cargo install --force blvm-spec-lock --version '>=0.1, <1' --locked --features z3
 
           if [ -f "../blvm-spec/PROTOCOL.md" ] && [ -f "../blvm-spec/ARCHITECTURE.md" ]; then
@@ -372,6 +370,9 @@ jobs:
             echo "❌ No spec found at ../blvm-spec"
             exit 1
           fi
+          # cargo install stores the tool in the registry. spec_checkout() looks
+          # next to that source unless BLVM_SPEC_DIR points at the runner checkout.
+          export BLVM_SPEC_DIR="$(cd ../blvm-spec && pwd)"
 
           echo "📎 Running blvm-spec-lock check-drift..."
           SPEC_ARGS="--crate-path . --scoped-unparseables ${SPEC_PATH_ARGS}"
