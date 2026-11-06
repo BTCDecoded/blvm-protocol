@@ -15,6 +15,7 @@ use crate::utxo_commitments::verification::{verify_header_chain, verify_supply};
 #[cfg(feature = "utxo-commitments")]
 use blvm_consensus::types::{BlockHeader, Hash, Natural};
 #[cfg(feature = "utxo-commitments")]
+#[cfg(feature = "spec-lock")]
 use blvm_spec_lock::spec_locked;
 #[cfg(feature = "utxo-commitments")]
 use sparse_merkle_tree::MerkleProof;
@@ -120,7 +121,7 @@ impl PeerConsensus {
     /// - Subnets (/16 for IPv4, /32 for IPv6)
     /// - Geographic regions
     /// - Bitcoin implementations
-    #[spec_locked("13.4")]
+    #[cfg_attr(feature = "spec-lock", spec_locked("13.4"))]
     pub fn discover_diverse_peers(&self, all_peers: Vec<PeerInfo>) -> Vec<PeerInfo> {
         use rand::seq::SliceRandom;
 
@@ -171,7 +172,7 @@ impl PeerConsensus {
     /// - Median is always between min(tips) and max(tips)
     /// - Checkpoint height is always >= 0
     /// - Checkpoint height <= median_tip
-    #[spec_locked("13.4")]
+    #[cfg_attr(feature = "spec-lock", spec_locked("13.4"))]
     pub fn determine_checkpoint_height(&self, peer_tips: Vec<Natural>) -> Natural {
         if peer_tips.is_empty() {
             return 0;
@@ -270,7 +271,7 @@ impl PeerConsensus {
     ///
     /// Groups commitments by their values and finds the majority consensus.
     /// Returns the consensus commitment if threshold is met.
-    #[spec_locked("11.4")]
+    #[cfg_attr(feature = "spec-lock", spec_locked("11.4"))]
     pub fn find_consensus(
         &self,
         peer_commitments: Vec<PeerCommitment>,
@@ -401,8 +402,8 @@ impl PeerConsensus {
     /// 1. Block header chain is valid (PoW verification)
     /// 2. Commitment supply matches expected supply at height
     /// 3. Commitment block hash matches actual block hash
-    #[spec_locked("11.4", "VerifyConsensusCommitment")]
-    #[blvm_spec_lock::ensures(header_chain.len() > 0 || result.is_err())]
+    #[cfg_attr(feature = "spec-lock", spec_locked("11.4", "VerifyConsensusCommitment"))]
+    #[cfg_attr(feature = "spec-lock", blvm_spec_lock::ensures(header_chain.len() > 0 || result.is_err()))]
     pub fn verify_consensus_commitment(
         &self,
         consensus: &ConsensusResult,
@@ -463,7 +464,7 @@ impl PeerConsensus {
     ///
     /// peer_consensus.verify_utxo_proofs(&consensus, utxos_to_verify)?;
     /// ```
-    #[spec_locked("13.4")]
+    #[cfg_attr(feature = "spec-lock", spec_locked("13.4"))]
     pub fn verify_utxo_proofs(
         &self,
         consensus: &ConsensusResult,

@@ -75,7 +75,7 @@ blvm-spec-lock = { path = "../blvm-spec-lock" }
 # Production performance optimizations (passed through from blvm-consensus)
 production = ["blvm-consensus/production", "dep:smallvec", "dep:lru", "dep:rayon"]
 # UTXO commitments module (implementation in blvm-protocol)
-utxo-commitments = ["sparse-merkle-tree", "dep:rand", "dep:blvm-spec-lock"]
+utxo-commitments = ["sparse-merkle-tree", "dep:rand"]
 # CTV (BIP119 CheckTemplateVerify) - passed through from blvm-consensus
 ctv = ["blvm-consensus/ctv"]
 # IBD/PERF profiling - passed through from blvm-consensus (profile_log, BATCH, etc.)
@@ -96,8 +96,10 @@ test-utils = []
 erlay = []
 # [`node_tcp::VersionMessage`] helper `supports_dandelion`
 dandelion = []
-# Orange Paper spec-lock on [`node_tcp::ProtocolParser`] (same dep as utxo-commitments)
-protocol-verification = ["dep:blvm-spec-lock"]
+# Orange Paper markers on [`node_tcp::TcpFramedParser`]. The attribute crate is `spec-lock`, not this flag.
+protocol-verification = []
+# Compile spec-lock attribute macros. The node does not enable this.
+spec-lock = ["dep:blvm-spec-lock"]
 
 [dev-dependencies]
 blvm-primitives = { version = ">=0.1, <1", default-features = false }

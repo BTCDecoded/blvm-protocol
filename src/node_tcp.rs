@@ -6,7 +6,7 @@
 //!
 //! The embedding binary supplies which command strings are accepted (e.g. node `ALLOWED_COMMANDS`).
 
-#[cfg(feature = "protocol-verification")]
+#[cfg(feature = "spec-lock")]
 use blvm_spec_lock::spec_locked;
 
 use crate::wire::{
@@ -612,11 +612,11 @@ impl TcpFramedParser {
     /// Parse a raw message into a protocol message
     /// Orange Paper 10.1.1: ParseMessage, size bounds, checksum rejection
     #[cfg_attr(
-        feature = "protocol-verification",
+        feature = "spec-lock",
         spec_locked("10.1.1", "ParseMessage")
     )]
     #[cfg_attr(
-        feature = "protocol-verification",
+        feature = "spec-lock",
         blvm_spec_lock::ensures(data.len() >= 24 || result.is_err())
     )]
     pub fn parse_message(data: &[u8], allowed_commands: &[&str]) -> Result<ProtocolMessage> {
@@ -1034,11 +1034,11 @@ impl TcpFramedParser {
     /// Computes double SHA256 of payload and returns first 4 bytes.
     /// Orange Paper 10.1.1: CalculateChecksum, |result| = 4
     #[cfg_attr(
-        feature = "protocol-verification",
+        feature = "spec-lock",
         spec_locked("10.1.1", "CalculateChecksum")
     )]
     #[cfg_attr(
-        feature = "protocol-verification",
+        feature = "spec-lock",
         blvm_spec_lock::ensures(result.len() == 4)
     )]
     pub fn calculate_checksum(payload: &[u8]) -> [u8; 4] {
