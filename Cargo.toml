@@ -33,7 +33,7 @@ serde_bytes = "=0.11.19"  # P2P extension messages (bincode + byte blobs)
 tracing = "=0.1.41"  # Optional debug in [`node_tcp::TcpFramedParser`]
 
 # Error handling - EXACT VERSIONS for security
-anyhow = "=1.0.93"
+anyhow = "=1.0.104"
 thiserror = "=1.0.69"
 
 # Cryptography - EXACT VERSIONS for security
@@ -55,7 +55,7 @@ bech32 = "=0.9"
 sparse-merkle-tree = { version = "=0.6", optional = true }
 rand = { version = "=0.8.5", optional = true }
 # LruCache for spam filter script type cache (production)
-lru = { version = "=0.12", optional = true }
+lru = { version = "=0.18.5", optional = true }
 # Rayon for parallel UTXO proof verification
 rayon = { version = "=1.10", optional = true }
 
