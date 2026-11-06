@@ -471,6 +471,9 @@ pub enum NetworkResponse {
 pub(crate) struct PendingCompact {
     pub header: BlockHeader,
     pub nonce: u64,
+    /// `sendcmpct` version that selected the short-id preimage. `1` is the txid.
+    /// `2` is the wtxid.
+    pub version: u64,
     pub slots: Vec<Option<(Transaction, Vec<blvm_consensus::segwit::Witness>)>>,
     pub missing: Vec<(usize, ShortTxId)>,
 }
@@ -624,6 +627,18 @@ pub trait ChainStateAccess {
 
     /// Get all mempool transactions
     fn get_mempool_transactions(&self) -> Vec<Transaction>;
+
+    /// Mempool bodies paired with the witness stacks that belong in a BIP152
+    /// version-2 short id. Empty stacks mean the wtxid equals the txid.
+    /// The default has no SegWit stacks. A node that stored them overrides this.
+    fn mempool_for_compact_block(
+        &self,
+    ) -> Vec<(Transaction, Vec<blvm_consensus::segwit::Witness>)> {
+        self.get_mempool_transactions()
+            .into_iter()
+            .map(|tx| (tx, Vec::new()))
+            .collect()
+    }
 
     /// Witness stacks for a stored block (SegWit relay). Default: not available.
     fn get_block_witnesses(
@@ -1228,14 +1243,52 @@ fn process_sendcmpct_message(
     Ok(NetworkResponse::Ok)
 }
 
-fn txid_of(tx: &Transaction) -> Hash {
+fn sha256d(bytes: &[u8]) -> Hash {
     use sha2::{Digest, Sha256};
-    let bytes = crate::wire::serialize_tx(tx).unwrap_or_default();
-    let first = Sha256::digest(&bytes);
+    let first = Sha256::digest(bytes);
     let second = Sha256::digest(first);
     let mut hash = [0u8; 32];
     hash.copy_from_slice(&second);
     hash
+}
+
+fn txid_of(tx: &Transaction) -> Hash {
+    let bytes = crate::wire::serialize_tx(tx).unwrap_or_default();
+    sha256d(&bytes)
+}
+
+/// BIP152 version 1 hashes the txid. Version 2 hashes the wtxid, which is the
+/// txid when every witness stack is empty.
+fn short_id_preimage(
+    tx: &Transaction,
+    witnesses: &[blvm_consensus::segwit::Witness],
+    version: u64,
+) -> Hash {
+    if version > 1 {
+        if let Ok(bytes) = crate::wire::serialize_tx_with_witness(tx, witnesses) {
+            return sha256d(&bytes);
+        }
+    }
+    txid_of(tx)
+}
+
+/// Version 1 blocks carry no witness. Version 2 keeps the stacks that were hashed.
+fn stacks_for_reconstructed_slot(
+    version: u64,
+    witnesses: &[blvm_consensus::segwit::Witness],
+) -> Vec<blvm_consensus::segwit::Witness> {
+    if version > 1 && witnesses.iter().any(|stack| !stack.is_empty()) {
+        witnesses.to_vec()
+    } else {
+        Vec::new()
+    }
+}
+
+fn negotiated_compact_version(peer_state: &PeerState, config: &ProtocolConfig) -> u64 {
+    peer_state
+        .compact_block_version
+        .map(u64::from)
+        .unwrap_or(config.compact_blocks.preferred_version)
 }
 
 fn header_hash(header: &BlockHeader) -> Hash {
@@ -1255,7 +1308,8 @@ fn short_id_hex(id: &ShortTxId) -> String {
 /// Place prefilled transactions and unique mempool matches. Missing short ids stay empty.
 fn begin_pending_compact(
     msg: &CmpctBlockMessage,
-    mempool: &[Transaction],
+    mempool: &[(Transaction, Vec<blvm_consensus::segwit::Witness>)],
+    version: u64,
 ) -> std::result::Result<PendingCompact, String> {
     let n = msg.short_ids.len() + msg.prefilled_txs.len();
     let mut slots: Vec<Option<(Transaction, Vec<blvm_consensus::segwit::Witness>)>> = vec![None; n];
@@ -1283,11 +1337,12 @@ fn begin_pending_compact(
         }
         let mut found: Option<(Transaction, Vec<blvm_consensus::segwit::Witness>)> = None;
         let mut hits = 0usize;
-        for tx in mempool {
-            let id = crate::bip152::short_tx_id(&msg.header, &txid_of(tx), msg.nonce);
+        for (tx, witnesses) in mempool {
+            let preimage = short_id_preimage(tx, witnesses, version);
+            let id = crate::bip152::short_tx_id(&msg.header, &preimage, msg.nonce);
             if &id == short_id {
                 hits += 1;
-                found = Some((tx.clone(), Vec::new()));
+                found = Some((tx.clone(), stacks_for_reconstructed_slot(version, witnesses)));
             }
         }
         if hits == 1 {
@@ -1299,6 +1354,7 @@ fn begin_pending_compact(
     Ok(PendingCompact {
         header: msg.header.clone(),
         nonce: msg.nonce,
+        version,
         slots,
         missing,
     })
@@ -1353,10 +1409,11 @@ fn process_cmpctblock_message(
     if !config.compact_blocks.enabled {
         return Ok(NetworkResponse::Reject("Compact blocks not enabled".into()));
     }
+    let version = negotiated_compact_version(peer_state, config);
     let mempool = chain_access
-        .map(|chain| chain.get_mempool_transactions())
+        .map(|chain| chain.mempool_for_compact_block())
         .unwrap_or_default();
-    let pending = match begin_pending_compact(cmpctblock, &mempool) {
+    let pending = match begin_pending_compact(cmpctblock, &mempool, version) {
         Ok(pending) => pending,
         Err(reason) => return Ok(NetworkResponse::Reject(reason)),
     };
@@ -1469,19 +1526,23 @@ fn process_blocktxn_message(
     }
     for (i, (index, expected)) in pending.missing.iter().enumerate() {
         let tx = &blocktxn.transactions[i];
-        let got = crate::bip152::short_tx_id(&pending.header, &txid_of(tx), pending.nonce);
+        let witness = blocktxn
+            .witnesses
+            .as_ref()
+            .and_then(|all| all.get(i).cloned())
+            .unwrap_or_default();
+        let preimage = short_id_preimage(tx, &witness, pending.version);
+        let got = crate::bip152::short_tx_id(&pending.header, &preimage, pending.nonce);
         if &got != expected {
             return Ok(NetworkResponse::Reject(format!(
                 "short id {} matches neither the mempool nor blocktxn",
                 short_id_hex(expected)
             )));
         }
-        let witness = blocktxn
-            .witnesses
-            .as_ref()
-            .and_then(|all| all.get(i).cloned())
-            .unwrap_or_default();
-        pending.slots[*index] = Some((tx.clone(), witness));
+        pending.slots[*index] = Some((
+            tx.clone(),
+            stacks_for_reconstructed_slot(pending.version, &witness),
+        ));
     }
     pending.missing.clear();
     peer_state.pending_compact = None;
@@ -1854,6 +1915,118 @@ fn compact_block_rebuilds_from_mempool_and_names_a_miss() {
         }
         other => panic!("expected a named short-id reject, got {other:?}"),
     }
+}
+
+#[cfg(test)]
+struct WitnessMempool {
+    tx: Transaction,
+    witnesses: Vec<blvm_consensus::segwit::Witness>,
+}
+
+#[cfg(test)]
+impl ChainStateAccess for WitnessMempool {
+    fn has_object(&self, _hash: &Hash) -> bool {
+        false
+    }
+    fn get_object(&self, _hash: &Hash) -> Option<ChainObject> {
+        None
+    }
+    fn get_headers_for_locator(&self, _locator: &[Hash], _stop: &Hash) -> Vec<BlockHeader> {
+        Vec::new()
+    }
+    fn get_mempool_transactions(&self) -> Vec<Transaction> {
+        vec![self.tx.clone()]
+    }
+    fn mempool_for_compact_block(
+        &self,
+    ) -> Vec<(Transaction, Vec<blvm_consensus::segwit::Witness>)> {
+        vec![(self.tx.clone(), self.witnesses.clone())]
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn compact_block_version_two_matches_wtxid_and_keeps_the_witness() {
+    use crate::{BitcoinProtocolEngine, ProtocolVersion};
+    let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
+    let header = sample_header();
+    let coinbase = sample_tx(0);
+    let pooled = sample_tx(7);
+    let stacks = vec![vec![vec![0x30, 0x01]]];
+    let nonce = 11u64;
+    let wtxid = short_id_preimage(&pooled, &stacks, 2);
+    let txid = short_id_preimage(&pooled, &stacks, 1);
+    assert_ne!(wtxid, txid);
+    let short = crate::bip152::short_tx_id(&header, &wtxid, nonce);
+    let cmpct = CmpctBlockMessage {
+        header: header.clone(),
+        nonce,
+        short_ids: vec![short],
+        prefilled_txs: vec![PrefilledTransaction {
+            index: 0,
+            tx: coinbase,
+            witness: None,
+        }],
+    };
+    let mut peer = PeerState::new();
+    peer.compact_block_version = Some(2);
+    let response = process_cmpctblock_message(
+        &engine,
+        &cmpct,
+        &mut peer,
+        Some(&WitnessMempool {
+            tx: pooled.clone(),
+            witnesses: stacks.clone(),
+        }),
+        None,
+        None,
+        &ProtocolConfig::default(),
+    )
+    .unwrap();
+    match response {
+        NetworkResponse::SendMessage(message) => match *message {
+            NetworkMessage::Block(block, witnesses) => {
+                assert_eq!(block.transactions.len(), 2);
+                assert_eq!(block.transactions[1], pooled);
+                assert_eq!(witnesses.len(), 2);
+                assert!(witnesses[0].is_empty());
+                assert_eq!(witnesses[1], stacks);
+            }
+            other => panic!("expected the reconstructed block, got {other:?}"),
+        },
+        other => panic!("expected the reconstructed block, got {other:?}"),
+    }
+
+    let txid_short = crate::bip152::short_tx_id(&header, &txid, nonce);
+    let cmpct = CmpctBlockMessage {
+        header,
+        nonce,
+        short_ids: vec![txid_short],
+        prefilled_txs: vec![PrefilledTransaction {
+            index: 0,
+            tx: sample_tx(0),
+            witness: None,
+        }],
+    };
+    let mut peer = PeerState::new();
+    peer.compact_block_version = Some(2);
+    let asked = process_cmpctblock_message(
+        &engine,
+        &cmpct,
+        &mut peer,
+        Some(&WitnessMempool {
+            tx: pooled,
+            witnesses: stacks,
+        }),
+        None,
+        None,
+        &ProtocolConfig::default(),
+    )
+    .unwrap();
+    assert!(matches!(
+        asked,
+        NetworkResponse::SendMessage(ref message) if matches!(**message, NetworkMessage::GetBlockTxn(_))
+    ));
 }
 
 #[cfg(test)]
