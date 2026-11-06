@@ -360,7 +360,7 @@ jobs:
 
           # 0.1.48 check-drift exits on notation mismatches and on functions the
           # Orange Paper does not name. 0.1.45 is the verifier that passed 0.1.39 (same pin as consensus).
-          cargo install --force blvm-spec-lock --version 0.1.45 --locked --features z3
+          cargo install --force blvm-spec-lock --version '>=0.1, <1' --locked --features z3
 
           if [ -f "../blvm-spec/PROTOCOL.md" ] && [ -f "../blvm-spec/ARCHITECTURE.md" ]; then
             SPEC_PATH_ARGS="--spec-path ../blvm-spec/PROTOCOL.md ../blvm-spec/ARCHITECTURE.md"
