@@ -12,8 +12,11 @@ pub const BITCOIN_MAGIC_TESTNET: [u8; 4] = [0x0b, 0x11, 0x09, 0x07];
 /// Regtest magic.
 pub const BITCOIN_MAGIC_REGTEST: [u8; 4] = [0xfa, 0xbf, 0xb5, 0xda];
 
-/// Maximum P2P message size including 24-byte header (32 MiB payload cap in practice).
-pub const MAX_PROTOCOL_MESSAGE_LENGTH: usize = 32 * 1024 * 1024;
+/// Maximum P2P payload. A block message is at most this many bytes.
+pub const MAX_PROTOCOL_PAYLOAD: usize = 4_000_000;
+
+/// Maximum P2P message size, including the 24-byte header.
+pub const MAX_PROTOCOL_MESSAGE_LENGTH: usize = MAX_PROTOCOL_PAYLOAD + 24;
 
 /// Maximum addresses in an `addr` message (`MAX_ADDR_TO_SEND`).
 pub const MAX_ADDR_TO_SEND: usize = 1000;

@@ -497,6 +497,15 @@ pub struct PeerState {
     pub compact_block_version: Option<u8>,
     /// BIP152: peer prefers compact blocks when true.
     pub prefer_compact_block: bool,
+    /// This peer was sent `sendcmpct` with announce true and still holds that slot.
+    pub high_bandwidth: bool,
+    /// Last header height this peer has accepted from us, or that we accepted from them.
+    /// Version `start_height` is not this value.
+    pub known_header_height: Option<u64>,
+    /// Peer sent `wtxidrelay` after version and before verack.
+    pub wtxid_relay: bool,
+    /// `sendpackages` version word received before verack.
+    pub package_remote: Option<u64>,
     /// Compact block waiting on `blocktxn` for the short ids the mempool did not fill.
     pub(crate) pending_compact: Option<PendingCompact>,
     /// BIP324: v2 encrypted transport state (if enabled)
@@ -530,6 +539,10 @@ impl PeerState {
             prefer_headers: false,
             compact_block_version: None,
             prefer_compact_block: false,
+            high_bandwidth: false,
+            known_header_height: None,
+            wtxid_relay: false,
+            package_remote: None,
             pending_compact: None,
             #[cfg(all(
                 feature = "bip324",

@@ -5,8 +5,8 @@ use sha2::{Digest, Sha256};
 /// Bitcoin P2P message header size (magic + command + length + checksum)
 pub const MESSAGE_HEADER_SIZE: usize = 4 + 12 + 4 + 4;
 
-/// Maximum message payload size (32 MB)
-pub const MAX_MESSAGE_PAYLOAD: usize = 32 * 1024 * 1024;
+/// Maximum message payload size.
+pub const MAX_MESSAGE_PAYLOAD: usize = crate::p2p_framing::MAX_PROTOCOL_PAYLOAD;
 
 /// Calculate checksum for message payload (first 4 bytes of double SHA256)
 pub fn calculate_checksum(payload: &[u8]) -> [u8; 4] {

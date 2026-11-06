@@ -114,7 +114,7 @@ fn test_build_block_filter_basic() {
     let block = vec![tx];
     let previous_scripts = vec![];
 
-    let filter = build_block_filter(&block, &previous_scripts).unwrap();
+    let filter = build_block_filter(&[0u8; 32], &block, &previous_scripts).unwrap();
 
     assert!(!filter.filter_data.is_empty() || filter.num_elements == 0);
 }
@@ -175,7 +175,7 @@ fn test_build_block_filter_with_multiple_transactions() {
     let block = vec![tx1, tx2];
     let previous_scripts = vec![];
 
-    let filter = build_block_filter(&block, &previous_scripts).unwrap();
+    let filter = build_block_filter(&[0u8; 32], &block, &previous_scripts).unwrap();
 
     // Should have at least 2 elements (one per unique script)
     assert!(filter.num_elements >= 2);
@@ -188,7 +188,7 @@ fn test_build_block_filter_with_empty_block() {
     let block = vec![coinbase];
     let previous_scripts = vec![];
 
-    let filter = build_block_filter(&block, &previous_scripts).unwrap();
+    let filter = build_block_filter(&[0u8; 32], &block, &previous_scripts).unwrap();
 
     // Should have at least 1 element (coinbase output script)
     assert!(filter.num_elements >= 1);
@@ -249,7 +249,7 @@ fn test_build_block_filter_with_previous_scripts() {
         0x33,
     ]];
 
-    let filter = build_block_filter(&block, &previous_scripts).unwrap();
+    let filter = build_block_filter(&[0u8; 32], &block, &previous_scripts).unwrap();
 
     // Should include both output script and previous script
     assert!(filter.num_elements >= 2);
@@ -291,10 +291,10 @@ fn test_match_filter_positive_match() {
     let block = vec![tx];
     let previous_scripts = vec![];
 
-    let filter = build_block_filter(&block, &previous_scripts).unwrap();
+    let filter = build_block_filter(&[0u8; 32], &block, &previous_scripts).unwrap();
 
     // Should match the script that's in the block
-    assert!(match_filter(&filter, &script));
+    assert!(match_filter(&[0u8; 32], &filter, &script));
 }
 
 #[test]
@@ -355,12 +355,12 @@ fn test_match_filter_negative_match() {
     let block = vec![tx];
     let previous_scripts = vec![];
 
-    let filter = build_block_filter(&block, &previous_scripts).unwrap();
+    let filter = build_block_filter(&[0u8; 32], &block, &previous_scripts).unwrap();
 
     // Should not match script that's not in the block
     // Note: Due to false positives, this might still match, but with low probability
     // For deterministic testing, we use distinct scripts
-    let _matches = match_filter(&filter, &script_not_in_block);
+    let _matches = match_filter(&[0u8; 32], &filter, &script_not_in_block);
     // We can't assert false here due to false positives, but we can verify the filter works
     assert!(filter.num_elements > 0);
 }
@@ -400,7 +400,7 @@ fn test_match_filter_with_empty_filter() {
     ];
 
     // Empty filter should never match
-    assert!(!match_filter(&empty_filter, &script));
+    assert!(!match_filter(&[0u8; 32], &empty_filter, &script));
 }
 
 #[test]
@@ -462,14 +462,14 @@ fn test_match_filter_with_previous_scripts() {
     let block = vec![tx];
     let previous_scripts = vec![script_in_previous.clone()];
 
-    let filter = build_block_filter(&block, &previous_scripts).unwrap();
+    let filter = build_block_filter(&[0u8; 32], &block, &previous_scripts).unwrap();
 
     // Verify filter was built with both scripts
     assert!(filter.num_elements >= 2);
 
     // Should match the previous script (may have false positives, but should generally match)
     // Note: Due to GCS false positive rate, we verify the filter contains the element
-    let matches = match_filter(&filter, &script_in_previous);
+    let matches = match_filter(&[0u8; 32], &filter, &script_in_previous);
     // If it doesn't match, it could be a hash collision issue - verify filter was built correctly
     if !matches {
         // This could indicate an issue with the filter building or matching
@@ -546,7 +546,7 @@ fn test_filter_roundtrip() {
     let block = vec![tx];
     let previous_scripts = vec![];
 
-    let filter = build_block_filter(&block, &previous_scripts).unwrap();
+    let filter = build_block_filter(&[0u8; 32], &block, &previous_scripts).unwrap();
 
     // Verify filter was built
     assert!(filter.num_elements >= 1);
@@ -554,7 +554,7 @@ fn test_filter_roundtrip() {
     // All scripts in block should match (may have false positives, but should generally match)
     // Note: GCS filters have a false positive rate, so we verify the filter structure
     for script in &scripts {
-        let matches = match_filter(&filter, script);
+        let matches = match_filter(&[0u8; 32], &filter, script);
         // Due to the probabilistic nature of GCS, we verify the filter was built correctly
         // If it doesn't match, it could indicate an implementation issue
         if !matches {
@@ -598,10 +598,10 @@ fn test_filter_with_duplicate_scripts() {
     let block = vec![tx];
     let previous_scripts = vec![];
 
-    let filter = build_block_filter(&block, &previous_scripts).unwrap();
+    let filter = build_block_filter(&[0u8; 32], &block, &previous_scripts).unwrap();
 
     // Should still match (duplicates should be deduplicated)
-    assert!(match_filter(&filter, &script));
+    assert!(match_filter(&[0u8; 32], &filter, &script));
     // Should have only 1 unique element
     assert_eq!(filter.num_elements, 1);
 }
@@ -610,6 +610,5 @@ fn test_filter_with_duplicate_scripts() {
 fn test_filter_constants() {
     // Test that BIP158 constants are correct
     assert_eq!(BIP158_P, 19);
-    assert_eq!(BIP158_M, 1 << 19); // 2^19 = 524,288
-    assert_eq!(BIP158_M, 524288);
+    assert_eq!(BIP158_M, 784_931);
 }

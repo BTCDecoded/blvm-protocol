@@ -25,5 +25,5 @@ fuzz_target!(|data: &[u8]| {
     } else {
         data
     };
-    let _ = match_filter(&filter, script);
+    let _ = match_filter(&[0u8; 32], &filter, script);
 });

@@ -4,6 +4,7 @@
 pub mod cmd {
     pub const ADDR: &str = "addr";
     pub const ADDRV2: &str = "addrv2";
+    pub const ANCPKGINFO: &str = "ancpkginfo";
     pub const BANLIST: &str = "banlist";
     pub const BLOCK: &str = "block";
     pub const BLOCKTXN: &str = "blocktxn";
@@ -26,6 +27,7 @@ pub mod cmd {
     pub const GETMODULEBYHASH: &str = "getmodulebyhash";
     pub const GETMODULELIST: &str = "getmodulelist";
     pub const GETPAYMENTREQUEST: &str = "getpaymentrequest";
+    pub const GETPKGTXNS: &str = "getpkgtxns";
     pub const GETUTXOPROOF: &str = "getutxoproof";
     pub const GETUTXOSET: &str = "getutxoset";
     pub const GETBLOCKS: &str = "getblocks";
@@ -45,12 +47,14 @@ pub mod cmd {
     pub const PING: &str = "ping";
     pub const PKGTXN: &str = "pkgtxn";
     pub const PKGTXNREJECT: &str = "pkgtxnreject";
+    pub const PKGTXNS: &str = "pkgtxns";
     pub const PONG: &str = "pong";
     pub const REQRECON: &str = "reqrecon";
     pub const REQSKT: &str = "reqskt";
     pub const REJECT: &str = "reject";
     pub const SENDCMPCT: &str = "sendcmpct";
     pub const SENDHEADERS: &str = "sendheaders";
+    pub const SENDPACKAGES: &str = "sendpackages";
     pub const SENDPKGTXN: &str = "sendpkgtxn";
     pub const SENDTXRCNCL: &str = "sendtxrcncl";
     pub const SETTLEMENTNOTIFICATION: &str = "settlementnotification";
@@ -60,4 +64,5 @@ pub mod cmd {
     pub const UTXOSET: &str = "utxoset";
     pub const VERACK: &str = "verack";
     pub const VERSION: &str = "version";
+    pub const WTXIDRELAY: &str = "wtxidrelay";
 }

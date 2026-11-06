@@ -4,7 +4,7 @@
 //! rules stay single-sourced.
 
 use crate::error::{ProtocolError, Result};
-use crate::p2p_framing::MAX_PROTOCOL_MESSAGE_LENGTH;
+use crate::p2p_framing::{MAX_PROTOCOL_MESSAGE_LENGTH, MAX_PROTOCOL_PAYLOAD};
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 
@@ -59,7 +59,7 @@ pub fn parse_p2p_frame(
     }
 
     let payload_length = u32::from_le_bytes([data[16], data[17], data[18], data[19]]) as usize;
-    if payload_length > MAX_PROTOCOL_MESSAGE_LENGTH.saturating_sub(24) {
+    if payload_length > MAX_PROTOCOL_PAYLOAD {
         return Err(ProtocolError::InvalidMessage(Cow::Borrowed(
             "Payload too large",
         )));

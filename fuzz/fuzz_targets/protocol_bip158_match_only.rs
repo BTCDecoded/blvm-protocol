@@ -10,5 +10,5 @@ fuzz_target!(|data: &[u8]| {
         num_elements: n,
     };
     let script = if data.len() > 64 { &data[..64] } else { data };
-    let _ = match_filter(&f, script);
+    let _ = match_filter(&[0u8; 32], &f, script);
 });

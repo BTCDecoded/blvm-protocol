@@ -228,7 +228,7 @@ fn test_serialize_deserialize_roundtrip_verack() {
 fn test_wire_format_constants() {
     // Verify constants match Bitcoin protocol spec
     assert_eq!(MESSAGE_HEADER_SIZE, 24); // 4 + 12 + 4 + 4
-    assert_eq!(MAX_MESSAGE_PAYLOAD, 32 * 1024 * 1024); // 32 MB
+    assert_eq!(MAX_MESSAGE_PAYLOAD, 4_000_000);
 }
 
 #[test]

@@ -47,25 +47,25 @@ fn test_checksum_calculation() {
 fn test_wire_format_constants() {
     // Test that wire format constants are accessible
     // MESSAGE_HEADER_SIZE = 4 + 12 + 4 + 4 = 24 bytes
-    // MAX_MESSAGE_PAYLOAD = 32 MB
+    // MAX_MESSAGE_PAYLOAD = 4_000_000
 
     // These constants would be testable if wire module was exported
     // For now, we verify the expected structure
     let expected_header_size = 24; // 4 (magic) + 12 (command) + 4 (length) + 4 (checksum)
-    let expected_max_payload = 32 * 1024 * 1024; // 32 MB
+    let expected_max_payload = blvm_protocol::wire::MAX_MESSAGE_PAYLOAD;
 
     // Verify constants match expected Bitcoin protocol values
     assert_eq!(expected_header_size, 24);
-    assert_eq!(expected_max_payload, 33_554_432);
+    assert_eq!(expected_max_payload, 4_000_000);
 }
 
 #[test]
 fn test_message_size_limits() {
     // Test that message size limits are enforced
-    // MAX_MESSAGE_PAYLOAD should be 32 MB
+    // MAX_MESSAGE_PAYLOAD is 4_000_000 bytes.
 
-    let max_payload = 32 * 1024 * 1024;
-    assert_eq!(max_payload, 33_554_432);
+    let max_payload = blvm_protocol::wire::MAX_MESSAGE_PAYLOAD;
+    assert_eq!(max_payload, 4_000_000);
 
     // Verify this matches Bitcoin protocol limits
     assert!(max_payload > 0);
@@ -168,13 +168,13 @@ fn test_empty_payload() {
 #[test]
 fn test_large_payload_boundary() {
     // Test payload size boundary conditions
-    // MAX_MESSAGE_PAYLOAD = 32 MB
+    // MAX_MESSAGE_PAYLOAD = 4_000_000
 
-    let max_payload = 32 * 1024 * 1024;
+    let max_payload = blvm_protocol::wire::MAX_MESSAGE_PAYLOAD;
     let over_limit = max_payload + 1;
 
     // Verify boundary values
-    assert_eq!(max_payload, 33_554_432);
+    assert_eq!(max_payload, 4_000_000);
     assert!(over_limit > max_payload);
 }
 

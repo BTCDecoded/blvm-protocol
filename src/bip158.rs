@@ -7,15 +7,14 @@
 //! without downloading the entire block.
 
 use crate::Transaction;
-use sha2::{Digest, Sha256};
+use crate::bip152::siphash24;
 use std::sync::Arc;
 
-/// BIP158 filter parameter: false positive rate (2^(-P))
-/// P = 19 means ~1 in 524,288 false positives
+/// Golomb-Rice parameter P. The false-positive rate is about 1 in 2^P.
 pub const BIP158_P: u8 = 19;
 
-/// BIP158 filter parameter: multiplier M = 2^P
-pub const BIP158_M: u64 = 1 << BIP158_P; // 2^19 = 524,288
+/// Range multiplier. F = N * BIP158_M.
+pub const BIP158_M: u64 = 784_931;
 
 /// Compact block filter (GCS)
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,20 +25,16 @@ pub struct CompactBlockFilter {
     pub num_elements: u32,
 }
 
-/// Hash a script to a number in range [0, N*M)
-fn hash_to_range(script: &[u8], n: u64, m: u64) -> u64 {
-    // Hash script with SHA256
-    let mut hasher = Sha256::new();
-    hasher.update(script);
-    let hash = hasher.finalize();
+fn filter_key(block_hash: &[u8; 32]) -> (u64, u64) {
+    let k0 = u64::from_le_bytes(block_hash[0..8].try_into().expect("8"));
+    let k1 = u64::from_le_bytes(block_hash[8..16].try_into().expect("8"));
+    (k0, k1)
+}
 
-    // Interpret first 8 bytes as u64 (little-endian)
-    let hash_value = u64::from_le_bytes([
-        hash[0], hash[1], hash[2], hash[3], hash[4], hash[5], hash[6], hash[7],
-    ]);
-
-    // Map to range [0, N*M)
-    hash_value % (n * m)
+/// `(siphash24(k0, k1, script) as u128 * F as u128) >> 64`.
+fn map_script(k0: u64, k1: u64, script: &[u8], f: u128) -> u64 {
+    let hashed = siphash24(k0, k1, script) as u128;
+    ((hashed.saturating_mul(f)) >> 64) as u64
 }
 
 /// Bit writer for Golomb-Rice encoding
@@ -118,22 +113,49 @@ fn golomb_rice_encode(value: u64, p: u8) -> Vec<u8> {
     writer.finish()
 }
 
-/// Encode sorted hashed values as Golomb-Rice differences from zero.
-/// Each value is byte-aligned, matching concatenation of [`golomb_rice_encode`].
+/// Golomb-Rice deltas from 0, one bitstream. The partial byte is flushed once.
 fn encode_sorted_differences(values: &[u64]) -> Vec<u8> {
     let mut writer = BitWriter::new();
-    let Some((first, rest)) = values.split_first() else {
-        return writer.finish();
-    };
-    writer.write_golomb_rice(*first, BIP158_P);
-    writer.align_byte();
-    let mut prev = *first;
-    for value in rest {
-        writer.write_golomb_rice(value - prev, BIP158_P);
-        writer.align_byte();
+    let mut prev = 0u64;
+    for value in values {
+        writer.write_golomb_rice(value.saturating_sub(prev), BIP158_P);
         prev = *value;
     }
     writer.finish()
+}
+
+fn write_compact_size(n: u64, out: &mut Vec<u8>) {
+    if n < 253 {
+        out.push(n as u8);
+    } else if n <= u16::MAX as u64 {
+        out.push(0xfd);
+        out.extend_from_slice(&(n as u16).to_le_bytes());
+    } else if n <= u32::MAX as u64 {
+        out.push(0xfe);
+        out.extend_from_slice(&(n as u32).to_le_bytes());
+    } else {
+        out.push(0xff);
+        out.extend_from_slice(&n.to_le_bytes());
+    }
+}
+
+fn read_compact_size(data: &[u8]) -> Option<(u64, usize)> {
+    let first = *data.first()?;
+    match first {
+        n @ 0..=252 => Some((n as u64, 1)),
+        0xfd => {
+            let bytes = data.get(1..3)?;
+            Some((u16::from_le_bytes([bytes[0], bytes[1]]) as u64, 3))
+        }
+        0xfe => {
+            let bytes: [u8; 4] = data.get(1..5)?.try_into().ok()?;
+            Some((u32::from_le_bytes(bytes) as u64, 5))
+        }
+        _ => {
+            let bytes: [u8; 8] = data.get(1..9)?.try_into().ok()?;
+            Some((u64::from_le_bytes(bytes), 9))
+        }
+    }
 }
 
 /// Bit reader for Golomb-Rice decoding
@@ -206,6 +228,7 @@ fn golomb_rice_decode(reader: &mut BitReader, p: u8) -> Option<u64> {
 /// 1. All spendable output scriptPubKeys in the block
 /// 2. All scriptPubKeys from outputs spent by block's inputs
 pub fn build_block_filter(
+    block_hash: &[u8; 32],
     block_transactions: &[Transaction],
     previous_outpoint_scripts: &[Vec<u8>],
 ) -> Result<CompactBlockFilter, String> {
@@ -213,11 +236,12 @@ pub fn build_block_filter(
         .iter()
         .map(Vec::as_slice)
         .collect();
-    build_block_filter_slices(block_transactions, &refs)
+    build_block_filter_slices(block_hash, block_transactions, &refs)
 }
 
 /// Same filter as [`build_block_filter`]. The spent scripts are borrowed.
 pub fn build_block_filter_slices<'a>(
+    block_hash: &[u8; 32],
     block_transactions: &'a [Transaction],
     previous_outpoint_scripts: &[&'a [u8]],
 ) -> Result<CompactBlockFilter, String> {
@@ -227,53 +251,45 @@ pub fn build_block_filter_slices<'a>(
             output_scripts.push(output.script_pubkey.as_slice());
         }
     }
-    build_block_filter_output_scripts(output_scripts, previous_outpoint_scripts)
+    build_block_filter_output_scripts(block_hash, output_scripts, previous_outpoint_scripts)
 }
 
 /// Same filter as [`build_block_filter_slices`], from output scripts already in hand.
 ///
 /// `output_scripts` is reused. Spent scripts are appended to it. Empty scripts are dropped.
 pub fn build_block_filter_output_scripts<'a>(
+    block_hash: &[u8; 32],
     mut scripts: Vec<&'a [u8]>,
     previous_outpoint_scripts: &[&'a [u8]],
 ) -> Result<CompactBlockFilter, String> {
-    scripts.retain(|script| !script.is_empty());
-    scripts.extend(
-        previous_outpoint_scripts
-            .iter()
-            .copied()
-            .filter(|script| !script.is_empty()),
-    );
-
-    // Unique by script bytes. N for the range hash is this count.
+    scripts.extend(previous_outpoint_scripts.iter().copied());
+    scripts.retain(|script| !script.is_empty() && script.first() != Some(&0x6a));
     scripts.sort_unstable();
     scripts.dedup();
     let n = scripts.len() as u64;
     if n == 0 {
-        // Empty filter
+        // Compact-size 0. An empty byte string omits N.
         return Ok(CompactBlockFilter {
-            filter_data: Arc::new(Vec::new()),
+            filter_data: Arc::new(vec![0]),
             num_elements: 0,
         });
     }
 
-    // Hash each script to range [0, N*M)
+    let (k0, k1) = filter_key(block_hash);
+    let f = (n as u128).saturating_mul(BIP158_M as u128);
     let mut hashed_values: Vec<u64> = scripts
         .iter()
-        .map(|script| hash_to_range(script, n, BIP158_M))
+        .map(|script| map_script(k0, k1, script, f))
         .collect();
-
-    // Sort and remove duplicates
     hashed_values.sort_unstable();
-    hashed_values.dedup();
 
-    // Update n after deduplication. The first encoded value is the difference from 0.
-    let n_final = hashed_values.len() as u64;
-    let filter_data = Arc::new(encode_sorted_differences(&hashed_values));
+    let mut filter_data = Vec::new();
+    write_compact_size(n, &mut filter_data);
+    filter_data.extend(encode_sorted_differences(&hashed_values));
 
     Ok(CompactBlockFilter {
-        filter_data,
-        num_elements: n_final as u32,
+        filter_data: Arc::new(filter_data),
+        num_elements: n as u32,
     })
 }
 
@@ -283,18 +299,26 @@ pub fn build_block_filter_output_scripts<'a>(
 /// A filter that does not fully decode returns false.
 ///
 /// Algorithm:
-/// 1. Hash the script to get a value in range [0, N*M)
-/// 2. Walk the Golomb-Rice differences, rebuilding each hashed value
-/// 3. The script matches when its hash is one of those values
-pub fn match_filter(filter: &CompactBlockFilter, script: &[u8]) -> bool {
+/// 1. Map the script with the block-hash key and F = N * M
+/// 2. Read the compact-size count, then the Golomb-Rice differences
+/// 3. The script matches when its mapped value is one of those values
+pub fn match_filter(block_hash: &[u8; 32], filter: &CompactBlockFilter, script: &[u8]) -> bool {
     if filter.num_elements == 0 {
         return false;
     }
 
     let n = filter.num_elements as u64;
-    let script_hash = hash_to_range(script, n, BIP158_M);
+    let Some((counted, offset)) = read_compact_size(filter.filter_data.as_slice()) else {
+        return false;
+    };
+    if counted != n {
+        return false;
+    }
+    let (k0, k1) = filter_key(block_hash);
+    let f = (n as u128).saturating_mul(BIP158_M as u128);
+    let script_hash = map_script(k0, k1, script, f);
 
-    let mut reader = BitReader::new(filter.filter_data.as_slice());
+    let mut reader = BitReader::new(&filter.filter_data[offset..]);
     let mut current_value = 0u64;
     let mut found = false;
     for _ in 0..filter.num_elements {
@@ -313,13 +337,29 @@ pub fn match_filter(filter: &CompactBlockFilter, script: &[u8]) -> bool {
 mod tests {
     use super::*;
 
+    const BLOCK_HASH: [u8; 32] = [0x11; 32];
+
     #[test]
-    fn test_hash_to_range() {
-        let script = b"test script";
-        let n = 100;
-        let m = BIP158_M;
-        let value = hash_to_range(script, n, m);
-        assert!(value < n * m);
+    fn one_script_encodes_the_mapped_value_and_ignores_op_return() {
+        let script = b"\x51";
+        let filter =
+            build_block_filter_output_scripts(&BLOCK_HASH, vec![script.as_slice()], &[]).unwrap();
+        let (k0, k1) = filter_key(&BLOCK_HASH);
+        let mapped = ((siphash24(k0, k1, script) as u128 * 784_931) >> 64) as u64;
+        let mut expected = Vec::new();
+        write_compact_size(1, &mut expected);
+        expected.extend(golomb_rice_encode(mapped, BIP158_P));
+        assert_eq!(filter.filter_data.as_slice(), expected.as_slice());
+        assert_eq!(filter.num_elements, 1);
+        assert!(match_filter(&BLOCK_HASH, &filter, script));
+
+        let with_return = build_block_filter_output_scripts(
+            &BLOCK_HASH,
+            vec![script.as_slice(), &[0x6a, 0x01]],
+            &[],
+        )
+        .unwrap();
+        assert_eq!(with_return.filter_data, filter.filter_data);
     }
 
     #[test]
@@ -334,24 +374,21 @@ mod tests {
 
     #[test]
     fn test_empty_filter() {
-        let filter = build_block_filter(&[], &[]).unwrap();
+        let filter = build_block_filter(&BLOCK_HASH, &[], &[]).unwrap();
         assert_eq!(filter.num_elements, 0);
-        assert!(filter.filter_data.is_empty());
+        assert_eq!(filter.filter_data.as_slice(), &[0]);
     }
 
     #[test]
-    fn test_joined_golomb_matches_separate_encodings() {
+    fn test_deltas_share_one_bitstream() {
         let values = [0u64, 1, 100, 10_000];
-        let mut separate = Vec::new();
-        for value in values {
-            separate.extend(golomb_rice_encode(value, BIP158_P));
-        }
         let mut writer = BitWriter::new();
+        let mut prev = 0u64;
         for value in values {
-            writer.write_golomb_rice(value, BIP158_P);
-            writer.align_byte();
+            writer.write_golomb_rice(value - prev, BIP158_P);
+            prev = value;
         }
-        assert_eq!(writer.finish(), separate);
+        assert_eq!(writer.finish(), encode_sorted_differences(&values));
     }
 
     #[test]
@@ -392,17 +429,17 @@ mod tests {
         };
 
         // Build filter
-        let filter = build_block_filter(&[tx.clone()], &[]).unwrap();
+        let filter = build_block_filter(&BLOCK_HASH, &[tx.clone()], &[]).unwrap();
         assert!(filter.num_elements > 0);
 
         // Match the script that's in the filter
         let script_in_filter = &tx.outputs[0].script_pubkey;
-        assert!(match_filter(&filter, script_in_filter));
+        assert!(match_filter(&BLOCK_HASH, &filter, script_in_filter));
 
         // Match a script that's not in the filter
         let script_not_in_filter = vec![0x53, 0x54]; // OP_3 OP_4
         // Note: May have false positives due to GCS nature, but should generally work
-        let _matched = match_filter(&filter, &script_not_in_filter);
+        let _matched = match_filter(&BLOCK_HASH, &filter, &script_not_in_filter);
         // False positives are possible, so we can't assert false
         // But we can verify the filter works for scripts that are definitely in it
 
@@ -411,7 +448,7 @@ mod tests {
             filter_data: filter.filter_data.clone(),
             num_elements: filter.num_elements + 1,
         };
-        assert!(!match_filter(&truncated, script_in_filter));
+        assert!(!match_filter(&BLOCK_HASH, &truncated, script_in_filter));
     }
 
     #[test]
@@ -431,9 +468,100 @@ mod tests {
                 .into(),
             lock_time: 0,
         };
-        let first = build_block_filter(&[tx(&[b"\x51\x52", b"\x53\x54"])], &[]).unwrap();
-        let second = build_block_filter(&[tx(&[b"\x53\x54", b"\x51\x52"])], &[]).unwrap();
+        let first =
+            build_block_filter(&BLOCK_HASH, &[tx(&[b"\x51\x52", b"\x53\x54"])], &[]).unwrap();
+        let second =
+            build_block_filter(&BLOCK_HASH, &[tx(&[b"\x53\x54", b"\x51\x52"])], &[]).unwrap();
         assert_eq!(first, second);
         assert_eq!(first.num_elements, 2);
+    }
+
+    /// Bytes from an independent SipHash-2-4 and one Golomb-Rice bitstream.
+    /// Block hash is 32 bytes of `0x11`. `P` is 19 and `F` is `N * 784_931`.
+    #[test]
+    fn known_filter_bytes_match_an_independent_encoding() {
+        let one = build_block_filter_output_scripts(&BLOCK_HASH, vec![b"\x51"], &[]).unwrap();
+        let expected = hex_bytes("01719c40");
+        assert_eq!(one.filter_data.as_slice(), expected.as_slice());
+        assert_eq!(one.num_elements, 1);
+        assert!(match_filter(&BLOCK_HASH, &one, b"\x51"));
+        assert!(!match_filter(&BLOCK_HASH, &one, b"\x52"));
+
+        let with_return =
+            build_block_filter_output_scripts(&BLOCK_HASH, vec![b"\x51", &[0x6a, 0x01]], &[])
+                .unwrap();
+        assert_eq!(with_return.filter_data.as_slice(), expected.as_slice());
+
+        let duplicated =
+            build_block_filter_output_scripts(&BLOCK_HASH, vec![b"\x51", b"\x51"], &[]).unwrap();
+        assert_eq!(duplicated.filter_data.as_slice(), expected.as_slice());
+
+        let two =
+            build_block_filter_output_scripts(&BLOCK_HASH, vec![b"\x52", b"\x51"], &[]).unwrap();
+        assert_eq!(
+            two.filter_data.as_slice(),
+            hex_bytes("02b19c4999d800").as_slice()
+        );
+        assert_eq!(two.num_elements, 2);
+        assert!(match_filter(&BLOCK_HASH, &two, b"\x51"));
+        assert!(match_filter(&BLOCK_HASH, &two, b"\x52"));
+
+        let collided = build_block_filter_output_scripts(
+            &BLOCK_HASH,
+            vec![&[0x25, 0x01, 0x00], &[0x2e, 0x08, 0x00]],
+            &[],
+        )
+        .unwrap();
+        assert_eq!(collided.num_elements, 2);
+        assert_eq!(
+            collided.filter_data.as_slice(),
+            hex_bytes("0207aea00000").as_slice()
+        );
+        assert!(match_filter(&BLOCK_HASH, &collided, &[0x25, 0x01, 0x00]));
+        assert!(match_filter(&BLOCK_HASH, &collided, &[0x2e, 0x08, 0x00]));
+
+        let empty = build_block_filter_output_scripts(&BLOCK_HASH, vec![], &[]).unwrap();
+        assert_eq!(empty.filter_data.as_slice(), &[0]);
+        assert!(!match_filter(&BLOCK_HASH, &empty, b"\x51"));
+        let only_return =
+            build_block_filter_output_scripts(&BLOCK_HASH, vec![&[0x6a]], &[]).unwrap();
+        assert_eq!(only_return.filter_data.as_slice(), &[0]);
+
+        // Quotient 1. Mapped value 730006 is 1 * 2^19 + 205718.
+        let unary =
+            build_block_filter_output_scripts(&BLOCK_HASH, vec![&[0x04, 0x00]], &[]).unwrap();
+        assert_eq!(
+            unary.filter_data.as_slice(),
+            hex_bytes("01991cb0").as_slice()
+        );
+        assert!(match_filter(&BLOCK_HASH, &unary, &[0x04, 0x00]));
+
+        // Eight scripts. Deltas have quotients 2, 1, 0, 2, 3, 0, 0, 0.
+        let scripts: [&[u8]; 8] = [
+            &[0x01, 0x00, 0x5a],
+            &[0x02, 0x00, 0x5a],
+            &[0x03, 0x00, 0x5a],
+            &[0x04, 0x00, 0x5a],
+            &[0x05, 0x00, 0x5a],
+            &[0x06, 0x00, 0x5a],
+            &[0x07, 0x00, 0x5a],
+            &[0x08, 0x00, 0x5a],
+        ];
+        let wide = build_block_filter_output_scripts(&BLOCK_HASH, scripts.to_vec(), &[]).unwrap();
+        assert_eq!(wide.num_elements, 8);
+        assert_eq!(
+            wide.filter_data.as_slice(),
+            hex_bytes("08c09d02f1a544977793c53f77dc52be4722d7e3911d").as_slice()
+        );
+        for script in scripts {
+            assert!(match_filter(&BLOCK_HASH, &wide, script));
+        }
+    }
+
+    fn hex_bytes(hex: &str) -> Vec<u8> {
+        (0..hex.len())
+            .step_by(2)
+            .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).unwrap())
+            .collect()
     }
 }
