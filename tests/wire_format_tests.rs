@@ -379,6 +379,75 @@ fn test_version_message_user_agent_variants() {
 }
 
 #[test]
+fn non_utf8_user_agent_finishes_the_handshake() {
+    use blvm_protocol::wire::{deserialize_version, serialize_version};
+
+    let version = VersionMessage {
+        version: 70015,
+        services: 1,
+        timestamp: 1,
+        addr_recv: NetworkAddress {
+            time: 0,
+            services: 0,
+            ip: [0u8; 16],
+            port: 0,
+        },
+        addr_from: NetworkAddress {
+            time: 0,
+            services: 0,
+            ip: [0u8; 16],
+            port: 0,
+        },
+        nonce: 0,
+        user_agent: "a".to_string(),
+        start_height: 0,
+        relay: false,
+    };
+    let mut serialized = serialize_version(&version).expect("serialize");
+    let agent_at = serialized.len() - 6;
+    assert_eq!(serialized[agent_at], b'a');
+    serialized[agent_at] = 0xff;
+    let decoded = deserialize_version(&serialized).expect("non-utf8 agent is accepted");
+    assert_eq!(decoded.user_agent, "\u{FFFD}");
+}
+
+#[test]
+fn framed_tx_keeps_its_witness() {
+    use blvm_protocol::wire::{deserialize_message, serialize_message};
+    use blvm_protocol::{OutPoint, Transaction, TransactionInput, TransactionOutput};
+    use std::io::Cursor;
+    use std::sync::Arc;
+
+    let tx = Transaction {
+        version: 2,
+        inputs: vec![TransactionInput {
+            prevout: OutPoint {
+                hash: [1u8; 32],
+                index: 0,
+            },
+            script_sig: Vec::new(),
+            sequence: 0xffffffff,
+        }]
+        .into(),
+        outputs: vec![TransactionOutput {
+            value: 1000,
+            script_pubkey: vec![0x51],
+        }]
+        .into(),
+        lock_time: 0,
+    };
+    let witnesses: Vec<blvm_protocol::Witness> = vec![vec![vec![0x30, 0x01]]];
+    let message = NetworkMessage::Tx(Arc::new(tx), witnesses.clone());
+    let magic = [0xf9, 0xbe, 0xb4, 0xd9];
+    let bytes = serialize_message(&message, magic).expect("frame");
+    let (decoded, _) = deserialize_message(&mut Cursor::new(bytes), magic).expect("decode");
+    match decoded {
+        NetworkMessage::Tx(_, got) => assert_eq!(got, witnesses),
+        other => panic!("expected tx, got {other:?}"),
+    }
+}
+
+#[test]
 fn test_version_message_network_address_encoding() {
     // Test that NetworkAddress is encoded correctly (services LE, ip, port BE)
 

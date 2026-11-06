@@ -655,7 +655,7 @@ impl TcpFramedParser {
                 let version_msg = deserialize_version(payload)?;
 
                 Ok(ProtocolMessage::Version(VersionMessage {
-                    version: version_msg.version as i32, // blvm-node uses i32, blvm-protocol uses u32
+                    version: version_msg.version,
                     services: version_msg.services,
                     timestamp: version_msg.timestamp,
                     addr_recv: version_msg.addr_recv,
@@ -861,7 +861,7 @@ impl TcpFramedParser {
                 use crate::wire::serialize_version;
 
                 let version_msg = WireVersionMessage {
-                    version: msg.version as u32,
+                    version: msg.version,
                     services: msg.services,
                     timestamp: msg.timestamp,
                     addr_recv: msg.addr_recv.clone(),

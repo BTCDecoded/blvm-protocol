@@ -27,21 +27,42 @@ pub fn read_varint<R: Read>(reader: &mut R) -> Result<u64> {
             reader
                 .read_exact(&mut buf)
                 .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
-            Ok(u16::from_le_bytes(buf) as u64)
+            let n = u16::from_le_bytes(buf) as u64;
+            if n < 253 {
+                return Err(ConsensusError::Serialization(
+                    format!("non-canonical compact size {n}").into(),
+                )
+                .into());
+            }
+            Ok(n)
         }
         0xfe => {
             let mut buf = [0u8; 4];
             reader
                 .read_exact(&mut buf)
                 .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
-            Ok(u32::from_le_bytes(buf) as u64)
+            let n = u32::from_le_bytes(buf) as u64;
+            if n < 65536 {
+                return Err(ConsensusError::Serialization(
+                    format!("non-canonical compact size {n}").into(),
+                )
+                .into());
+            }
+            Ok(n)
         }
         0xff => {
             let mut buf = [0u8; 8];
             reader
                 .read_exact(&mut buf)
                 .map_err(|e| ConsensusError::Serialization(format!("IO error: {e}").into()))?;
-            Ok(u64::from_le_bytes(buf))
+            let n = u64::from_le_bytes(buf);
+            if n < 0x1_0000_0000 {
+                return Err(ConsensusError::Serialization(
+                    format!("non-canonical compact size {n}").into(),
+                )
+                .into());
+            }
+            Ok(n)
         }
         _ => Ok(first_byte as u64),
     }
@@ -122,6 +143,20 @@ mod tests {
             let decoded = read_varint(&mut cursor).unwrap();
             assert_eq!(value, decoded);
         }
+    }
+
+    #[test]
+    fn test_varint_rejects_non_canonical() {
+        for bytes in [
+            vec![0xfd, 0x00, 0x00],
+            vec![0xfe, 0xfd, 0x00, 0x00, 0x00],
+            vec![0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        ] {
+            let mut cursor = Cursor::new(&bytes);
+            assert!(read_varint(&mut cursor).is_err(), "{bytes:?}");
+        }
+        let mut cursor = Cursor::new(vec![0u8]);
+        assert_eq!(read_varint(&mut cursor).unwrap(), 0);
     }
 
     #[test]

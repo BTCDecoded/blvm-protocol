@@ -129,8 +129,12 @@ config.service_flags.node_fibre = true;
 config.commons.utxo_commitments = true;
 config.validation.max_block_size = 4_000_000;
 
-// Load from environment variables
-let config = ProtocolConfig::from_env();
+// The node starts from this default. It does not read BLVM_PROTOCOL_VERSION,
+// BLVM_MAX_TX_SIZE, BLVM_MAX_TXS_PER_BLOCK, BLVM_MAX_LOCATOR_HASHES,
+// BLVM_SERVICE_FIBRE, BLVM_SERVICE_UTXO_COMMITMENTS, BLVM_SERVICE_BAN_LIST_SHARING,
+// BLVM_FEATURE_COMPACT_BLOCKS, or BLVM_UTXO_COMMITMENTS. A library caller can
+// still call ProtocolConfig::from_env().
+let config = ProtocolConfig::default();
 
 // Get service flags from configuration
 let service_flags = config.get_service_flags();

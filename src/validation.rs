@@ -300,19 +300,6 @@ impl BitcoinProtocolEngine {
             }
         }
 
-        for output in &tx.outputs {
-            if output.script_pubkey.len() > context.validation_rules.max_script_size as usize {
-                return Err(ProtocolError::Validation(
-                    format!(
-                        "Script size exceeds maximum: {} bytes (max {} bytes)",
-                        output.script_pubkey.len(),
-                        context.validation_rules.max_script_size
-                    )
-                    .into(),
-                ));
-            }
-        }
-
         Ok(())
     }
 

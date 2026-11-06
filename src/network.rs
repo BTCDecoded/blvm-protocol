@@ -47,7 +47,9 @@ pub enum NetworkMessage {
     /// Full block message.  Witnesses are required for correct SegWit/Taproot validation and
     /// wire round-tripping.  The second field is the per-tx, per-input witness stack.
     Block(Arc<Block>, Vec<Vec<blvm_consensus::segwit::Witness>>),
-    Tx(Arc<Transaction>),
+    /// Transaction message. The second field is the per-input witness stack.
+    /// A legacy transaction carries an empty stack list.
+    Tx(Arc<Transaction>, Vec<crate::segwit::Witness>),
     Ping(PingMessage),
     Pong(PongMessage),
     MemPool,
@@ -79,7 +81,7 @@ pub enum NetworkMessage {
 /// Version message for initial handshake
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct VersionMessage {
-    pub version: u32,
+    pub version: i32,
     pub services: u64,
     pub timestamp: i64,
     pub addr_recv: NetworkAddress,
@@ -476,7 +478,7 @@ pub(crate) struct PendingCompact {
 /// Peer connection state
 #[derive(Clone)]
 pub struct PeerState {
-    pub version: u32,
+    pub version: i32,
     pub services: u64,
     pub user_agent: String,
     pub start_height: i32,
@@ -687,7 +689,7 @@ pub fn process_network_message(
         NetworkMessage::Block(block, witnesses) => {
             process_block_message(engine, block, witnesses, utxo_set, height, config)
         }
-        NetworkMessage::Tx(tx) => process_tx_message(engine, tx, height),
+        NetworkMessage::Tx(tx, witnesses) => process_tx_message(engine, tx, witnesses, height),
         NetworkMessage::Ping(ping) => process_ping_message(ping, peer_state),
         NetworkMessage::Pong(pong) => process_pong_message(pong, peer_state),
         NetworkMessage::MemPool => process_mempool_message(chain_access),
@@ -898,7 +900,7 @@ fn process_getdata_message(
                     1 => {
                         // MSG_TX
                         if let Some(tx) = obj.as_transaction() {
-                            responses.push(NetworkMessage::Tx(Arc::clone(tx)));
+                            responses.push(NetworkMessage::Tx(Arc::clone(tx), Vec::new()));
                         }
                     }
                     2 => {
@@ -1012,6 +1014,7 @@ fn process_block_message(
 fn process_tx_message(
     engine: &BitcoinProtocolEngine,
     tx: &Transaction,
+    _witnesses: &[crate::segwit::Witness],
     height: Option<u64>,
 ) -> Result<NetworkResponse> {
     // Check protocol limits and validate
@@ -1055,7 +1058,7 @@ fn process_mempool_message(chain_access: Option<&dyn ChainStateAccess>) -> Resul
         let mut responses = Vec::with_capacity(mempool_txs.len());
 
         for tx in mempool_txs {
-            responses.push(NetworkMessage::Tx(Arc::new(tx)));
+            responses.push(NetworkMessage::Tx(Arc::new(tx), Vec::new()));
         }
 
         if !responses.is_empty() {

@@ -818,7 +818,7 @@ fn test_process_getdata_message() {
     match response {
         NetworkResponse::SendMessages(msgs) => {
             assert!(!msgs.is_empty());
-            assert!(matches!(msgs[0], NetworkMessage::Tx(_)));
+            assert!(matches!(msgs[0], NetworkMessage::Tx(_, _)));
         }
         _ => panic!("Expected SendMessages with Tx"),
     }
@@ -997,7 +997,7 @@ fn test_process_mempool_message() {
         NetworkResponse::SendMessages(msgs) => {
             assert_eq!(msgs.len(), 2);
             for msg in msgs {
-                assert!(matches!(msg, NetworkMessage::Tx(_)));
+                assert!(matches!(msg, NetworkMessage::Tx(_, _)));
             }
         }
         _ => panic!("Expected SendMessages with Tx"),

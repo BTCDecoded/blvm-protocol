@@ -35,7 +35,7 @@ pub fn serialize_message(message: &NetworkMessage, magic_bytes: [u8; 4]) -> Resu
         NetworkMessage::GetHeaders(gh) => ("getheaders", serialize_getheaders(gh)?),
         NetworkMessage::Headers(h) => ("headers", serialize_headers(h)?),
         NetworkMessage::Block(b, witnesses) => ("block", serialize_block_witnesses(b, witnesses)?),
-        NetworkMessage::Tx(tx) => ("tx", serialize_tx(tx)?),
+        NetworkMessage::Tx(tx, witnesses) => ("tx", serialize_tx_with_witness(tx, witnesses)?),
         NetworkMessage::Ping(p) => ("ping", serialize_ping(p)?),
         NetworkMessage::Pong(p) => ("pong", serialize_pong(p)?),
         NetworkMessage::MemPool => ("mempool", vec![]),
@@ -128,6 +128,11 @@ pub fn deserialize_message<R: Read>(
     // Read command (12 bytes, null-terminated)
     let command_bytes = &header[4..16];
     let command_len = command_bytes.iter().position(|&b| b == 0).unwrap_or(12);
+    if command_bytes[command_len..].iter().any(|&b| b != 0) {
+        return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+            Cow::Owned(format!("Non-zero command padding in {command_bytes:?}")),
+        )));
+    }
     let command = std::str::from_utf8(&command_bytes[..command_len]).map_err(|e| {
         ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
             "Invalid command: {e}"
@@ -179,7 +184,10 @@ pub fn deserialize_message<R: Read>(
             let (block, witnesses) = deserialize_block_with_witnesses_pair(&payload)?;
             NetworkMessage::Block(Arc::new(block), witnesses)
         }
-        "tx" => NetworkMessage::Tx(Arc::new(deserialize_tx(&payload)?)),
+        "tx" => {
+            let (tx, witnesses) = deserialize_tx_with_witness(&payload)?;
+            NetworkMessage::Tx(Arc::new(tx), witnesses)
+        }
         "ping" => NetworkMessage::Ping(deserialize_ping(&payload)?),
         "pong" => NetworkMessage::Pong(deserialize_pong(&payload)?),
         "mempool" => NetworkMessage::MemPool,
@@ -274,9 +282,7 @@ pub fn serialize_version(v: &crate::network::VersionMessage) -> Result<Vec<u8>> 
 
     let mut buf = Vec::new();
 
-    // version: i32 (4 bytes, little-endian)
-    // Note: VersionMessage uses u32, but protocol expects i32
-    buf.extend_from_slice(&(v.version as i32).to_le_bytes());
+    buf.extend_from_slice(&v.version.to_le_bytes());
 
     // services: u64 (8 bytes, little-endian)
     buf.extend_from_slice(&v.services.to_le_bytes());
@@ -321,7 +327,7 @@ pub fn deserialize_version(data: &[u8]) -> Result<crate::network::VersionMessage
             "Failed to read version: {e}"
         ))))
     })?;
-    let version = i32::from_le_bytes(version_bytes) as u32;
+    let version = i32::from_le_bytes(version_bytes);
 
     // services: u64 (8 bytes, little-endian)
     let mut services_bytes = [0u8; 8];
@@ -381,11 +387,8 @@ pub fn deserialize_version(data: &[u8]) -> Result<crate::network::VersionMessage
             "Failed to read user_agent: {e}"
         ))))
     })?;
-    let user_agent = String::from_utf8(user_agent_bytes).map_err(|e| {
-        ProtocolError::Consensus(ConsensusError::Serialization(Cow::Owned(format!(
-            "Invalid user_agent UTF-8: {e}"
-        ))))
-    })?;
+    // Peers send this field as raw bytes. Invalid UTF-8 must not fail the handshake.
+    let user_agent = String::from_utf8_lossy(&user_agent_bytes).into_owned();
 
     // start_height: i32 (4 bytes, little-endian)
     let mut start_height_bytes = [0u8; 4];
@@ -903,8 +906,14 @@ pub fn deserialize_headers(data: &[u8]) -> Result<crate::network::HeadersMessage
         })?;
         let nonce = u32::from_le_bytes(nonce_bytes) as u64;
 
-        // tx_count (varint, should be 0 for headers message, but we read and discard)
-        let _tx_count = read_varint(&mut cursor)?;
+        let tx_count = read_varint(&mut cursor)?;
+        if tx_count != 0 {
+            return Err(ProtocolError::Consensus(ConsensusError::Serialization(
+                Cow::Owned(format!(
+                    "Headers message transaction count must be 0, got {tx_count}"
+                )),
+            )));
+        }
 
         headers.push(crate::BlockHeader {
             version,
