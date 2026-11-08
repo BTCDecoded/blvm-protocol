@@ -208,6 +208,43 @@ fn test_deserialize_message_payload_too_large() {
 }
 
 #[test]
+fn test_verack_nonzero_padding_is_rejected() {
+    let magic = [0xf9, 0xbe, 0xb4, 0xd9];
+    let mut header = vec![0u8; MESSAGE_HEADER_SIZE];
+    header[0..4].copy_from_slice(&magic);
+    let mut cmd = [0u8; 12];
+    cmd[..6].copy_from_slice(b"verack");
+    cmd[7] = 0x01;
+    header[4..16].copy_from_slice(&cmd);
+    header[16..20].copy_from_slice(&0u32.to_le_bytes());
+    header[20..24].copy_from_slice(&calculate_checksum(&[]));
+    let result = deserialize_message(&mut Cursor::new(&header), magic);
+    let err = result.unwrap_err();
+    assert!(
+        err.to_string().contains("Non-zero command padding"),
+        "{err}"
+    );
+}
+
+#[test]
+fn test_headers_transaction_count_must_be_zero() {
+    use blvm_protocol::wire::deserialize_headers;
+    let mut payload = vec![1u8];
+    payload.extend_from_slice(&1i32.to_le_bytes());
+    payload.extend_from_slice(&[0u8; 32]);
+    payload.extend_from_slice(&[0u8; 32]);
+    payload.extend_from_slice(&0u32.to_le_bytes());
+    payload.extend_from_slice(&0u32.to_le_bytes());
+    payload.extend_from_slice(&0u32.to_le_bytes());
+    payload.push(1);
+    let err = deserialize_headers(&payload).unwrap_err();
+    assert!(
+        err.to_string().contains("transaction count must be 0"),
+        "{err}"
+    );
+}
+
+#[test]
 fn test_serialize_deserialize_roundtrip_verack() {
     let magic = [0xf9, 0xbe, 0xb4, 0xd9];
     let message = NetworkMessage::VerAck;

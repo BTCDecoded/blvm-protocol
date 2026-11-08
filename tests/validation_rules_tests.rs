@@ -176,6 +176,18 @@ fn test_script_size_validation() {
     for output in &tx.outputs {
         assert!(output.script_pubkey.len() <= context.validation_rules.max_script_size as usize);
     }
+
+    let engine = BitcoinProtocolEngine::new(ProtocolVersion::BitcoinV1).unwrap();
+    let mut oversized = create_simple_transaction();
+    oversized.inputs[0].prevout.index = 0;
+    oversized.inputs[0].script_sig = vec![0u8; 10_001];
+    let err = engine
+        .validate_transaction_with_protocol(&oversized, &context)
+        .unwrap_err();
+    assert!(
+        err.to_string().contains("Script size exceeds maximum"),
+        "{err}"
+    );
 }
 
 // ============================================================================

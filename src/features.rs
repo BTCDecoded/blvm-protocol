@@ -137,20 +137,18 @@ impl FeatureRegistry {
                     activation_method: ActivationMethod::BIP9,
                     bip_number: Some(119),
                 },
-                // CSV (CheckSequenceVerify) - Always active
                 FeatureActivation {
                     feature_name: "csv".to_string(),
-                    activation_height: Some(0),
+                    activation_height: Some(blvm_consensus::BIP112_CSV_ACTIVATION_MAINNET),
                     activation_timestamp: None,
-                    activation_method: ActivationMethod::AlwaysActive,
+                    activation_method: ActivationMethod::HeightBased,
                     bip_number: Some(112),
                 },
-                // CLTV (CheckLockTimeVerify) - Always active
                 FeatureActivation {
                     feature_name: "cltv".to_string(),
-                    activation_height: Some(0),
+                    activation_height: Some(blvm_consensus::BIP65_ACTIVATION_MAINNET),
                     activation_timestamp: None,
-                    activation_method: ActivationMethod::AlwaysActive,
+                    activation_method: ActivationMethod::HeightBased,
                     bip_number: Some(65),
                 },
             ],
@@ -162,19 +160,17 @@ impl FeatureRegistry {
         Self {
             protocol_version: ProtocolVersion::Testnet3,
             features: vec![
-                // SegWit activated earlier on testnet
                 FeatureActivation {
                     feature_name: "segwit".to_string(),
-                    activation_height: Some(465_600), // Earlier on testnet
-                    activation_timestamp: Some(1493596800), // May 1, 2017
+                    activation_height: Some(blvm_consensus::SEGWIT_ACTIVATION_TESTNET),
+                    activation_timestamp: Some(1493596800),
                     activation_method: ActivationMethod::BIP9,
                     bip_number: Some(141),
                 },
-                // Taproot activated earlier on testnet
                 FeatureActivation {
                     feature_name: "taproot".to_string(),
-                    activation_height: Some(2_016_000), // Earlier on testnet
-                    activation_timestamp: Some(1628640000), // Aug 11, 2021
+                    activation_height: Some(blvm_consensus::TAPROOT_ACTIVATION_TESTNET),
+                    activation_timestamp: Some(1628640000),
                     activation_method: ActivationMethod::BIP9,
                     bip_number: Some(341),
                 },
@@ -186,20 +182,18 @@ impl FeatureRegistry {
                     activation_method: ActivationMethod::AlwaysActive,
                     bip_number: Some(125),
                 },
-                // CSV - Always active
                 FeatureActivation {
                     feature_name: "csv".to_string(),
-                    activation_height: Some(0),
+                    activation_height: Some(blvm_consensus::BIP112_CSV_ACTIVATION_TESTNET),
                     activation_timestamp: None,
-                    activation_method: ActivationMethod::AlwaysActive,
+                    activation_method: ActivationMethod::HeightBased,
                     bip_number: Some(112),
                 },
-                // CLTV - Always active
                 FeatureActivation {
                     feature_name: "cltv".to_string(),
-                    activation_height: Some(0),
+                    activation_height: Some(blvm_consensus::BIP65_ACTIVATION_TESTNET),
                     activation_timestamp: None,
-                    activation_method: ActivationMethod::AlwaysActive,
+                    activation_method: ActivationMethod::HeightBased,
                     bip_number: Some(65),
                 },
             ],
@@ -495,10 +489,19 @@ mod tests {
     fn test_always_active_features() {
         let registry = FeatureRegistry::mainnet();
 
-        // RBF, CSV, CLTV should always be active
         assert!(registry.is_feature_active("rbf", 0, 1231006505));
-        assert!(registry.is_feature_active("csv", 0, 1231006505));
-        assert!(registry.is_feature_active("cltv", 0, 1231006505));
+        assert!(!registry.is_feature_active("csv", 0, 1231006505));
+        assert!(registry.is_feature_active(
+            "csv",
+            blvm_consensus::BIP112_CSV_ACTIVATION_MAINNET,
+            1231006505
+        ));
+        assert!(!registry.is_feature_active("cltv", 0, 1231006505));
+        assert!(registry.is_feature_active(
+            "cltv",
+            blvm_consensus::BIP65_ACTIVATION_MAINNET,
+            1231006505
+        ));
         assert!(registry.is_feature_active("rbf", 1_000_000, 2000000000));
     }
 
@@ -517,10 +520,17 @@ mod tests {
     fn test_testnet_earlier_activations() {
         let registry = FeatureRegistry::testnet();
 
-        // SegWit activated earlier on testnet
-        assert!(!registry.is_feature_active("segwit", 465_599, 1493596000));
-        assert!(registry.is_feature_active("segwit", 465_600, 1493596800));
-        assert!(registry.is_feature_active("segwit", 500_000, 1500000000));
+        assert!(!registry.is_feature_active("segwit", 500_000, 1500000000));
+        assert!(registry.is_feature_active(
+            "segwit",
+            blvm_consensus::SEGWIT_ACTIVATION_TESTNET,
+            1500000000
+        ));
+        assert!(!registry.is_feature_active(
+            "segwit",
+            blvm_consensus::SEGWIT_ACTIVATION_TESTNET - 1,
+            1500000000
+        ));
     }
 
     #[test]
