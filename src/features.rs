@@ -639,11 +639,11 @@ mod tests {
     fn test_feature_context_active_features() {
         let registry = FeatureRegistry::mainnet();
 
-        // Before any activations
+        // Genesis: RBF is policy from height 0. CSV and CLTV wait for their heights.
         let ctx_before = registry.create_context(0, 1231006505);
         let active = ctx_before.active_features();
-        assert!(active.contains(&"csv"));
-        assert!(active.contains(&"cltv"));
+        assert!(!active.contains(&"csv"));
+        assert!(!active.contains(&"cltv"));
         assert!(active.contains(&"rbf"));
         assert!(!active.contains(&"segwit"));
         assert!(!active.contains(&"taproot"));
