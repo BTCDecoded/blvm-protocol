@@ -1342,7 +1342,10 @@ fn begin_pending_compact(
             let id = crate::bip152::short_tx_id(&msg.header, &preimage, msg.nonce);
             if &id == short_id {
                 hits += 1;
-                found = Some((tx.clone(), stacks_for_reconstructed_slot(version, witnesses)));
+                found = Some((
+                    tx.clone(),
+                    stacks_for_reconstructed_slot(version, witnesses),
+                ));
             }
         }
         if hits == 1 {

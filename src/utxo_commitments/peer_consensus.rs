@@ -402,7 +402,10 @@ impl PeerConsensus {
     /// 1. Block header chain is valid (PoW verification)
     /// 2. Commitment supply matches expected supply at height
     /// 3. Commitment block hash matches actual block hash
-    #[cfg_attr(feature = "spec-lock", spec_locked("11.4", "VerifyConsensusCommitment"))]
+    #[cfg_attr(
+        feature = "spec-lock",
+        spec_locked("11.4", "VerifyConsensusCommitment")
+    )]
     #[cfg_attr(feature = "spec-lock", blvm_spec_lock::ensures(header_chain.len() > 0 || result.is_err()))]
     pub fn verify_consensus_commitment(
         &self,

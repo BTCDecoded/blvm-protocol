@@ -611,10 +611,7 @@ pub struct TcpFramedParser;
 impl TcpFramedParser {
     /// Parse a raw message into a protocol message
     /// Orange Paper 10.1.1: ParseMessage, size bounds, checksum rejection
-    #[cfg_attr(
-        feature = "spec-lock",
-        spec_locked("10.1.1", "ParseMessage")
-    )]
+    #[cfg_attr(feature = "spec-lock", spec_locked("10.1.1", "ParseMessage"))]
     #[cfg_attr(
         feature = "spec-lock",
         blvm_spec_lock::ensures(data.len() >= 24 || result.is_err())
@@ -642,7 +639,7 @@ impl TcpFramedParser {
             crate::p2p_frame::parse_p2p_frame(data, BITCOIN_P2P_MAGIC_MAINNET_LE, |c| {
                 allowed_commands.contains(&c)
             })
-            .map_err(|e| anyhow::anyhow!("{}", e))?;
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
 
         debug!("Message command: '{}', data_len={}", command, data.len());
 
@@ -671,7 +668,7 @@ impl TcpFramedParser {
             cmd::PING => {
                 // Use proper Bitcoin wire format (8-byte nonce)
                 let wire_msg = crate::wire::deserialize_ping(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize ping: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize ping: {e}"))?;
                 Ok(ProtocolMessage::Ping(PingMessage {
                     nonce: wire_msg.nonce,
                 }))
@@ -679,56 +676,56 @@ impl TcpFramedParser {
             cmd::PONG => {
                 // Use proper Bitcoin wire format (8-byte nonce)
                 let wire_msg = crate::wire::deserialize_pong(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize pong: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize pong: {e}"))?;
                 Ok(ProtocolMessage::Pong(PongMessage {
                     nonce: wire_msg.nonce,
                 }))
             }
             cmd::GETHEADERS => {
                 let wire_msg = deserialize_getheaders(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize getheaders: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize getheaders: {e}"))?;
                 Ok(ProtocolMessage::GetHeaders(wire_msg))
             }
             cmd::HEADERS => {
                 let wire_msg = deserialize_headers(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize headers: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize headers: {e}"))?;
                 Ok(ProtocolMessage::Headers(wire_msg))
             }
             cmd::GETBLOCKS => {
                 let wire_msg = deserialize_getblocks(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize getblocks: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize getblocks: {e}"))?;
                 Ok(ProtocolMessage::GetBlocks(wire_msg))
             }
             cmd::BLOCK => {
                 // Use consensus wire format (Bitcoin block + witness structure)
                 let (block, witnesses) =
                     crate::serialization::deserialize_block_with_witnesses(payload)
-                        .map_err(|e| anyhow::anyhow!("Failed to deserialize block: {}", e))?;
+                        .map_err(|e| anyhow::anyhow!("Failed to deserialize block: {e}"))?;
                 Ok(ProtocolMessage::Block(BlockMessage { block, witnesses }))
             }
             cmd::GETDATA => {
                 let msg = deserialize_getdata(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize getdata: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize getdata: {e}"))?;
                 Ok(ProtocolMessage::GetData(msg))
             }
             cmd::INV => {
                 let msg = deserialize_inv(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize inv: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize inv: {e}"))?;
                 Ok(ProtocolMessage::Inv(msg))
             }
             cmd::NOTFOUND => {
                 let msg = deserialize_notfound(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize notfound: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize notfound: {e}"))?;
                 Ok(ProtocolMessage::NotFound(msg))
             }
             cmd::REJECT => {
                 let msg = deserialize_reject(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize reject: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize reject: {e}"))?;
                 Ok(ProtocolMessage::Reject(msg))
             }
             cmd::TX => {
                 let (transaction, witnesses) = deserialize_tx_with_witness(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize tx: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize tx: {e}"))?;
                 Ok(ProtocolMessage::Tx(TxMessage {
                     transaction,
                     witnesses,
@@ -737,18 +734,18 @@ impl TcpFramedParser {
             cmd::MEMPOOL => Ok(ProtocolMessage::MemPool),
             cmd::FEEFILTER => {
                 let msg = deserialize_feefilter(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize feefilter: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize feefilter: {e}"))?;
                 Ok(ProtocolMessage::FeeFilter(msg))
             }
             // Compact Block Relay (BIP152)
             cmd::SENDCMPCT => {
                 let msg = deserialize_sendcmpct(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize sendcmpct: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize sendcmpct: {e}"))?;
                 Ok(ProtocolMessage::SendCmpct(msg))
             }
             cmd::CMPCTBLOCK => {
                 let wire_msg = deserialize_cmpctblock(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize cmpctblock: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize cmpctblock: {e}"))?;
                 let compact_block = crate::bip152::CompactBlock::from(&wire_msg);
                 Ok(ProtocolMessage::CmpctBlock(CompactBlockMessage {
                     compact_block,
@@ -756,12 +753,12 @@ impl TcpFramedParser {
             }
             cmd::GETBLOCKTXN => {
                 let wire_msg = crate::wire::deserialize_getblocktxn(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize getblocktxn: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize getblocktxn: {e}"))?;
                 Ok(ProtocolMessage::GetBlockTxn(wire_msg))
             }
             cmd::BLOCKTXN => {
                 let wire_msg = crate::wire::deserialize_blocktxn(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize blocktxn: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize blocktxn: {e}"))?;
                 Ok(ProtocolMessage::BlockTxn(wire_msg))
             }
             // UTXO commitment protocol extensions
@@ -816,12 +813,12 @@ impl TcpFramedParser {
             cmd::GETADDR => Ok(ProtocolMessage::GetAddr),
             cmd::ADDR => {
                 let wire_msg = crate::wire::deserialize_addr(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize addr: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize addr: {e}"))?;
                 Ok(ProtocolMessage::Addr(wire_msg))
             }
             cmd::ADDRV2 => {
                 let wire_msg = deserialize_addrv2(payload)
-                    .map_err(|e| anyhow::anyhow!("Failed to deserialize addrv2: {}", e))?;
+                    .map_err(|e| anyhow::anyhow!("Failed to deserialize addrv2: {e}"))?;
                 Ok(ProtocolMessage::AddrV2(wire_msg))
             }
             // Module Registry
@@ -848,7 +845,7 @@ impl TcpFramedParser {
             cmd::REQSKT => Ok(ProtocolMessage::ReqSkt(bincode::deserialize(payload)?)),
             #[cfg(feature = "erlay")]
             cmd::SKETCH => Ok(ProtocolMessage::Sketch(bincode::deserialize(payload)?)),
-            _ => Err(anyhow::anyhow!("Unknown command: {}", command)),
+            _ => Err(anyhow::anyhow!("Unknown command: {command}")),
         }
     }
 
@@ -882,23 +879,23 @@ impl TcpFramedParser {
             ProtocolMessage::SendHeaders => (cmd::SENDHEADERS, vec![]),
             ProtocolMessage::Ping(msg) => (
                 cmd::PING,
-                crate::wire::serialize_ping(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                crate::wire::serialize_ping(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::Pong(msg) => (
                 cmd::PONG,
-                crate::wire::serialize_pong(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                crate::wire::serialize_pong(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::GetHeaders(msg) => (
                 cmd::GETHEADERS,
-                serialize_getheaders(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                serialize_getheaders(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::Headers(msg) => (
                 cmd::HEADERS,
-                crate::wire::serialize_headers(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                crate::wire::serialize_headers(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::GetBlocks(msg) => (
                 cmd::GETBLOCKS,
-                serialize_getblocks(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                serialize_getblocks(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::Block(msg) => {
                 // Must match `parse_message` cmd::BLOCK: consensus block+witness wire bytes, not bincode.
@@ -911,50 +908,50 @@ impl TcpFramedParser {
             }
             ProtocolMessage::GetData(msg) => (
                 cmd::GETDATA,
-                serialize_getdata(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                serialize_getdata(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::Inv(msg) => (
                 cmd::INV,
-                serialize_inv(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                serialize_inv(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::NotFound(msg) => (
                 cmd::NOTFOUND,
-                serialize_notfound(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                serialize_notfound(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::Reject(msg) => (
                 cmd::REJECT,
-                serialize_reject(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                serialize_reject(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::Tx(msg) => (
                 cmd::TX,
                 serialize_tx_with_witness(&msg.transaction, &msg.witnesses)
-                    .map_err(|e| anyhow::anyhow!("{}", e))?,
+                    .map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::FeeFilter(msg) => (
                 cmd::FEEFILTER,
-                serialize_feefilter(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                serialize_feefilter(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::MemPool => (cmd::MEMPOOL, vec![]),
             // Compact Block Relay (BIP152)
             ProtocolMessage::SendCmpct(msg) => (
                 cmd::SENDCMPCT,
-                serialize_sendcmpct(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                serialize_sendcmpct(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::CmpctBlock(msg) => {
                 use crate::network::CmpctBlockMessage;
                 let wire_msg = CmpctBlockMessage::try_from(msg.compact_block.clone())
-                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+                    .map_err(|e| anyhow::anyhow!("{e}"))?;
                 let payload =
-                    serialize_cmpctblock(&wire_msg).map_err(|e| anyhow::anyhow!("{}", e))?;
+                    serialize_cmpctblock(&wire_msg).map_err(|e| anyhow::anyhow!("{e}"))?;
                 (cmd::CMPCTBLOCK, payload)
             }
             ProtocolMessage::GetBlockTxn(msg) => (
                 cmd::GETBLOCKTXN,
-                crate::wire::serialize_getblocktxn(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                crate::wire::serialize_getblocktxn(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::BlockTxn(msg) => (
                 cmd::BLOCKTXN,
-                crate::wire::serialize_blocktxn(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                crate::wire::serialize_blocktxn(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             // UTXO commitment protocol extensions
             ProtocolMessage::GetUTXOSet(msg) => (cmd::GETUTXOSET, bincode::serialize(msg)?),
@@ -996,11 +993,11 @@ impl TcpFramedParser {
             ProtocolMessage::GetAddr => (cmd::GETADDR, vec![]),
             ProtocolMessage::Addr(msg) => (
                 cmd::ADDR,
-                crate::wire::serialize_addr(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                crate::wire::serialize_addr(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             ProtocolMessage::AddrV2(msg) => (
                 cmd::ADDRV2,
-                serialize_addrv2(msg).map_err(|e| anyhow::anyhow!("{}", e))?,
+                serialize_addrv2(msg).map_err(|e| anyhow::anyhow!("{e}"))?,
             ),
             // Module Registry
             ProtocolMessage::GetModule(msg) => (cmd::GETMODULE, bincode::serialize(msg)?),
@@ -1026,17 +1023,14 @@ impl TcpFramedParser {
         };
 
         crate::p2p_frame::build_p2p_frame(BITCOIN_MAGIC_MAINNET, command, &payload)
-            .map_err(|e| anyhow::anyhow!("{}", e))
+            .map_err(|e| anyhow::anyhow!("{e}"))
     }
 
     /// Calculate message checksum
     ///
     /// Computes double SHA256 of payload and returns first 4 bytes.
     /// Orange Paper 10.1.1: CalculateChecksum, |result| = 4
-    #[cfg_attr(
-        feature = "spec-lock",
-        spec_locked("10.1.1", "CalculateChecksum")
-    )]
+    #[cfg_attr(feature = "spec-lock", spec_locked("10.1.1", "CalculateChecksum"))]
     #[cfg_attr(
         feature = "spec-lock",
         blvm_spec_lock::ensures(result.len() == 4)
