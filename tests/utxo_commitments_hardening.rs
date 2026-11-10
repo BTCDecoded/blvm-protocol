@@ -181,7 +181,8 @@ mod tests {
             transactions: transactions.into(),
         };
 
-        let witnesses: Vec<Vec<Witness>> = vec![Vec::new()];
+        // One empty stack for the coinbase input. Zero stacks is a mismatched row.
+        let witnesses: Vec<Vec<Witness>> = vec![vec![Witness::new()]];
         let ctx = BlockValidationContext::for_network(Network::Mainnet);
         let utxo_set = UtxoSet::default();
 
