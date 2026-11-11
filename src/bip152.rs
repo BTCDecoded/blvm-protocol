@@ -32,19 +32,30 @@ pub fn siphash24(k0: u64, k1: u64, data: &[u8]) -> u64 {
     hasher.finish()
 }
 
-/// BIP152 short id: SipHash-2-4 of the wtxid, keyed by SHA256(header || nonce).
-pub fn short_tx_id(header: &BlockHeader, wtxid: &crate::Hash, nonce: u64) -> ShortTxId {
+/// SipHash keys for one compact block: SHA256(header || nonce).
+pub fn short_id_keys(header: &BlockHeader, nonce: u64) -> (u64, u64) {
     use sha2::{Digest, Sha256};
     let mut data = crate::serialization::serialize_block_header(header);
     data.extend_from_slice(&nonce.to_le_bytes());
     let hash = Sha256::digest(&data);
     let k0 = u64::from_le_bytes(hash[0..8].try_into().expect("8"));
     let k1 = u64::from_le_bytes(hash[8..16].try_into().expect("8"));
+    (k0, k1)
+}
+
+/// BIP152 short id from keys already derived for this header and nonce.
+pub fn short_tx_id_with_keys(k0: u64, k1: u64, wtxid: &crate::Hash) -> ShortTxId {
     let digest = siphash24(k0, k1, wtxid);
     let bytes = digest.to_le_bytes();
     let mut short = [0u8; 6];
     short.copy_from_slice(&bytes[..6]);
     short
+}
+
+/// BIP152 short id: SipHash-2-4 of the wtxid, keyed by SHA256(header || nonce).
+pub fn short_tx_id(header: &BlockHeader, wtxid: &crate::Hash, nonce: u64) -> ShortTxId {
+    let (k0, k1) = short_id_keys(header, nonce);
+    short_tx_id_with_keys(k0, k1, wtxid)
 }
 
 #[cfg(test)]

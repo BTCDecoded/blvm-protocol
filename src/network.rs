@@ -1324,6 +1324,20 @@ fn begin_pending_compact(
         slots[index] = Some((item.tx.clone(), item.witness.clone().unwrap_or_default()));
     }
 
+    let (k0, k1) = crate::bip152::short_id_keys(&msg.header, msg.nonce);
+    let mut mempool_by_short_id: std::collections::HashMap<
+        crate::bip152::ShortTxId,
+        Vec<(Transaction, Vec<blvm_consensus::segwit::Witness>)>,
+    > = std::collections::HashMap::with_capacity(mempool.len());
+    for (tx, witnesses) in mempool {
+        let preimage = short_id_preimage(tx, witnesses, version);
+        let id = crate::bip152::short_tx_id_with_keys(k0, k1, &preimage);
+        mempool_by_short_id.entry(id).or_default().push((
+            tx.clone(),
+            stacks_for_reconstructed_slot(version, witnesses),
+        ));
+    }
+
     let mut missing = Vec::new();
     let mut next = 0usize;
     for short_id in &msg.short_ids {
@@ -1335,23 +1349,13 @@ fn begin_pending_compact(
         if block_index >= n {
             return Err("compact block short ids ran past the transaction list".into());
         }
-        let mut found: Option<(Transaction, Vec<blvm_consensus::segwit::Witness>)> = None;
-        let mut hits = 0usize;
-        for (tx, witnesses) in mempool {
-            let preimage = short_id_preimage(tx, witnesses, version);
-            let id = crate::bip152::short_tx_id(&msg.header, &preimage, msg.nonce);
-            if &id == short_id {
-                hits += 1;
-                found = Some((
-                    tx.clone(),
-                    stacks_for_reconstructed_slot(version, witnesses),
-                ));
+        match mempool_by_short_id.get(short_id).map(Vec::len) {
+            Some(1) => {
+                slots[block_index] = mempool_by_short_id
+                    .get(short_id)
+                    .and_then(|hits| hits.first().cloned());
             }
-        }
-        if hits == 1 {
-            slots[block_index] = found;
-        } else {
-            missing.push((block_index, *short_id));
+            _ => missing.push((block_index, *short_id)),
         }
     }
     Ok(PendingCompact {
