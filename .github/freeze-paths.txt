@@ -1,0 +1,7 @@
+# Consensus parameters and validation helpers that live in the protocol crate.
+src/validation.rs
+src/validation_tests.rs
+src/genesis.rs
+src/economic.rs
+src/network_params.rs
+src/utxo_commitments/
