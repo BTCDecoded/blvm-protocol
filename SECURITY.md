@@ -37,11 +37,13 @@ These are targets, not a claim about past performance. The advisory record is th
 | Step | Target |
 | --- | --- |
 | Acknowledgement | 2 days |
-| Triage, including a severity label from `docs/security/SEVERITY.md` | 7 days |
+| Triage, with a severity label | 7 days |
 | Fix for consensus, remote crash, or memory safety | 14 days after triage |
 | Fix for resource exhaustion | 30 days after triage |
 | Fix for local-only and informational | 90 days after triage |
 | Disclosure | When the fix is in a release, or sooner if the bug is being exploited. The default embargo after a fix is released is none: the release is the disclosure. A reporter can ask for a coordinated date up to 90 days after the fix. |
+
+Severity labels, tied to node impact: chain split or consensus divergence, remote crash, resource exhaustion, local-only, and informational.
 
 ## Embargo and credit
 
@@ -49,12 +51,49 @@ We keep the report private until the fix is released, unless the bug is already 
 
 ## Advisories
 
-The append-only record is `docs/security/advisories/`. One OSV JSON file per id. A correction is a new id that references the old one. Do not edit a published file. The index is `INDEX.md`. The public counts are `docs/security/METRICS.md`.
+The append-only record is one OSV JSON file per advisory id, plus a generated index. A correction is a new id that references the old one. Do not edit a published file. Public counts are generated from that record.
 
-Advisory files are signed the same way release tags are signed, once a signing key exists. They are unsigned in this tree. `scripts/release/sign-release.sh` exits 2 until `user.signingkey` is set.
+Advisory files are signed with the same key as release tags, once a signing key exists. They are unsigned until that key is configured.
 
-Dependency advisories that affect a shipped build get an entry in the same directory. `cargo audit` and `cargo deny` run in CI. Ignore entries belong in `.cargo/audit.toml` with a reason, not only in a workflow flag.
+Dependency advisories that affect a shipped build get an entry in the same record. `cargo audit` and `cargo deny` run in CI. Ignore entries belong in `.cargo/audit.toml` with a reason, not only in a workflow flag.
 
 ## Supported versions
 
 Security fixes target the current beta line once `0.2.0-beta.1` is published. Until that tag exists, the supported line is the highest published `0.1.x` tag of the affected crate. Older `0.1` tags are not maintained as a second line.
+
+The reporting policy above is the one in force. Older timelines, bounty language, and an "all 0.1.x supported" table are not restored. The notes below are this repository's existing boundary text.
+
+### Critical (P0)
+- Protocol variant confusion attacks
+- Network parameter manipulation
+- Validation rule bypasses
+- Genesis block spoofing
+- Magic number conflicts
+
+#### High (P1)
+- Denial of service through protocol parameters
+- Resource exhaustion via network constants
+- Input validation bypasses
+- Logic errors in protocol selection
+
+#
+
+### Security Considerations
+
+#### Protocol Abstraction
+- All protocol variants must be clearly separated
+- No cross-contamination between networks
+- Network parameters must be immutable
+- Protocol selection must be secure
+
+#### Network Parameters
+- Magic bytes must be unique per network
+- Genesis blocks must be cryptographically verified
+- Network constants must be tamper-proof
+- Protocol versions must be clearly defined
+
+#### Validation Rules
+- Protocol-specific rules must be enforced
+- No rule bypassing through protocol switching
+- All validation must be deterministic
+- Edge cases must be handled correctly
