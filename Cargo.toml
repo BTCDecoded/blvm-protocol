@@ -53,7 +53,8 @@ bech32 = "=0.9"
 
 # UTXO commitments (sparse merkle tree, randomness)
 sparse-merkle-tree = { version = "=0.6", optional = true }
-rand = { version = "=0.8.5", optional = true }
+# 0.8.6 is the patched 0.8 release for RUSTSEC-2026-0097.
+rand = { version = "=0.8.6", optional = true }
 # LruCache for spam filter script type cache (production)
 lru = { version = "=0.18.5", optional = true }
 # Rayon for parallel UTXO proof verification
